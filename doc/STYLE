@@ -1,0 +1,12 @@
+Directories:
+
+- `applications`: Specific application implementations
+- `core`: Core definitions and interfaces for simulation entities
+- `doc`: All documnetation files
+- `links`: Link implementations
+- `nodes`: Specialised node implementations
+- `protocols`: Specific Network Protocol implementations
+- `routing`: Specific Routing Protocol implementations
+- `tests`: FIles to run simulation tests
+
+Packages:

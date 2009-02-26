@@ -1,0 +1,73 @@
+This is the Lisp Educational Network Simulator (LENS).
+It is Copyright 2007 Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
+
+LENS is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+LENS is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+for more details.
+
+You should have received a copy of the GNU General Public License
+along with LENS.  If not, see <http://www.gnu.org/licenses/>.
+
+LENS provides a Common Lisp environment for network simulations.  It
+includes a set of packages, classes and libraries to represent network
+elements and protocols. Simulations may be configured and run
+interactively in the :lens-user package which includes a number of
+procedures to assist you in setting up your simulation and analysing
+the results.
+
+The architecture is based on that of the Georgia Tech Network
+Simulator (GTNetS) which was written in C++ and NS-2 written in C++
+and Tcl, however, where possible, advantage has been taken of the
+features of Common Lisp to simplify and provide higher level
+abstractions than is the case for network simulators written in lowert
+level or mixed languages. Additionally Common Lisp provides an
+interactive environment with complete object introspection and accesss
+to the programming language itself making it easier to do explorative
+simulations and simulation development. In LENS the simulations are
+run in a separate thread to the normal Common Lisp read-eval loop so
+the user can probe or modify the simulation even while it is running.
+
+It is hoped that LENS will be easier to develop for than other network
+simulators and will be more suitable as a tool for teaching network
+principles.
+
+LENS has been developed using the SBCL <http://sbcl.sourceforge.net/>
+Common Lisp implementation. Implementation specific features are
+accessed through a thin compatibility layer in
+`core/compatibility.lisp` which is the only file that should need
+changed to port it to other implementations. Currently the only
+implementation feature used is threading so porting is a minimal
+task. If you do port LENS to another implementation please send me the
+changes to encorporate back into the main distribution.
+
+LENS is dependant on the following additional Common Lisp libraries
+
+asdf: <http://www.cliki.net/asdf>
+split-sequence: <http://www.cliki.net/SPLIT-SEQUENCE>
+trivial-gray-streams: http://www.cliki.net/trivial-gray-streams
+
+The file `lens.asd` provides the asdf system definition for LENS. You
+should place a symbolic link to this file in a system definition
+directory searched by asdf. Then in the Common Lisp environment
+
+  (asdf:operate 'asdf:compile-op :lens)
+  (asdf:operate 'asdf:load-op :lens)
+  (in-package :lens-user)
+
+will compile and load LENS and put you into the :lens-user package to
+build your simulation.
+
+Development releases of LENS will be made available
+at http://www.jarw.org.uk/lisp/lens/
+
+If you wish to aid in the development it is recommended you use the 
+GIT version control system and clone the release using
+
+git clone http://www.jarw.org.uk/lisp/lens/
+
