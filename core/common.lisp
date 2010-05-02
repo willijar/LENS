@@ -154,7 +154,8 @@ which returns the single instance of it."
                                             (fill-pointer v)))))
       ;; note we copy all elements - even those past the fill pointer
       (do((i 0 (1+ i)))
-         ((= i (array-total-size v)))
+         ((= i (array-total-size v))
+          copy)
         (setf (aref copy i) (copy (aref v i)))))))
 
 (defun copy-with-slots(original slots)

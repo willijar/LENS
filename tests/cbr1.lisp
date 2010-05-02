@@ -35,7 +35,7 @@
    :node (node 5)
    :delay-statistics (make-instance 'average-min-max)
    :bandwidth-statistics (make-instance 'average-min-max)
-   :port 20000))
+   :local-port 20000))
 
 (start src)
 (start sink)
