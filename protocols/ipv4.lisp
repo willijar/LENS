@@ -89,7 +89,7 @@ node to communicate with each other."))
 (defmethod default-trace-detail((entity ipv4))
   '(ttl layer4:protocol-number src-address dst-address))
 
-(defmethod data-request((ipv4 ipv4) node packet
+(defmethod send((ipv4 ipv4) node packet
                         &rest args
                         &key src-address dst-address (ttl 64)
                         protocol-number (tos 0)
@@ -113,7 +113,7 @@ node to communicate with each other."))
          ((and (route-locally ipv4) (local-ipaddr-p dst-address node))
           ;; do local routing - send packet back up stack
           (write-trace node ipv4 iphdr nil :packet packet :text "-")
-          (data-indication ipv4 (find-interface ipv4 node dst-address) packet))
+          (receive ipv4 (find-interface ipv4 node dst-address) packet))
          (t ;; send packet over interface
           (let ((routing-entry (find-route dst-address node packet)))
             (setf (src-address iphdr)
@@ -131,13 +131,13 @@ node to communicate with each other."))
   (:method(option interface packet)
     (error "Unknown IP option ~S" option)))
 
-(defmethod data-indication((ipv4 ipv4) interface packet)
+(defmethod receive((ipv4 ipv4) interface packet)
   "ipv4 data arrival"
   (let ((node (node interface)))
     (unless (node:call-callbacks
              (layer ipv4) (protocol-number ipv4)
              :rx packet node interface)
-      (return-from data-indication))
+      (return-from receive))
     (let* ((iphdr (peek-pdu packet))
            (dst-address (dst-address iphdr))
            (route (find-route dst-address node packet)))
@@ -156,7 +156,7 @@ node to communicate with each other."))
                          4 (layer4:protocol-number iphdr) node)))
            (unless l4demux
              (error "IPV4 indication with no l4demux object"))
-           (layer4:data-indication
+           (layer4:receive
             l4demux node packet (dst-address iphdr) interface)))
         ((zerop (decf (ttl iphdr)))
          ;; TTL expired - drop, log and notify ICMP
@@ -218,7 +218,7 @@ the specified src address."
   ()
   (:documentation "Base class for TCP or UDP demux"))
 
-(defmethod layer4:data-indication((demux ipv4-demux)
+(defmethod layer4:receive((demux ipv4-demux)
                                   node packet dst-address
                                   interface)
   (when (node:call-callbacks
@@ -230,7 +230,7 @@ the specified src address."
                                  :local-port (dst-port pdu))))
       (cond
         (layer4protocol
-         (layer4:data-indication
+         (layer4:receive
           layer4protocol node packet dst-address interface))
         (t ; no port - log and discard
          (write-trace node (ipv4)

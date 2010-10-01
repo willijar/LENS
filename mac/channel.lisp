@@ -18,7 +18,66 @@
 
 (in-package :interface)
 
-;; this corresponsd to interface and interface-real in GTNetS
+(defclass channel()
+  ((index :initarg :index :initform nil :reader index
+          :documentation "Index for multichannel support")
+   (interfaces :type list :accessor interfaces :initform nil
+               :initarg :interfaces
+               :documentation "List of interfaces connected to this channel")
+   (max-delay :type real :reader max-delay :initform max-delay :initform 0
+          :documentation "Delay for collision interval"))
+  (:documentation "A shared medium that supports contention and
+        collision This class is used to represent the physical media
+        to which network interfaces are attached."))
+
+(defgeneric channel-propagation-delay(channel tnode rnode)
+  (:documentation "Return the propagation delay between 2 nodes on a channel")
+  (:method(channel tnode rnode)
+    (declare (ignore tnode rnode))
+    (max-delay channel)))
+
+(defmethod receive((channel channel) packet &optional tinterface)
+  (send channel packet interface))
+
+(defmethod send((channel channel) packet interface &optional dummy)
+  (let ((tnode (node interface)))
+    (dolist(rinterface (interfaces channel))
+      (unless (equal rinterface tinterface)
+        (schedule (channel-propagation-delay channel tnode (node rinterface))
+                  (list #'receive rinterface (copy packet)))))))
+
+(defclass physical-interface()
+  ((node :initarg :node :type node :accessor node
+         :documentation "Associated node")
+   (uptarget :initarg :uptarget :accessor uptarget
+             :Documentation "Up target to receive packets")
+   (link :initarg :link :type link :accessor link
+         :documentation "Associated link head")
+   (bandwidth :type real :initform 10e6 :initarg :bandwidth :reader bandwidth
+              :documentation "bit rate")
+   (channel :type channel :reader channel :initarg :channel
+            :documentation "Channel for output")))
+
+(defgeneric transmission-time(interface packet)
+  (:documentation "TRansmission time on a channel")
+  (:method(interface (size real))
+    (/ size (bandwidth interface)))
+  (:method(interface (packet packet))
+    (/ (size packet) (bandwidth interface))))
+
+(defmethod receive((interface physical-interface) packet &optional dummy)
+  "Received from channel - send up"
+  (receive (uptarget interface) packet dummy))
+
+(defmethod send((interface physical-interface) packet dummy &optional dummy)
+  (send (channel interface) packet dummy))
+
+
+
+
+
+
+
 
 (defclass interface(timers-manager)
   ((node :initarg :node :type node :accessor node

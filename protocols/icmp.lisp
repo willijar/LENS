@@ -113,7 +113,7 @@
 (defun add-callback(node application)
   (pushnew application  (gethash node (callbacks (icmp)))))
 
-(defmethod data-indication((protocol icmp) (node node) (packet packet)
+(defmethod receive((protocol icmp) (node node) (packet packet)
                            (dst-address ipaddr) interface)
   (declare (ignore interface))
   (when (enabled-p node)
@@ -145,7 +145,7 @@
       (when l4pdu (push-pdu (copy l4pdu) packet))
       (push-pdu icmp packet)
       (write-trace node (icmp) icmp nil :packet packet :text "-")
-      (layer3:data-request (ipv4) node packet
+      (layer3:send (ipv4) node packet
                            :src (src-address ipv4-header)
                            :dst (src-address ipv4-header)
                            :proto (protocol-number (icmp))))))
@@ -159,7 +159,7 @@
                                :code code)))
       (push-pdu icmp packet)
       (write-trace node (icmp) icmp nil :packet packet :text "-")
-      (layer3:data-request (ipv4) node packet
+      (layer3:send (ipv4) node packet
                            :src (src-address ipv4-header)
                            :dst nil
                            :proto (protocol-number (icmp))))))
@@ -172,7 +172,7 @@
       (setf (icmp-type icmp) :echo-reply)
       (push-pdu icmp packet)
       (write-trace node (icmp) icmp nil :packet packet :text "-")
-      (layer3:data-request (ipv4) node packet
+      (layer3:send (ipv4) node packet
                            :src (src-address ipv4-header)
                            :dst nil
                            :proto (protocol-number (icmp))))))
@@ -183,7 +183,7 @@
       (setf (icmp-type icmp) :echo)
       (push-pdu icmp packet)
       (write-trace node (icmp) icmp nil :packet packet :text "-")
-      (layer3:data-request (ipv4) node packet
+      (layer3:send (ipv4) node packet
                            :src dst
                            :proto (protocol-number (icmp))))))
 
@@ -193,7 +193,7 @@
       (setf (icmp-type icmp) :timestamp)
       (push-pdu icmp packet)
       (write-trace node (icmp) icmp nil :packet packet :text "-")
-      (layer3:data-request (ipv4) node packet
+      (layer3:send (ipv4) node packet
                            :src dst
                            :proto (protocol-number (icmp))))))
 

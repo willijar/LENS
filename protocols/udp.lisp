@@ -90,7 +90,7 @@
 
 (defmethod notify((protocol udp)) (udp-send-pending protocol))
 
-(defmethod data-indication((protocol udp) node packet dst-address interface)
+(defmethod receive((protocol udp) node packet dst-address interface)
   (let ((h (pop-pdu packet))
         (application (application protocol)))
     (when node
@@ -149,7 +149,7 @@
                (layer protocol) (protocol-number protocol) :tx packet node)
         (return-from send 0))
       (write-trace node protocol pdu nil :packet packet :text "-"))
-    (layer3:data-request (layer3:protocol protocol) node packet
+    (layer3:send (layer3:protocol protocol) node packet
                          :dst-address dst-address
                          :ttl (ttl protocol)
                          :protocol-number (protocol-number protocol)

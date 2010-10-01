@@ -100,7 +100,7 @@
   (:nicknames :layer2 :layer.link)
   (:use :cl :address :common :protocol)
   (:export #:pdu #:protocol
-           #:data-request #:data-indication #:build-pdu #:busy-p
+           #:send #:receive #:build-pdu #:busy-p
            ;; specific default layer 2 protocols
            #:ieee802.3 #:llcsnap #:snap-ethtype #:ieee802.11))
 
@@ -108,7 +108,7 @@
   (:documentation "Network Layer protocol interface")
   (:nicknames :layer3 :layer.network)
   (:use :cl :common :address :protocol)
-  (:export #:protocol #:pdu #:data-request #:data-indication
+  (:export #:protocol #:pdu #:send #:receive
            #:find-interface #:protocol-number
            ;; some specific default layer 3 protocols
            #:ipv4 #:arp))
@@ -121,7 +121,7 @@
                 #:queue #:insert #:extract-head #:extract #:lookup)
   (:export #:peer-address #:peer-port #:local-port #:local-address
            #:ipport #:protocol #:pdu #:application  #:protocol-number
-           #:data-indication
+           #:receive
            #:notification #:request-notification #:cancel-notification
            #:ttl #:fid #:tos #:interface
            #:send #:connect #:close-connection #:bind #:unbind #:make-packet

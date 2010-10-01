@@ -161,7 +161,7 @@
             ;; else arp again
             (send-arp packet dst interface arp))))))
 
-(defmethod data-indication((arp arp) interface packet)
+(defmethod receive((arp arp) interface packet)
   "arp request arrival"
   (let* ((arp (arp interface)) ;; ensure we are using arp on correct interface
          (arphdr (pop-pdu packet))

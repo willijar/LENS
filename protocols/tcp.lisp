@@ -408,7 +408,7 @@
        (vector-push-extend
         (make-time-seq :time (simulation-time) :seq seq) tsv))))
 
-(defmethod data-indication((tcp tcp) node packet dst-address interface)
+(defmethod receive((tcp tcp) node packet dst-address interface)
   (let ((header (peek-pdu packet))
         (state (state tcp)))
     (setf (last-rx-time tcp) (simulation-time))
@@ -830,7 +830,7 @@
       (setf (need-ack tcp) nil)
       (when (flag-set-p (flags h) ack)
         (setf (last-ack-time tcp) (simulation-time))))
-    (layer3:data-request (layer3:protocol tcp) (node tcp) packet
+    (layer3:send (layer3:protocol tcp) (node tcp) packet
                          :dst-address dst-address
                          :ttl (ttl tcp)
                          :protocol-number (protocol-number tcp)

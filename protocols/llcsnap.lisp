@@ -48,10 +48,10 @@
   (declare (ignore src-address dst-address))
   (packet:push-pdu (make-instance 'llcsnap-header :type type) packet))
 
-(defmethod data-indication((protocol llcsnap) packet)
+(defmethod receive((protocol llcsnap) packet)
   (let* ((h (packet:pop-pdu packet))
          (interface (interface protocol))
          (layer3 (protocol:find-protocol 3 (ethtype h) (node interface))))
     (unless layer3
       (error "Unable to find protocol ~X in protocol graph" (ethtype h)))
-    (layer3:data-indication layer3 interface packet)))
+    (layer3:receive layer3 interface packet)))

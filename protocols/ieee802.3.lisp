@@ -73,7 +73,7 @@ comparison to ns2.")
     :length (size packet))
    packet))
 
-(defmethod data-request((protocol ieee802.3) packet)
+(defmethod send((protocol ieee802.3) packet)
   (let* ((interface (interface protocol))
          (node (node interface)))
     (when (node:call-callbacks (layer protocol) 0
@@ -82,7 +82,7 @@ comparison to ns2.")
                    nil :packet packet :text "-")
       (link:transmit (link interface) packet interface node))))
 
-(defmethod data-indication((protocol ieee802.3) packet)
+(defmethod receive((protocol ieee802.3) packet)
   (let* ((interface (interface protocol))
          (node (node interface)))
     (when (node:call-callbacks  (layer protocol) 0

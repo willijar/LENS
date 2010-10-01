@@ -92,10 +92,10 @@ returns a default for that layer")
 (defgeneric busy-p(protocol)
   (:documentation "True if proto/link is busy"))
 
-(defgeneric data-request(protocol packet)
+(defgeneric send(protocol packet)
   (:documentation "Packet received to be passed downwards to peer."))
 
-(defgeneric data-indication(protocol packet)
+(defgeneric receive(protocol packet)
   (:documentation "Packet received to be passed upwards"))
 
 (defgeneric build-pdu(protocol src-address dst-address packet &optional type)
@@ -124,10 +124,10 @@ See http://www.iana.org/assignments/ppp-numbers"))
 
 (defmethod layer((p pdu)) 3)
 
-(defgeneric data-request(protocol node packet &key &allow-other-keys)
+(defgeneric send(protocol node packet &key &allow-other-keys)
   (:documentation "Packet received to be passed downwards"))
 
-(defgeneric data-indication(protocol interface packet)
+(defgeneric receive(protocol interface packet)
   (:documentation "packet received from lower layer"))
 
 (defgeneric find-interface(protocol node addr)
@@ -180,7 +180,7 @@ layer 4 protocol instances by port"))
   (:documentation "Return the IANA protocol number.
 See http://www.iana.org/assignments/protocol-numbers"))
 
-(defgeneric data-indication(protocol node packet dst-address interface)
+(defgeneric receive(protocol node packet dst-address interface)
   (:documentation "Indication that packet has been received by layer 3
 protocol addressed to this node with protocol number matching this
 one"))
