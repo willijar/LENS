@@ -1,6 +1,6 @@
 ;;; LENS System definition -*- Lisp -*-
 ;; $Id$
-;; Copyright (C) 2007 Dr. John A.R. Williams
+;; Copyright (C) 2007-2009 Dr. John A.R. Williams
 
 ;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
 ;; Keywords:
@@ -92,6 +92,3 @@
               :components
               ((:file "defpackage")
                (:file "dot" :depends-on ("defpackage"))))))
-
-
-(declaim (optimize (debug  3)))
