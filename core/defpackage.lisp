@@ -30,22 +30,16 @@
            #:copy #:copy-with-slots #:up-p #:up #:down
            #:+speed-light+))
 
-(defpackage :queues
-  (:use :cl)
-  (:import-from :common #:reset)
-  (:export #:queue #:size #:adjustable-queue-p #:allocation #:empty-p
-           #:head #:insert  #:extract-head #:extract #:lookup
-           #:element-type #:priority-queue #:queue))
-
 (defpackage :scheduler
   (:documentation "LENS Discrete Event Scheduler")
-  (:use :cl :queues)
+  (:use :cl)
   (:import-from :common #:start #:stop #:reset #:while #:counter)
+  (:import-from :alg #:enqueue #:dequeue #:make-queue #:make-binary-heap
+                #:empty-p #:size)
   (:export #:scheduler #:schedule #:handle #:handler
            #:cancel #:cancel-if #:reset #:time-type
            #:event-time #:start #:stop #:status #:simulation-time
-           #:timers-manager #:schedule-timer #:cancel-timer
-           #:find-timer #:cancel-all-timers #:with-delay))
+           #:timers-manager #:schedule-timer  #:with-delay))
 
 (defpackage :lens.math
   (:documentation "Various mathematical functions and classes")

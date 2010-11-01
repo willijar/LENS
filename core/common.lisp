@@ -42,26 +42,6 @@
     (when ,var
       ,@body)))
 
-(defmacro when-bind* (binds &body body)
-  "Bind VARS to VALUES
-
-If a value is false terminate and do not perform further bindings
-If all values are bound then execute body
-
-Arguments:
-
-- `binds`: ({var | (var [init-form])}*) the bindings (as per let*)
-- `body`: The form body to be exectuted if all bound values are true
-
-Returns:
-
-- `results`: the values returned by the body"
-  (if (null binds)
-      `(progn ,@body)
-      `(let (,(car binds))
-        (if ,(caar binds)
-            (when-bind* ,(cdr binds) ,@body)))))
-
 (defmacro filter-if(test lst &key (key '#'identity))
   "Return a list of the elements in `lst` for which `test` (applied to `key`)
 is true.
@@ -93,16 +73,6 @@ Returns:
           `(deftype ,(first typename)() ',@(rest typename))
           `(deftype ,typename () '(member ,@(mapcar #'second items)))))))
 
-(defmacro def-singleton-class(name &rest args)
-  "Define a class intented to be instantiated only once. Form is as
-per `defclass` but creates a function of the same name as the class
-which returns the single instance of it."
-  (let ((gname (gensym)))
-    `(progn
-      (defclass ,name ,@args)
-      (let ((,gname))
-        (defun ,name() (or ,gname (setf ,gname (make-instance ',name))))))))
-
 (defgeneric uid(entity)
   (:documentation "Return the unique id of an entity"))
 
@@ -123,8 +93,8 @@ which returns the single instance of it."
   "List of hooks to call during a reset")
 
 (defgeneric reset(entity)
-  (:documentation "Reset an entity to same state as start of simulation i.e.
- clear all packets etc.")
+  (:documentation "Reset an entity to same state as start of
+ simulation i.e.  clear all packets etc.")
   (:method ((entities sequence))
     (map nil #'reset entities))
   (:method ((entity (eql :all)))
@@ -160,16 +130,15 @@ which returns the single instance of it."
           copy)
         (setf (aref copy i) (copy (aref v i)))))))
 
-(defun copy-with-slots(original slots)
+(defun copy-with-slots(original slots &optional (copy (allocate-instance (class-of original))))
   "Given an original instance allocate and return a new instance of
 the same class and set specified slots of copy to the same values as
 the slots of the original."
-  (let ((copy (allocate-instance (class-of original))))
     (dolist(slot slots)
       (if (slot-boundp original slot)
           (setf (slot-value copy slot) (copy (slot-value original slot)))
           (slot-makunbound copy slot)))
-    copy))
+    copy)
 
 (defgeneric up-p(entity)
   (:documentation "Return true if entity is active (not failed)"))
