@@ -27,3 +27,7 @@
 
 (defun yield-thread()
   #+sb-thread(sb-thread::release-foreground))
+
+(in-package :trace)
+
+(import 'sb-gray:stream-line-length)

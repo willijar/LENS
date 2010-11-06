@@ -17,12 +17,13 @@
 
 (in-package :common)
 
+;; Basic types
 (deftype counter() "Type for counting objects" 'fixnum)
 (deftype octet() "8-bit byte type" '(unsigned-byte 8))
 (deftype word() "16-bit word type" '(unsigned-byte 16))
 (deftype seq() "a sequence number type" 'fixnum)
 (deftype fid() "a flow id number type" 'fixnum)
-(defconstant +speed-light+ 299792458 "Speed of Light in m/sec")
+(defconstant +c+ 299792458 "Speed of Light in m/sec")
 
 (defmacro while (test &body body)
   "A while loop - repeat body while test is true"
@@ -42,7 +43,7 @@
     (when ,var
       ,@body)))
 
-(defmacro filter-if(test lst &key (key '#'identity))
+(defmacro filter(test lst &key (key '#'identity))
   "Return a list of the elements in `lst` for which `test` (applied to `key`)
 is true.
 
@@ -76,6 +77,9 @@ Returns:
 (defgeneric uid(entity)
   (:documentation "Return the unique id of an entity"))
 
+(defgeneric node(entity)
+  (:documentation "Return the node associated with an entity"))
+
 (defgeneric name(entity)
   (:documentation "Return a descriptive name of an entity"))
 
@@ -88,6 +92,9 @@ Returns:
 (defgeneric stop(entity &key abort)
   (:documentation "Stop a running entity.
  If keyword abort is true - also abort current action"))
+
+(defgeneric busy-p(entity)
+  (:documentation "Return true if an entity is busy"))
 
 (defvar *reset-hooks* nil
   "List of hooks to call during a reset")
@@ -103,12 +110,6 @@ Returns:
         (list (apply (first h) (rest h)))
         (function (funcall h))
         (t (reset h))))))
-
-(defgeneric notify(entity)
-  (:documentation "Notification to an entity.")
-  (:method((func function)) (funcall func))
-  (:method((args list)) (apply (first args) (rest args)))
-  (:method((nothing null))))
 
 (defgeneric copy(entity)
   (:documentation "Create an return a (deep - no shared structure)
@@ -139,15 +140,6 @@ the slots of the original."
           (setf (slot-value copy slot) (copy (slot-value original slot)))
           (slot-makunbound copy slot)))
     copy)
-
-(defgeneric up-p(entity)
-  (:documentation "Return true if entity is active (not failed)"))
-
-(defgeneric down(entity &key inform-routing)
-  (:documentation "Set  maybe inform-routing"))
-
-(defgeneric up(entity &key inform-routing)
-  (:documentation "Bring an entity back online and maybe inform-routing"))
 
 (defun cl-user::print-eng(os arg &optional colon-p at-p
                  (d 2) (padchar #\space) (exponentchar #\e))

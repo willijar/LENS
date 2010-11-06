@@ -23,28 +23,28 @@
     :author "Dr. John A.R. Williams <J.A.R.Williams@aston.ac.uk>"
     :maintainer "Dr. John A.R. Williams <J.A.R.Williams@aston.ac.uk>"
     :licence "GPL v3"
-    :long-description "A Network Simulator is LISP inspired by NS2 and GTNetS"
-    :depends-on (:split-sequence :trivial-gray-streams :clrs)
+    :long-description "A Network Simulator in LISP inspired by NS2 and GTNetS"
+    :depends-on (:split-sequence :trivial-gray-streams :clrs :closer-mop)
     :components
     ((:module "core"
               :components
               ((:file "defpackage")
                (:file "common" :depends-on ("defpackage"))
                (:file "random" :depends-on ("defpackage"))
-               (:file "statistics" :depends-on ("common" "scheduler"))
                (:file "compatibility" :depends-on ("defpackage"))
-               (:file "address" :depends-on ("defpackage" "common"))
-;;                (:file "trace" :depends-on ("defpackage" "common" "scheduler"))
-;;                (:file "scheduler"
-;;                       :depends-on
-;;                       ("defpackage" "common" "compatibility" "queues"))
+               (:file "scheduler" :depends-on
+                      ("defpackage" "common" "compatibility"))
+               (:file "packet" :depends-on ("defpackage" "scheduler"))
+               #+nil(:file "address" :depends-on ("defpackage" "common"))
+               #+nil(:file "trace" :depends-on
+                      ("defpackage" "common" "scheduler" "compatibility"))
+
 ;;                (:file "protocol"
 ;;                       :depends-on ("address" "common" "packet-queue"))
 ;;                (:file "node"
 ;;                       :depends-on ("common" "address" "routing" "protocol"))
 ;;                (:file "application"
 ;;                       :depends-on ("common" "scheduler" "protocol"))
-;;                (:file "packet" :depends-on ("defpackage" "scheduler"))
 ;;                (:file "packet-queue"
 ;;                       :depends-on ("defpackage" "packet" "scheduler"))
 ;;                (:file "interface"
@@ -53,6 +53,9 @@
 ;;                       :depends-on ("common" "scheduler" "queues" "random"
 ;;                                    "address" "packet-queue" "node"))
 ;;                (:file "routing" :depends-on ("common" "address"))
+               #+nil(:file "statistics" :depends-on ("common" "scheduler"))
+
+
 ;;                (:file "user"
 ;;                       :depends-on ("common" "address" "scheduler" "link"
 ;;                                             "node"))))

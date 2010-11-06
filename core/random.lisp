@@ -16,7 +16,7 @@
 
 ;;; Code:
 
-(in-package :lens.math)
+(in-package :math)
 
 (defun random-variable(func &rest args)
   (cons (if (symbolp func) (symbol-function func) func) args))
