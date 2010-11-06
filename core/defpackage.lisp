@@ -52,16 +52,17 @@
   (:export #:pdu #:pdus #:length-bytes #:layer #:packet #:created #:routing
            #:push-pdu #:skip-pdu #:peek-pdu #:pop-pdu))
 
-#+nil(defpackage :address
+(defpackage :address
   (:documentation "network and hardware addressing")
   (:use :cl)
   (:import-from :split-sequence #:split-sequence)
-  (:export  #:*print-ip-format* #:print-ip-format
+  (:export  #:address #:address= #:broadcast-p
+            #:macaddr #:ipaddr #:ipport #:ipmask
+            #:*print-ip-format* #:print-ip-form
             #:ipaddr #:ipport #:ipmask #:macaddr
-           #:broadcast-p #:bitcount #:+ip-addr-size+
-           #:address= #:address< #:print-ip-format
-           #:subnet #:next-ipaddr #:last-ipaddr
-           #:src-address #:dst-address #:ipaddr-allocator))
+            #:src-address #:dest-address
+            #:address-condition #:address-out-of-range
+            #:subnet #:ipaddr-allocator))
 
 
 #+nil(defpackage :layer1

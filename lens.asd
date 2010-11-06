@@ -35,7 +35,7 @@
                (:file "scheduler" :depends-on
                       ("defpackage" "common" "compatibility"))
                (:file "packet" :depends-on ("defpackage" "scheduler"))
-               #+nil(:file "address" :depends-on ("defpackage" "common"))
+               (:file "address" :depends-on ("defpackage" "common"))
                #+nil(:file "trace" :depends-on
                       ("defpackage" "common" "scheduler" "compatibility"))
 
