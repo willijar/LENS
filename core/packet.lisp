@@ -22,7 +22,7 @@
         :initform (incf *packet-count*)
         :reader uid
         :documentation "Unique id of the packet")
-   (pdus :type vector :initform (make-array 5 :adjustable t :fill-pointer 0)
+   (pdus :type vector :initform (make-array 4 :adjustable t :fill-pointer 0)
          :reader pdus)
    (created :type time-type :initform (simulation-time) :reader created
             :initarg :created :documentation "Time the packet was created")
@@ -30,6 +30,15 @@
             :documentation "Source routing e.g. nixvector data"))
   (:documentation  "A generic packet class composed of a vector of
 protocol data units (PDUs)."))
+
+(defmethod initialize-instance :after((packet packet) &key data &allow-other-keys)
+  (typecase data
+    (pdu
+     (push-pdu data packet))
+    (integer
+     (push-pdu (make-instance 'layer5:data :length-bytes data) packet))
+    ((vector octet *)
+     (push-pdu (make-instance 'layer5:data :contents data) packet))))
 
 (defmethod print-object((packet packet) stream)
   (print-unreadable-object(packet stream :type t :identity t)

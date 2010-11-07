@@ -1,5 +1,4 @@
-;; $Id$
-;; Interface queue interface and implementations
+;; Interface packet queue interface and implementations
 ;; Copyright (C) 2007 Dr. John A.R. Williams
 
 ;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
@@ -16,14 +15,12 @@
 
 ;;; Code:
 
-(in-package :interface)
+(in-package :physical)
 
 (defclass packet-queue()
-  ((interface :type interface :accessor interface :initarg :interface
-              :documentation "Associated interface")
-   (enq-count :type integer :accessor enq-count :initform 0
+  ((enqueue-count :type counter :accessor enqueue-count :initform 0
               :documentation "Total enqueued packets")
-   (drop-count :type integer :accessor drop-count :initform 0
+   (drop-count :type counter :accessor drop-count :initform 0
                :documentation "Total dropped packets")
    (egress-filter :type (or boolean function list) :writer egress-filter
                 :initform nil
@@ -52,43 +49,37 @@ they are sent down on the link"))
             (length-bytes q) (limit-bytes q))))
 
 (defmethod reset((q packet-queue))
+  (until (empty-p q) (dequeue q))
   (reset-average-queue-length q)
-  (setf (enq-count q) 0
+  (setf (enqueue-count q) 0
         (drop-count q) 0))
 
-(defgeneric enque(packet queue)
-  (:documentation
-   "Enque packet on queue, return true if enqued, false if not")
-  (:method :before (packet (queue packet-queue))
-      (update-average-queue-length queue)
-      (incf (enq-count queue)))
-  (:method :around(packet (queue packet-queue))
-      (cond
-        ((and (buffer-available-p packet queue)
-              (not (drop-packet-p packet queue)))
-         (incf (length-packets queue))
-         (incf (length-bytes queue) (size packet))
-         (call-next-method))
-        (t
-         (incf (drop-count queue))
-         nil))))
+(defmethod enqueue :after (packet (queue packet-queue))
+  (update-average-queue-length queue))
 
-(defgeneric deque(queue)
-  (:documentation "Remove and return next packet from queue (nil if none)")
-  (:method :before ((queue packet-queue))
-     (update-average-queue-length queue))
-  (:method :around((queue packet-queue))
-     (let ((packet (call-next-method)))
-       (when packet
-         (decf (length-packets queue))
-         (decf (length-bytes queue) (size packet))
-         packet))))
+(defmethod enqueue :around (packet (queue packet-queue))
+  (cond
+    ((and (buffer-available-p packet queue)
+          (not (drop-packet-p packet queue)))
+     (incf (length-packets queue))
+     (incf (length-bytes queue) (length-bytes packet))
+     (call-next-method)
+     (incf (enqueue-count queue)))
+    (t
+     (incf (drop-count queue))
+     nil)))
 
-(defgeneric  peek-deque(queue)
-  (:documentation
-   "Return next packet on queue without removing it (nil if none)"))
+(defmethod dequeue :after ((queue packet-queue))
+  (update-average-queue-length queue))
 
-(defgeneric deque-if(predicate queue &key key)
+(defmethod dequeue :around((queue packet-queue))
+  (let ((packet (call-next-method)))
+    (when packet
+      (decf (length-packets queue))
+      (decf (length-bytes queue) (length-bytes packet))
+      packet)))
+
+(defgeneric dequeue-if(predicate queue &key key)
   (:documentation "Remove the first packet on the queue for which
 predicate is true and return it, nil if none."))
 
@@ -118,8 +109,8 @@ Return True if time for a forced loss. May also be used for egress filtering")
        (<= (+ (length-bytes queue) size)
            (limit-bytes queue)))
       (t)))
-  (:method((packet packet) (queue packet-queue))
-    (buffer-available-p (size packet) queue)))
+  (:method(packet (queue packet-queue))
+    (buffer-available-p (length-bytes packet) queue)))
 
 (defun average-queue-length(queue)
   (let ((interval (- (simulation-time) (start-time queue))))
@@ -139,65 +130,43 @@ Return True if time for a forced loss. May also be used for egress filtering")
           (* (length-bytes queue) (- now (last-update queue))))
     (setf (last-update queue) now)))
 
-(defun queuing-delay(queue)
-  (when (interface queue)
-    (/ (* 8 (length-bytes queue)) (bandwidth (link (interface queue))))))
-
 (defclass drop-tail(packet-queue)
-  ((front :type list :accessor front :initform nil)
-   (back :type cons :accessor back :initform nil))
+  ((queue :initform (make-queue)))
   (:default-initargs :limit-bytes 50000)
   (:documentation "The simple droptail or FIFO queue"))
 
-(defmethod enque(packet (q drop-tail))
-  (let ((new-cons (cons packet nil)))
-    (cond ((front q)
-           (rplacd (back q) new-cons)
-           (setf (back q) new-cons))
-          (t (setf (front q) new-cons)
-             (setf (back q) new-cons)))))
+(defmethod enqueue(packet (q drop-tail))
+  (enqueue packet (slot-value q 'queue)))
 
-(defmethod deque((q drop-tail))
-  (pop (front q)))
+(defmethod dequeue((q drop-tail))
+  (dequeue (slot-value q 'queue)))
 
-(defmethod peek-deque((q drop-tail))
-  (car (front q)))
+(defmethod empty-p((q drop-tail))
+  (empty-p (slot-value q 'queue)))
 
 (defmethod delete-packets-if((predicate function) (queue drop-tail)
                              &key (key #'identity))
-  (let ((count 0))
-    (setf (front queue)
-          (mapcan
-           #'(lambda(packet)
-               (if (funcall predicate (funcall key packet))
-                   (progn
-                     (incf count)
-                     (decf (length-packets queue))
-                     (decf (length-bytes queue) (size packet))
-                     nil)
-                   (list packet)))
-           (front queue)))
-    (setf (back queue) (last (front queue)))
-    count))
+  (setf (alg::list-queue-head (slot-value queue 'queue))
+        (mapcan
+         #'(lambda(packet)
+             (if (funcall predicate (funcall key packet))
+                 (progn
+                   (decf (length-packets queue))
+                   (decf (length-bytes queue) (length-bytes packet))
+                   nil)
+                 (list packet)))
+         (alg::list-queue-head (slot-value queue 'queue))))
+  (setf (alg::list-queue-tail (slot-value queue 'queue)) (last (alg::list-queue-head (slot-value queue 'queue))))
+  (update-average-queue-length queue))
 
-(defmethod deque-if((predicate function) (queue drop-tail)
+(defmethod dequeue-if((predicate function) (queue drop-tail)
                     &key (key #'identity))
-  (let ((tail (member-if predicate (front queue) :key key)))
-    (when tail
-      (let ((packet (car tail)))
-        (decf (length-packets queue))
-        (decf (length-bytes queue) (size packet))
-        (setf (car tail) (cadr tail)
-              (cdr tail) (cddr tail))
-        (when (eql packet (car (back queue)))
-          (setf (back queue) (last (front queue))))
-        packet))))
-
-(defmethod reset((q drop-tail))
-  (call-next-method)
-  (setf (front q) nil
-        (back q) nil))
-
-
-
-
+  (traverse
+   #'(lambda(packet)
+       (when (funcall predicate (funcall key packet))
+         (alg::delete packet (slot-value queue 'queue))
+         (decf (length-packets queue))
+         (decf (length-bytes queue) (length-bytes packet))
+         (return-from dequeue-if packet)))
+   (slot-value queue 'queue))
+  (update-average-queue-length queue))

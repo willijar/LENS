@@ -18,257 +18,281 @@
 
 (in-package :protocol)
 
-(defparameter +number-protocol-layers+ 7 "Number of ISO Protocol layers")
+(defclass protocol()
+  ((node :initarg :node :reader node))
+  (:documentation "Base class for all protocol entities"))
 
-(defgeneric layer(protocol)
-  (:documentation "Determine layer of a protocol"))
+(defgeneric protocol-number(entity)
+  (:documentation "Return the IANA protocol number.
+See http://www.iana.org/assignments/protocol-numbers")
+  (:method((protocol protocol)) (get (type-of protocol) 'protocol-number))
+  (:method((protocol symbol)) (get protocol 'protocol-number)))
 
-(defun make-protocol-graph()
-  (make-array 2 :initial-element nil))
-
-(defvar *common-protocol-graph* (make-protocol-graph)
-  "The mapping of protocol numbers to global protocol instances")
-
-(defgeneric protocol-graph(entity)
-  (:documentation "Return the protocol graph associated with an entity")
-  (:method (entity)
-    (declare (ignore entity))
-    *common-protocol-graph*))
-
-(defgeneric insert-protocol(layer protocol-number protocol graph)
-  (:documentation  "Insert a protocol into the protocol graph")
-  (:method(layer protocol-number protocol (graph vector))
-    (let* ((idx (- layer 3))
-           (h (or (svref  graph idx)
-                 (setf (svref graph idx)
-                       (make-hash-table)))))
-      (setf (gethash protocol-number h) protocol))))
-
-(defgeneric remove-protocol(layer protocol-number graph)
-  (:documentation  "Remove an entry from the protocol graph")
-  (:method ((layer integer) (protocol-number integer) (graph vector))
-    (let ((h (svref  graph (- layer 3))))
-      (when h (remhash protocol-number h)))))
-
-(defgeneric find-protocol(layer protocol-number graph)
-  (:documentation "Lookup a protocol - if no proto eql :default
-returns a default for that layer")
-  (:method ((layer integer) protocol-number (graph vector))
-    (let ((h (svref graph (- layer 3))))
-      (when h
-        (if (eql protocol-number :default)
-            (when (= 1 (hash-table-count h))
-              (maphash
-               #'(lambda(k v)
-                   (declare (ignore k))
-                   (return-from find-protocol v))
-               h))
-            (gethash protocol-number h))))))
-
-(defgeneric sublayer(pdu)
-  (:documentation
-   "Return the PDU sublayer number (if applicable e.g. LLCSNAP)"))
-
-(defgeneric version(pdu)
-  (:documentation "Return the PDU version number (used for tracing)")
-  (:method(pdu) (declare (ignore pdu))))
-
-(defmethod priority(pdu) (declare (ignore pdu)) 0)
+(defmethod layer((protocol protocol)) (get (type-of protocol) 'layer))
+(defmethod layer((protocol symbol)) (get protocol 'layer))
 
 (in-package :protocol.layer2)
 
-(defclass protocol()
+(defclass protocol(protocol:protocol)
   ((layer :initform 2 :reader layer :allocation :class)
    (interface :initarg :iface :accessor interface
               :documentation "Interface for this protocol"))
   (:documentation "Layer 2 protocol base class"))
 
-(defclass pdu()
-  ()
+(defclass pdu(protocol:pdu)
+  ((layer :initform 2 :reader protocol:layer :allocation :class))
   (:documentation "The base class for all layer two  protocol data units"))
-
-(defmethod layer((p pdu)) 2)
-
-(defgeneric busy-p(protocol)
-  (:documentation "True if proto/link is busy"))
-
-(defgeneric send(protocol packet)
-  (:documentation "Packet received to be passed downwards to peer."))
-
-(defgeneric receive(protocol packet)
-  (:documentation "Packet received to be passed upwards"))
 
 (defgeneric build-pdu(protocol src-address dst-address packet &optional type)
   (:documentation "Build and append a layer2 pdu to the specified packet."))
 
 (in-package :protocol.layer3)
 
-(defclass protocol()
-  ((layer :initform 3 :reader layer :allocation :class))
-  (:documentation "Layer 3 protocol base class. Layer 3 protocols are
-global singleton instances"))
+(defclass protocol(protocol:protocol)
+  ((layer :initform 3 :reader layer :allocation :class)
+   (node :initarg :node :reader node
+         :documentation "Local Node"))
+  (:documentation "Layer 3 protocol"))
 
-(defgeneric protocol-number(entity)
-  (:documentation "Return the IANA PPP DLL number.
-See http://www.iana.org/assignments/ppp-numbers"))
+(defclass pdu(packet:pdu)
+  ((layer :initform 3 :reader protocol:layer :allocation :class))
+  (:documentation "The base class for all layer three protocol data units"))
+
+(defvar *standard-protocols* nil "List of standard registered layer 3
+protocols")
+
+(defgeneric register-protocol(protocol entity &optional replace)
+  (:documentation "Register a layer 3 protocol. If replace is true this will
+  replace the previously registered protocol with the same number."))
+
+(defgeneric delete-protocol(protocol entity)
+  (:documentation "Delete a layer 3 protocol from entity")
+  (:method((protocol integer) (protocols sequence))
+    (delete protocol protocols :key #'protocol-number :test #'=))
+  (:method(protocol entity)
+    (delete-protocol (protocol-number protocol) entity)))
+
+(defgeneric find-protocol(protocol entity)
+  (:documentation "Find a layer 3 protocol on entity")
+  (:method((protocol integer) (protocols sequence))
+    (find protocol protocols :key #'protocol-number :test #'=))
+  (:method(protocol entity)
+    (find-protocol (protocol-number protocol) entity)))
+
+(defmethod register-protocol(protocol (protocols list) &optional replace)
+  (cons protocol
+        (if replace
+            (delete-protocol protocol protocols)
+            (when (find-protocol protocol protocols)
+              (error "Unable to register a duplicate protocol ~A" protocol)))))
+
+(defmethod register-protocol((protocol symbol) (protocol-number integer) &optional (replace t))
+  "Register the protocol number for a protocol class name, if replace
+is true add it to the list of standard protocols"
+    (setf (get protocol 'protocol::layer) 3
+          (get protocol 'protocol::protocol-number) protocol-number)
+    (when replace
+      (setf *standard-protocols* (register-protocol protocol *standard-protocols*))))
+
+(defmethod delete-protocol((protocol integer) node)
+  (setf (slot-value node 'protocols)
+        (delete-protocol protocol (slot-value node 'protocols))))
+
+(defmethod find-protocol((protocol-number integer) node)
+  "Find an already existent protocol or add one"
+  (or (find-protocol protocol-number (slot-value node 'protocols))
+      (let ((protocol (find-protocol protocol-number *standard-protocols*)))
+        (when protocol (make-instance protocol :node node)))))
+
+(defmethod register-protocol((protocol protocol) node &optional (replace nil))
+  (setf (slot-value node 'protocols)
+        (register-protocol protocol (slot-value node 'protocols) replace)))
 
 (defmethod initialize-instance :after ((protocol protocol)
                                        &key &allow-other-keys)
-  (protocol:insert-protocol
-   (layer protocol) (protocol-number protocol) protocol
-   protocol:*common-protocol-graph*))
+  (register-protocol protocol (node protocol)))
 
-(defclass pdu()
-  ()
-  (:documentation "The base class for all layer two  protocol data units"))
-
-(defmethod layer((p pdu)) 3)
-
-(defgeneric send(protocol node packet &key &allow-other-keys)
-  (:documentation "Packet received to be passed downwards"))
-
-(defgeneric receive(protocol interface packet)
-  (:documentation "packet received from lower layer"))
-
-(defgeneric find-interface(protocol node addr)
+(defgeneric find-interface(protocol addr)
   (:documentation "Find the forwarding interface"))
 
 (in-package :protocol.layer4)
 
-(defclass demux()
-  ((layer :initform 4 :reader layer :allocation :class))
-  (:documentation "Base class for Layer 4 demultiplexers. These are
-global singleton instanciated classes responsible for finding specific
-layer 4 protocol instances by port"))
+(defvar *standard-protocols* nil "List of standard registered layer 4
+protocols")
 
-(defmethod initialize-instance :after ((protocol demux)
-                                       &key &allow-other-keys)
-  (protocol:insert-protocol
-   (layer protocol) (protocol-number protocol) protocol
-   protocol:*common-protocol-graph*))
-
-(defclass protocol()
+(defclass protocol(protocol:protocol)
   ((layer :initform 4 :reader layer :allocation :class)
-   (node :initarg :node :initform nil :accessor node
-         :documentation "Local Node")
-   (peer-address :initarg :peer-address :initform nil :type ipaddr
-                 :accessor peer-address
-                 :documentation "IP address of peer")
-   (peer-port  :initarg :peer-port :initform nil
-               :type ipport :accessor peer-port
-               :documentation "Port of peer")
-   (local-port :initarg :local-port :initform nil
-               :type ipport :accessor local-port
-               :documentation "Local port number")
-   (notification
-    :initform nil :accessor notification
-    :documentation "Entity to receive notification for all packets")
-   (application :initarg :application :initform nil
-                :type application :accessor application
-                :documentation "Local application object")
-   (layer3:protocol :initarg :layer3 :initform (layer3:ipv4)
-                    :type layer3:protocol :reader layer3:protocol
-                    :documentation "Layer 3 protocol to use")
-   (ttl :accessor ttl :initform 64 :documentation "Layer 3 ttl")
-   (fid :accessor fid :initform 0 :documentation "Flow id")
-   (tos :accessor tos :initform 0
-        :documentation "Layer 3 type of service")
-   (interface :initform nil :documentation "Interface used for this flow"))
-  (:documentation "Base class for all layer 4 protocols states"))
+   (node :initarg :node :reader node
+         :documentation "Local Node"))
+  (:documentation "Layer 3 protocol"))
 
-(defgeneric protocol-number(entity)
-  (:documentation "Return the IANA protocol number.
-See http://www.iana.org/assignments/protocol-numbers"))
+(defclass pdu(packet:pdu)
+  ((layer :initform 4 :reader protocol:layer :allocation :class))
+  (:documentation "The base class for all layer three protocol data units"))
 
-(defgeneric receive(protocol node packet dst-address interface)
-  (:documentation "Indication that packet has been received by layer 3
-protocol addressed to this node with protocol number matching this
-one"))
+(defgeneric register-protocol(protocol entity &optional replace)
+  (:documentation "Register a layer 4 protocol. If replace is true this will
+  replace the previously registered protocol with the same number."))
 
-(defgeneric send(data protocol &key dst-address dst-port)
-  (:documentation "Send data using this protocol to dst-address and port or
-default dst-address and port. Return no bytes sent.")
-  (:method((size integer) protocol &key
-           (dst-address (peer-address protocol))
-           (dst-port (peer-port protocol)))
-    (send (make-instance 'layer5:data :size size) protocol
-          :dst-address dst-address :dst-port dst-port))
-  (:method((data vector) protocol &key
-           (dst-address (peer-address protocol))
-           (dst-port (peer-port protocol)))
-    (send (make-instance 'layer5:data :contents data) protocol
-          :dst-address dst-address :dst-port dst-port)))
+(defgeneric delete-protocol(protocol entity)
+  (:documentation "Delete a layer 4 protocol from entity")
+  (:method((protocol integer) (protocols sequence))
+    (delete protocol protocols :key #'protocol-number :test #'=))
+  (:method(protocol entity)
+    (delete-protocol (protocol-number protocol) entity)))
 
-(defgeneric local-address(protocol)
-  (:documentation "Local IPaddress for this protocol")
-  (:method ((p protocol)) (ipaddr (node p))))
+(defgeneric find-protocol(protocol entity)
+  (:documentation "Find a layer 4 protocol on entity")
+  (:method((protocol integer) (protocols sequence))
+    (find protocol protocols :key #'protocol-number :test #'=))
+  (:method(protocol entity)
+    (find-protocol (protocol-number protocol) entity)))
 
-(defgeneric connect(protocol peer-address peer-port)
-  (:documentation "Connection to a remote host. Return true if
-initiated OK - does not mean was successfully completed if TCP"))
+(defmethod register-protocol(protocol (protocols list) &optional replace)
+  (cons protocol
+        (if replace
+            (delete-protocol protocol protocols)
+            (when (find-protocol protocol protocols)
+              (error "Unable to register a duplicate protocol ~A" protocol)))))
 
-(defgeneric close-connection(protocol)
-  (:documentation "Close an open connection, return success"))
+(defmethod register-protocol((protocol symbol) (protocol-number integer) &optional (replace t))
+    (setf (get protocol 'protocol::layer) 4
+          (get protocol 'protocol::protocol-number) protocol-number)
+    (when replace
+      (setf *standard-protocols*
+            (register-protocol protocol *standard-protocols*))))
 
-(defgeneric make-packet(protocol)
-  (:documentation "Allocate a new packet")
-  (:method ((protocol protocol))
-    (make-instance 'packet:packet :notification (notification protocol))))
+(defmethod delete-protocol((protocol integer) node)
+  (setf (slot-value node 'protocols)
+        (delete-protocol protocol (slot-value node 'protocols))))
 
-(defgeneric bind(protocol &key port)
-  (:documentation "Bind to specific or available port and return successs")
-  (:method((protocol protocol) &key port)
-    (when (local-port protocol) (unbind protocol))
-    (when (node protocol)
-      (setf (local-port protocol)
-            (node:bind protocol (node protocol)
-                            :local-port port)))))
+(defmethod find-protocol((protocol-number integer) node)
+  (or (find-protocol protocol-number (slot-value node 'protocols))
+      (let ((protocol (find-protocol protocol-number *standard-protocols*)))
+        (when protocol (make-instance protocol :node node)))))
 
-(defgeneric unbind(protocol &key port protocol-number)
-  (:documentation "Unbind a protocol from a specific port")
-  (:method((protocol protocol)
-           &key (port (local-port protocol))
-           (protocol-number (protocol-number protocol)))
-    (when (node protocol)
-      (when (= port (local-port protocol))
-        (setf (local-port protocol) nil))
-      (node:unbind protocol (node protocol)
-                        :port port
-                        :protocol-number protocol-number))))
+(defmethod register-protocol((protocol protocol) node &optional (replace nil))
+  (setf (slot-value node 'protocols)
+        (register-protocol protocol (slot-value node 'protocols) replace)))
 
-(defmethod interface((protocol protocol))
-  (or (slot-value protocol 'interface)
-      (when (peer-address protocol)
-        (setf (slot-value protocol 'interface)
-              (layer3:find-interface (layer3:protocol protocol)
-                                     (node protocol)
-                                     (peer-address protocol))))))
+(defmethod initialize-instance :after ((protocol protocol)
+                                       &key &allow-other-keys)
+  (register-protocol protocol (node protocol)))
 
-(defmethod buffer-available-p(size (protocol protocol))
-  (if (interface protocol)
-      (buffer-available-p size (interface protocol))
-      t))
+;; (defclass flow()
+;;   ((protocol :type protocol :initarg :protocol :reader protocol)
+;;    (peer-address :initarg :peer-address :initform nil :type hardware-address
+;;                  :accessor peer-address
+;;                  :documentation "IP address of peer")
+;;    (peer-port  :initarg :peer-port :initform nil
+;;                :type ipport :accessor peer-port
+;;                :documentation "Port of peer")
+;;    (local-port :initarg :local-port :initform nil
+;;                :type ipport :accessor local-port
+;;                :documentation "Local port number")
+;;    (notification
+;;     :initform nil :accessor notification
+;;     :documentation "Entity to receive notification for all packets")
+;;    (application :initarg :application :initform nil
+;;                 :type application :accessor application
+;;                 :documentation "Local application object")
+;;    (layer3:protocol :initarg :layer3 :initform (layer3:ipv4)
+;;                     :type layer3:protocol :reader layer3:protocol
+;;                     :documentation "Layer 3 protocol to use")
+;;    (ttl :accessor ttl :initform 64 :documentation "Layer 3 ttl")
+;;    (fid :accessor fid :initform 0 :documentation "Flow id")
+;;    (tos :accessor tos :initform 0
+;;         :documentation "Layer 3 type of service")
+;;    (interface :initform nil :documentation "Interface used for this flow"))
+;;   (:documentation "Base class for all layer 4 protocols states"))
 
-(defun request-notification(protocol)
-  "Rquest notification when buffer becomes available"
-  (when (interface protocol)
-    (interface:add-notify protocol (interface protocol))))
+;; (defmethod initialize-instance :after((protocol protocol) &key &allow-other-keys)
+;;   (register-protocol protocol (node protocol)))
 
-(defun cancel-notification(protocol)
-  "Cancel a previous notification"
-  (when (interface protocol)
-    (interface:cancel-notify protocol (interface protocol))))
+;; (defgeneric receive(protocol node packet dst-address interface)
+;;   (:documentation "Indication that packet has been received by layer 3
+;; protocol addressed to this node with protocol number matching this
+;; one"))
 
-(defclass pdu()
-  ()
-  (:documentation "The base class for all layer four protocol data units"))
+;; (defgeneric send(data protocol &key dst-address dst-port)
+;;   (:documentation "Send data using this protocol to dst-address and port or
+;; default dst-address and port. Return no bytes sent.")
+;;   (:method((size integer) protocol &key
+;;            (dst-address (peer-address protocol))
+;;            (dst-port (peer-port protocol)))
+;;     (send (make-instance 'layer5:data :size size) protocol
+;;           :dst-address dst-address :dst-port dst-port))
+;;   (:method((data vector) protocol &key
+;;            (dst-address (peer-address protocol))
+;;            (dst-port (peer-port protocol)))
+;;     (send (make-instance 'layer5:data :contents data) protocol
+;;           :dst-address dst-address :dst-port dst-port)))
 
-(defmethod layer((p pdu)) 4)
+;; (defgeneric local-address(protocol)
+;;   (:documentation "Local IPaddress for this protocol")
+;;   (:method ((p protocol)) (ipaddr (node p))))
+
+;; (defgeneric connect(protocol peer-address peer-port)
+;;   (:documentation "Connection to a remote host. Return true if
+;; initiated OK - does not mean was successfully completed if TCP"))
+
+;; (defgeneric close-connection(protocol)
+;;   (:documentation "Close an open connection, return success"))
+
+;; (defgeneric make-packet(protocol)
+;;   (:documentation "Allocate a new packet")
+;;   (:method ((protocol protocol))
+;;     (make-instance 'packet:packet :notification (notification protocol))))
+
+;; (defgeneric bind(protocol &key port)
+;;   (:documentation "Bind to specific or available port and return successs")
+;;   (:method((protocol protocol) &key port)
+;;     (when (local-port protocol) (unbind protocol))
+;;     (when (node protocol)
+;;       (setf (local-port protocol)
+;;             (node:bind protocol (node protocol)
+;;                             :local-port port)))))
+
+;; (defgeneric unbind(protocol &key port protocol-number)
+;;   (:documentation "Unbind a protocol from a specific port")
+;;   (:method((protocol protocol)
+;;            &key (port (local-port protocol))
+;;            (protocol-number (protocol-number protocol)))
+;;     (when (node protocol)
+;;       (when (= port (local-port protocol))
+;;         (setf (local-port protocol) nil))
+;;       (node:unbind protocol (node protocol)
+;;                         :port port
+;;                         :protocol-number protocol-number))))
+
+;; (defmethod interface((protocol protocol))
+;;   (or (slot-value protocol 'interface)
+;;       (when (peer-address protocol)
+;;         (setf (slot-value protocol 'interface)
+;;               (layer3:find-interface (layer3:protocol protocol)
+;;                                      (node protocol)
+;;                                      (peer-address protocol))))))
+
+;; (defmethod buffer-available-p(size (protocol protocol))
+;;   (if (interface protocol)
+;;       (buffer-available-p size (interface protocol))
+;;       t))
+
+;; (defun request-notification(protocol)
+;;   "Rquest notification when buffer becomes available"
+;;   (when (interface protocol)
+;;     (interface:add-notify protocol (interface protocol))))
+
+;; (defun cancel-notification(protocol)
+;;   "Cancel a previous notification"
+;;   (when (interface protocol)
+;;     (interface:cancel-notify protocol (interface protocol))))
 
 (in-package :protocol.layer5)
 
 (defclass data()
-  ((size :type integer :initarg :size
+  ((layer :initform 5 :allocation :class :reader layer)
+   (length-bytes :type integer :initarg :length-bytes
          :documentation "Number of data bytes if no contents")
    (contents :type (or null (vector octet *)) :initform nil :reader contents
              :initarg :contents
@@ -284,20 +308,18 @@ initiated OK - does not mean was successfully completed if TCP"))
 
 (defmethod print-object((data data) stream)
   (print-unreadable-object (data stream :type t :identity t)
-    (format stream "~:/print-eng/bytes" (size data))))
+    (format stream "~:/print-eng/bytes" (length-bytes data))))
 
-(defmethod size((pdu data))
-  (if (contents pdu) (length (contents pdu)) (slot-value pdu 'size)))
+(defmethod length-bytes((pdu data))
+  (if (contents pdu) (length (contents pdu)) (slot-value pdu 'length-bytes)))
 
 (defmethod copy((data data))
   (let ((copy (copy-with-slots data '(msg-size response-size checksum))))
     (if (contents data)
         (setf (slot-value copy 'contents) (copy-seq (contents data)))
-        (setf (slot-value copy 'size) (slot-value data 'size)
+        (setf (slot-value copy 'length-bytes) (slot-value data 'length-bytes)
               (slot-value copy 'contents) nil))
     copy))
-
-(defmethod layer((pdu data)) 5)
 
 (defgeneric checksum(entity)
   (:documentation "Perform 16 bit xor checksum across entity data")
@@ -331,7 +353,7 @@ initiated OK - does not mean was successfully completed if TCP"))
   (- o f))
 
 (defun size-from-offset(o data)
-  (let ((size (size data)))
+  (let ((size (length-bytes data)))
     (if (> o size) 0 (- size o))))
 
 (defun size-from-seq(f o data)
@@ -345,7 +367,7 @@ initiated OK - does not mean was successfully completed if TCP"))
        :contents (when (contents data)
                    (subseq (contents data) offset (+ offset size)))
        :msg-size (msg-size data)
-       :size (unless (contents data) size)
+       :length-bytes (unless (contents data) size)
        :response-size (response-size data)))))
 
 (defun copy-from-seq(size f o data)
@@ -353,11 +375,11 @@ initiated OK - does not mean was successfully completed if TCP"))
 
 (defun remove-data(s data)
   "Remove s bytes from start of data"
-  (with-slots(size contents) data
-    (let ((r (min s size)))
-      (setf size (- size r))
+  (with-slots(length-bytes contents) data
+    (let ((r (min s length-bytes)))
+      (setf length-bytes (- length-bytes r))
       (when contents
-        (if (> size 0)
+        (if (> length-bytes 0)
             (setf contents (subseq contents s))
             (setf contents nil))))))
 
@@ -367,8 +389,8 @@ initiated OK - does not mean was successfully completed if TCP"))
       (etypecase s
         (integer (values s nil))
         ((vector octet *) (values (length s) s))
-        (data (values (size s) (contents s))))
-    (with-slots(size contents) data
+        (data (values (length-bytes s) (contents s))))
+    (with-slots(length-bytes contents) data
       (if contents
           (setf contents
                 (concatenate 'vector contents
@@ -376,4 +398,4 @@ initiated OK - does not mean was successfully completed if TCP"))
                                                :element-type 'octet
                                                :initial-element 0))))
           (when d (setf contents (copy-seq d))))
-      (setf size (+ size s)))))
+      (setf length-bytes (+ length-bytes s)))))

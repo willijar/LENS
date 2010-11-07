@@ -56,7 +56,8 @@
   (:documentation "network and hardware addressing")
   (:use :cl)
   (:import-from :split-sequence #:split-sequence)
-  (:export  #:address #:address= #:broadcast-p
+  (:export  #:address #:hardware-address #:network-address
+            #:address= #:broadcast-p
             #:macaddr #:ipaddr #:ipport #:ipmask
             #:*print-ip-format* #:print-ip-form
             #:ipaddr #:ipport #:ipmask #:macaddr
@@ -64,32 +65,111 @@
             #:address-condition #:address-out-of-range
             #:subnet #:ipaddr-allocator))
 
-
-#+nil(defpackage :layer1
-  (:documentation "Physical layer implementation")
+ (defpackage :node
+  (:documentation "Node implementations")
   (:use :cl :common :address)
-  (:import-from :node #:node)
-  (:import-from :alg #:queue #:enqueu #:dequeue #:make-queue #:empty-p)
-  (:import-from :protocol.layer2 #:busy-p)
-  (:import-from :scheduler
-                #:time-type #:simulation-time #:schedule #:schedule-timer)
-  (:import-from :packet #:notification #:size)
-  (:export #:link #:local-interface #:peer-interfaces #:peer-node-p
-           #:default-peer-interface #:ip-to-mac #:find-interface #:busy-p
-           #:bandwidth #:delay #:bit-error-rate  #:jitter #:weight
-           #:notifications #:*default-link* #:*default-bandwidth*
-           #:*default-delay* #:*default-jitter*
-           #:transmit #:transmit-complete #:rx-own-broadcast
-           #:transmit-helper
-           #:point-to-point #:busy-p #:peer-node-ipaddr
-           #:make-new-interface))
+  (:export #:node #:nodes #:clear-nodes
+           #:interfaces #:ipaddrs #:bind #:unbind #:local-ipaddr-p
+           #:add-interface #:find-interface
+            #:neighbours
+           #:receive-packet #:callbacks #:call-callbacks #:make-callback
+           #:lookup-by-port #:bound-protocols #:applications
+           #:make-location #:location #:distance))
 
-#+nil(defpackage :protocol
+(defpackage :protocol
   (:documentation "Protocol stack layer implementations")
   (:use :cl #:common)
-  (:import-from :packet #:pdu #:layer)
-  (:export #:pdu #:layer #:protocol #:send #:receive
-           #:src-address #:dst-address #:priority))
+  (:import-from :packet #:pdu #:layer #:length-bytes)
+  (:export #:protocol-number #:protocol #:layer #:pdu #:length-bytes))
+
+ (defpackage :protocol.layer2
+   (:documentation "Link layer protocol interface")
+   (:nicknames :layer2 :layer.link)
+   (:use :cl :address :common :protocol)
+   (:import-from :node #:node)
+   (:export #:pdu #:protocol #:interface
+            ;; specific default layer 2 protocols
+            #:ieee802.3 #:llcsnap #:snap-ethtype #:ieee802.11))
+
+ (defpackage :protocol.layer3
+   (:documentation "Network Layer protocol interface")
+   (:nicknames :layer3 :layer.network)
+   (:use :cl :common :address :protocol)
+   (:import-from :node #:node)
+   (:export #:protocol #:pdu
+            #:register-protocol #:protocols #:find-protocol #:delete-protocol
+            ;;#:send #:receive
+            ;;#:find-interface #:protocol-number
+            ;; some specific default layer 3 protocols
+            #:ipv4 #:arp))
+
+(defpackage :protocol.layer4
+  (:documentation "Transport Layer protocol interface")
+  (:nicknames :layer4 :layer.transport)
+  (:use :cl :common :address :protocol)
+  (:import-from :alg
+                #:enqueue #:dequeue #:make-queue
+                #:empty-p)
+  (:export #:protocol #:pdu
+            #:register-protocol #:protocols #:find-protocol #:delete-protocol
+            #:peer-address #:peer-port #:local-port #:local-address
+            ;;#:ipport #:protocol
+           ;; #:receive
+           ;; #:notification #:request-notification #:cancel-notification
+           ;; #:ttl #:fid #:tos #:interface
+           ;; #:send #:connect #:close-connection #:bind #:unbind #:make-packet
+           ;; specific default layer 4 protocols
+           #:udp #:tcp #:icmp #:demux #:tcp-tahoe #:tcp-reno #:tcp-newreno))
+
+(defpackage :protocol.layer5
+  (:documentation "Application Layer protocol interface")
+  (:nicknames :layer5 :data :layer.application)
+  (:use :cl :common :address :protocol)
+  (:export #:data #:contents #:msg-size #:response-size #:checksum
+           #:copy-from-offset #:size-from-seq #:copy-from-seq
+           #:add-data #:remove-data))
+
+(defpackage :layer1
+  (:documentation "Physical layer implementation")
+  (:nicknames :physical)
+  (:use :cl :common :address)
+  (:import-from :node #:node)
+  (:import-from :alg  #:make-queue
+                #:enqueue #:dequeue #:list-queue #:traverse #:empty-p)
+  (:import-from :packet #:length-bytes)
+  (:import-from :scheduler
+                #:time-type #:simulation-time #:schedule)
+  (:export #:packet-queue  #:make-queue
+           #:enqueu #:dequeue #:dequeue-if #:empty-p
+           #:delete-packets-if #:drop-packet-p #:buffer-available-p
+           #:average-queue-length #:reset-average-queue-length
+           #:enqueue-count #:drop-count #:egress-filter
+           #:length-packets #:length-bytes #:limit-packets #:limit-bytes
+           #:drop-tail))
+
+
+;; #:link #:local-interface #:peer-interfaces #:peer-node-p
+;;            #:default-peer-interface #:ip-to-mac #:find-interface #:busy-p
+;;            #:bandwidth #:delay #:bit-error-rate  #:jitter #:weight
+;;            #:notifications #:*default-link* #:*default-bandwidth*
+;;            #:*default-delay* #:*default-jitter*
+;;            #:transmit #:transmit-complete #:rx-own-broadcast
+;;            #:transmit-helper
+;;            #:point-to-point #:busy-p #:peer-node-ipaddr
+;;            #:make-new-interface))
+
+
+#+nil(defpackage :routing
+  (:documentation "Routing implementation")
+  (:use :cl :address :common)
+  (:import-from :interface #:interface #:peer-node-ipaddr)
+  (:import-from :node #:node #:nodes #:ipaddrs #:neighbours #:find-interface)
+  (:export #:routing-entry #:next-hop #:lookup-route
+           #:find-route #:add-route #:rem-route
+           #:initialise-routes #:reinitialise-routes #:default-route
+           #:*default-routing* #:topology-changed
+           #:routing-manual #:routing-static
+           #:make-neighbour))
 
 (defpackage :trace
    (:documentation "Packet Trace handling")
@@ -104,59 +184,6 @@
 ;; ;; each protocol layer has its own pdu and protocol class
 ;; ;; as it should be made explicit in other packages which
 ;; ;; layer is being refered to. They all have different APIs
-
-
-;; (defpackage :protocol.layer2
-;;   (:documentation "Link layer protocol interface")
-;;   (:nicknames :layer2 :layer.link)
-;;   (:use :cl :address :common :protocol)
-;;   (:export #:pdu #:protocol
-;;            #:send #:receive #:build-pdu #:busy-p
-;;            ;; specific default layer 2 protocols
-;;            #:ieee802.3 #:llcsnap #:snap-ethtype #:ieee802.11))
-
-;; (defpackage :protocol.layer3
-;;   (:documentation "Network Layer protocol interface")
-;;   (:nicknames :layer3 :layer.network)
-;;   (:use :cl :common :address :protocol)
-;;   (:export #:protocol #:pdu #:send #:receive
-;;            #:find-interface #:protocol-number
-;;            ;; some specific default layer 3 protocols
-;;            #:ipv4 #:arp))
-
-;; (defpackage :protocol.layer4
-;;   (:documentation "Transport Layer protocol interface")
-;;   (:nicknames :layer4 :layer.transport)
-;;   (:use :cl :common :address :protocol)
-;;   (:import-from :queues
-;;                 #:queue #:insert #:extract-head #:extract #:lookup)
-;;   (:export #:peer-address #:peer-port #:local-port #:local-address
-;;            #:ipport #:protocol #:pdu #:application  #:protocol-number
-;;            #:receive
-;;            #:notification #:request-notification #:cancel-notification
-;;            #:ttl #:fid #:tos #:interface
-;;            #:send #:connect #:close-connection #:bind #:unbind #:make-packet
-;;            ;; specific default layer 4 protocols
-;;            #:udp #:tcp #:icmp #:demux #:tcp-tahoe #:tcp-reno #:tcp-newreno))
-
-;; (defpackage :protocol.layer5
-;;   (:documentation "Application Layer protocol interface")
-;;   (:nicknames :layer5 :data :layer.application)
-;;   (:use :cl :common :address :protocol)
-;;   (:export #:data #:contents #:msg-size #:response-size #:checksum
-;;            #:copy-from-offset #:size-from-seq #:copy-from-seq
-;;            #:add-data #:remove-data))
-
-;; (defpackage :node
-;;   (:documentation "Node implementations")
-;;   (:use :cl :common :address :protocol)
-;;   (:export #:node #:nodes #:clear-nodes
-;;            #:interfaces #:ipaddrs #:bind #:unbind #:local-ipaddr-p
-;;            #:add-interface #:find-interface
-;;            #:find-protocol #:neighbours
-;;            #:receive-packet #:callbacks #:call-callbacks #:make-callback
-;;            #:lookup-by-port #:bound-protocols #:applications
-;;            #:make-location #:location #:distance))
 
 
 ;; (defpackage :application
@@ -219,17 +246,6 @@
 ;;            #:peers #:peer-p #:default-peer-interface #:ip-to-mac
 ;;            #:peer-node-ipaddr #:local-ipaddr-p #:node #:send #:link))
 
-;; (defpackage :routing
-;;   (:documentation "Routing implementation")
-;;   (:use :cl :address :common)
-;;   (:import-from :interface #:interface #:peer-node-ipaddr)
-;;   (:import-from :node #:node #:nodes #:ipaddrs #:neighbours #:find-interface)
-;;   (:export #:routing-entry #:next-hop #:lookup-route
-;;            #:find-route #:add-route #:rem-route
-;;            #:initialise-routes #:reinitialise-routes #:default-route
-;;            #:*default-routing* #:topology-changed
-;;            #:routing-manual #:routing-static
-;;            #:make-neighbour))
 
 ;; ;; backward symbol dependencies
 ;; (in-package :protocol)
