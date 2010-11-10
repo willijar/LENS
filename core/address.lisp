@@ -91,7 +91,7 @@
 
 (defmethod print-object((addr macaddr) stream)
   (if *print-escape*
-      (print-unreadable-object (addr stream :type t :identity t)
+      (print-unreadable-object (addr stream :type t :identity nil)
         (write (slot-value addr 'datum) :stream stream :base 16))
       (write (slot-value addr 'datum) :stream stream :base 16)))
 
@@ -168,9 +168,9 @@ addresses is defined.")
        (print-unreadable-object (addr stream :type t :identity t)
          (princ (ipaddr-to-dotted (slot-value addr 'datum)) stream))))))
 
-(defclass ipmask(network-address)
+(defclass ipmask(address)
   ()
-  (:documentation "An IP Mask"))
+  (:documentation "A network mask"))
 
 (defmethod make-load-form((ipmask ipmask) &optional env)
   (declare (ignore env))
@@ -178,7 +178,7 @@ addresses is defined.")
 
 (defmethod print-object((mask ipmask) stream)
   (if *print-escape*
-      (print-unreadable-object (mask stream :type t :identity t)
+      (print-unreadable-object (mask stream :type t :identity nil)
         (write (slot-value mask 'datum) :stream stream :base 16))
       (write (slot-value mask 'datum) :stream stream :base 16)))
 
