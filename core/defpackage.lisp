@@ -50,12 +50,20 @@
   (:use :cl :common)
   (:import-from :scheduler #:simulation-time #:time-type)
   (:export #:pdu #:pdus #:length-bytes #:layer #:packet #:created #:routing
-           #:push-pdu #:skip-pdu #:peek-pdu #:pop-pdu))
+           #:push-pdu #:skip-pdu #:peek-pdu #:pop-pdu #:priority))
+
+(defpackage :protocol
+  (:documentation "Protocol stack layer implementations")
+  (:use :cl #:common)
+  (:import-from :packet #:pdu #:layer #:length-bytes)
+  (:export #:protocol-number #:protocol #:layer #:pdu #:length-bytes
+           #:send #:send-complete #:receive-start #:receive))
 
 (defpackage :address
   (:documentation "network and hardware addressing")
   (:use :cl)
   (:import-from :split-sequence #:split-sequence)
+  (:import-from :protocol #:length-bytes #:protocol-number)
   (:export  #:address #:hardware-address #:network-address
             #:address= #:broadcast-p
             #:macaddr #:ipaddr #:ipport #:ipmask
@@ -75,12 +83,6 @@
            #:receive-packet #:callbacks #:call-callbacks #:make-callback
            #:lookup-by-port #:bound-protocols #:applications
            #:make-location #:location #:distance))
-
-(defpackage :protocol
-  (:documentation "Protocol stack layer implementations")
-  (:use :cl #:common)
-  (:import-from :packet #:pdu #:layer #:length-bytes)
-  (:export #:protocol-number #:protocol #:layer #:pdu #:length-bytes))
 
  (defpackage :protocol.layer2
    (:documentation "Link layer protocol interface")
@@ -145,7 +147,8 @@
            #:average-queue-length #:reset-average-queue-length
            #:enqueue-count #:drop-count #:egress-filter
            #:length-packets #:length-bytes #:limit-packets #:limit-bytes
-           #:drop-tail))
+           #:drop-tail
+           #:interface #:haredware-address))
 
 
 ;; #:link #:local-interface #:peer-interfaces #:peer-node-p
@@ -159,17 +162,17 @@
 ;;            #:make-new-interface))
 
 
-#+nil(defpackage :routing
-  (:documentation "Routing implementation")
-  (:use :cl :address :common)
-  (:import-from :interface #:interface #:peer-node-ipaddr)
-  (:import-from :node #:node #:nodes #:ipaddrs #:neighbours #:find-interface)
-  (:export #:routing-entry #:next-hop #:lookup-route
-           #:find-route #:add-route #:rem-route
-           #:initialise-routes #:reinitialise-routes #:default-route
-           #:*default-routing* #:topology-changed
-           #:routing-manual #:routing-static
-           #:make-neighbour))
+;; (defpackage :routing
+;;   (:documentation "Routing implementation")
+;;   (:use :cl :address :common)
+;;   (:import-from :interface #:interface #:peer-node-ipaddr)
+;;   (:import-from :node #:node #:nodes #:ipaddrs #:neighbours #:find-interface)
+;;   (:export #:routing-entry #:next-hop #:lookup-route
+;;            #:find-route #:add-route #:rem-route
+;;            #:initialise-routes #:reinitialise-routes #:default-route
+;;            #:*default-routing* #:topology-changed
+;;            #:routing-manual #:routing-static
+;;            #:make-neighbour))
 
 (defpackage :trace
    (:documentation "Packet Trace handling")

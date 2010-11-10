@@ -1,6 +1,5 @@
-;; $Id$
-;; LENS Global Trace Control
-;; Copyright (C) 2007 Dr. John A.R. Williams
+;; LENS  Packet Trace Control
+;; Copyright (C) 2010 Dr. John A.R. Williams
 
 ;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
 ;; Keywords:
@@ -14,12 +13,32 @@
 
 ;; trace-stream combines the functionality of the tfstream and trace classes
 ;; in GTNetS
-;; Note due to the structure of Lisp streams and IO,
 ;;; Code:
 
 (in-package :trace)
 
+;; Generic interface with sensible defaults
+
 (deftype trace-status() '(member :enabled :disabled :default))
+
+(defgeneric trace-status(entity stream)
+  (:documentation "Return the trace status for given protocol layer on stream")
+  (:method(entity stream) (declare (ignore entity stream)) :default))
+
+(defgeneric trace-enabled-p(entity stream)
+  (:documentation "Determine if tracing enabled for entity on stream - checking  heirarchically - node, entity (protocol) and layer")
+  (:method(entity stream) (eql (trace-status entity stream) :enabled))
+  (:method(entity (stream stream))
+    (when (open-stream-p stream) (call-next-method))))
+
+(defgeneric trace-detail(entity stream)
+  (:documentation "Return the trace detail for given entity on stream. t means all")
+  (:method(entity stream) (declare (ignore entity stream)) t))
+
+(defgeneric trace(entity packet &key &allow-other-keys)
+  (:documentation "Called by entity to trace an action on a packet"))
+
+;; specific trace stream implementation of interface
 
 (defclass trace-stream(fundamental-stream)
   ((os :initarg :stream :reader os :initform *standard-output*)
@@ -35,15 +54,11 @@
    (last-log-time
     :initform -1.0 :type time-type :accessor last-log-time
     :documentation "")
-   (status :type hash-table :initform (make-hash-table)
-           :reader status)
-   (detail :type hash-table :initform (make-hash-table)
-           :reader detail))
+   (status :type hash-table :initform (make-hash-table) :reader status)
+   (detail :type hash-table :initform (make-hash-table) :reader detail))
   (:documentation "A packet trace stream"))
 
 (defmethod reset((ts trace-stream))
-  (clrhash (status ts))
-  (clrhash (detail ts))
   (terpri (os ts))
   (setf (col-index ts) 0)
   (setf (last-log-time ts) (simulation-time)))
@@ -81,7 +96,7 @@
      (terpri (os stream))
      (setf (col-index stream) 0))
     (t (check-sim-time stream)
-       (incf  (col-index stream))
+       (incf (col-index stream))
        (write-char char (os stream)))))
 
 (defmethod stream-write-sequence((ts trace-stream)
@@ -101,16 +116,9 @@
 (defmethod stream-write-string((ts trace-stream) string &optional start end)
   (stream-write-sequence ts string start end))
 
-(defmethod sb-gray:stream-line-length((ts trace-stream))
-  (sb-gray:stream-line-length (os ts)))
+(defmethod stream-line-length((ts trace-stream))
+  (stream-line-length (os ts)))
 
-(defgeneric (setf node)(node stream)
-  (:documentation "CHande node reporting on a trace"))
-
-(defmethod (setf node) (node (ts trace-stream))
-  (unless (eql node (node ts))
-    (eol ts)
-    (setf (slot-value ts 'node) node)))
 
 ;; trace status and trace detail are set by node, protocol
 ;; or protocol layer number
@@ -122,16 +130,8 @@
 (defun reset-traces() (reset *lens-trace-output*))
 (eval-when(:load-toplevel :execute) (pushnew #'reset-traces *reset-hooks*))
 
-(defmethod (setf node)(node (ts list))
-  (dolist(s ts) (setf (node s) node)))
-
-(defmethod (setf node)(node (ts (eql nil)))
-  (when *lens-trace-output* (setf (node *lens-trace-output*) node)))
-
-(defgeneric trace-status(entity stream)
-  (:documentation "Return the trace status for given protocol layer on stream")
-  (:method(protocol (stream trace-stream))
-    (gethash protocol (status stream) :default)))
+(defmethod trace-status(protocol (stream trace-stream))
+  (gethash protocol (status stream) :default))
 
 (defgeneric (setf trace-status)(value entity stream)
   (:documentation "Set the trace status for given protocol, node or layer")
@@ -145,39 +145,45 @@
     (when *lens-trace-output*
       (setf (trace-status entity *lens-trace-output*) value))))
 
+(defmethod trace-enabled-p((protocol protocol:protocol) stream)
+  "Determine if tracing enabled for entity on stream - checking
+heirarchically - node, entity (protocol) and layer"
+  (when (open-stream-p stream)
+    (let ((ts (trace-status (node protocol) stream)))
+      (when (eql ts :default)
+        (setf ts (trace-status protocol stream)))
+      (when (eql ts :default)
+        (setf ts (trace-status (protocol:layer protocol) stream)))
+      (eql ts :enabled))))
+
 ;; trace detail is passed to a PDU trace to control its output
 ;; a value of t means trace everything
 
-(defgeneric default-trace-detail(entity)
-  (:documentation "Return the default detail for an entity")
-  (:method(entity) nil))
-
-(defgeneric trace-detail(entity stream)
-  (:documentation "Return the trace detail for given entity on stream")
-  (:method(entity (stream trace-stream))
+(defmethod trace-detail(entity (stream trace-stream))
     "Return the list of all for entity on stream details"
     (or (gethash entity (detail stream))
-        (default-trace-detail entity))))
+        (call-next-method)))
 
-(defgeneric (setf trace-detail)(value protocol stream)
+(defgeneric (setf trace-detail)(value entity stream)
   (:documentation
-   "Return the trace  detail for given protocol layer on stream")
-  (:method((value list) protocol (stream trace-stream))
-    (setf (gethash protocol (detail stream)) value))
-  (:method(value protocol (streams list))
+   "Set the trace  detail for given entity on stream")
+  (:method((value list) entity (stream trace-stream))
+    (setf (gethash entity (detail stream)) value))
+  (:method(value entity (streams list))
     (dolist(stream streams)
-      (setf (trace-detail protocol stream) value)))
-  (:method(value protocol (streams (eql 'nil)))
+      (setf (trace-detail entity stream) value)))
+  (:method(value entity (streams (eql 'nil)))
     (when *lens-trace-output*
-      (setf (trace-detail protocol *lens-trace-output*) value))))
+      (setf (trace-detail entity *lens-trace-output*) value))))
 
-(defun eol(entity)
-  (etypecase entity
-    (trace-stream (unless (zerop (col-index entity))
-                    (write-char #\newline entity)
-                    (setf (col-index entity) 0)))
-    (null (when *lens-trace-output* (eol *lens-trace-output*)))
-    (list (map 'nil #'eol entity))))
+(defgeneric eol(stream)
+  (:documentation "Write end of line eol to a stream type entity")
+  (:method ((stream stream)) (write-char #\newline stream))
+  (:method ((stream trace-stream))
+            (unless (zerop (col-index stream))
+              (write-char #\newline stream)
+              (setf (col-index stream) 0)))
+  (:method((streams list)) (dolist(stream streams) (eol stream))))
 
 (defun write-pdu-slots(pdu slots mask stream)
   "Helper to write the slots of a PDU to stream. mask is the detail mask
@@ -189,23 +195,13 @@ or a list of slot name and format string"
             (values (first slot) (second slot))
             (values slot " ~A"))
       (when (member slot mask)
-        (format stream format (slot-value pdu slot))))))
-
-(defun trace-enabled-p(node protocol stream)
-  "Determine if tracing enabled for this node,
-protocol and pdu on stream. Check is heirarchical - node, protocol and
-then layer."
-  ;; if no protocol this is a drop
-  (when (open-stream-p stream)
-    (let ((ts (trace-status node stream)))
-      (when (eql ts :default)
-        (setf ts (trace-status protocol stream)))
-      (when (and protocol (eql ts :default))
-        (setf ts (trace-status (layer protocol) stream)))
-      (eql ts :enabled))))
+        (format stream format
+                (if (functionp slot)
+                    (funcall slot pdu)
+                    (slot-value pdu slot)))))))
 
 (defgeneric pdu-trace(pdu detail stream &key packet text)
-  (:documentation "All PDUs should define this method to trace theor
+  (:documentation "All PDUs should define this method to trace their
 output according to detail onto stream")
   (:method((pdu (eql :drop)) detail stream &key packet text)
     "Trace a packet drop"
@@ -216,22 +212,12 @@ output according to detail onto stream")
   (:method((pdu null) detail stream &key packet text)
     (format stream " ~A ~D" text (uid packet))))
 
-(defgeneric write-trace(node protocol pdu stream &key packet text)
-  (:documentation "Main entry point to trace a PDU")
-  (:method(node protocol pdu (streams list)  &key packet text)
-    (dolist(stream streams)
-      (write-trace node  protocol pdu stream :packet packet :text text)))
-  (:method(node protocol pdu (streams (eql 'nil)) &key packet text)
-    (when *lens-trace-output*
-      (write-trace node protocol pdu *lens-trace-output*
-                   :packet packet :text text)))
-  (:method(node protocol pdu (stream trace-stream) &key packet text)
-    "Main entry point to trace a PDU on a given node"
-    (when (trace-enabled-p node protocol stream)
-      (setf (node stream) node)
+(defun write-trace(node protocol pdu &key packet text (stream *lens-trace-output*))
+  (dolist(stream (if (listp stream) stream (list stream)))
+        (when (trace-enabled-p node protocol stream)
+      (setf (slot-value stream 'node) node)
       (pdu-trace pdu
                  (if protocol (trace-detail protocol stream) nil)
                  stream
                  :packet packet
                  :text text))))
-

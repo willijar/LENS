@@ -31,10 +31,8 @@
   (:documentation "Return the destination address of an entity"))
 
 (defclass address()
-  ((datum :type (unsigned-byte 32) :initarg :datum))
+  ((datum :type integer :initarg :datum))
   (:documentation "Generic class for addresses"))
-
-(defmethod length-bytes((address address)) 4)
 
 (defun address=(a b)
   (or (eql a b)
@@ -60,12 +58,15 @@
   (:documentation "Base class for hardware addresses"))
 
 (deftype ip() '(unsigned-byte 32))
-(deftype mac() '(unsigned-byte 32))
+(deftype mac() '(unsigned-byte 48))
 (deftype ipport() '(unsigned-byte 16))
 
 (defclass macaddr(hardware-address)
   ((nextmac :initform 0 :allocation :class :type mac))
-  (:documentation "Standard mac addresse"))
+  (:documentation "Standard mac address"))
+
+(defmethod length-bytes((addr macaddr)) 6)
+(defmethod protocol-number((addr macaddr)) 1)
 
 (defgeneric macaddr(arg)
   (:documentation "Create a mac address entity. May be aliased")
@@ -85,7 +86,7 @@
            (setf (slot-value addr 'nextmac)
                  (max mac (slot-value addr 'nextmac)))
            mac)
-          ((eql mac :broadcast) #xFFFFFFFF)
+          ((eql mac :broadcast) #xFFFFFFFFFF)
           (t (error "Invalid Mac Address specification ~S" mac)))))
 
 (defmethod print-object((addr macaddr) stream)
@@ -97,6 +98,9 @@
 (defclass ipaddr(network-address)
   ()
   (:documentation "An IP Address"))
+
+(defmethod length-bytes((addr ipaddr)) 4)
+(defmethod protocol-number((addr ipaddr)) #x0800)
 
 (defmethod make-load-form((ipaddr ipaddr) &optional environment)
   (make-load-form-saving-slots ipaddr :environment environment))
@@ -192,7 +196,8 @@ addresses is defined.")
 (defgeneric ipmask(entity)
   (:documentation "Construct an ipmask from entity")
   (:method((nobits integer)) (aref *ipmasks* nobits))
-  (:method((s string)) (aref *ipmasks* (parse-integer s :radix 16))))
+  (:method((s string)) (aref *ipmasks* (parse-integer s :radix 16)))
+  (:method((c symbol)) (ipmask (ecase c (:a 8) (:b 16) (:c 24)))))
 
 (defun subnet(ipaddr mask)
   (make-instance 'ipaddr

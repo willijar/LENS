@@ -15,7 +15,7 @@
 
 ;;; Code:
 
-(in-package :physical)
+(in-package :layer1)
 
 (defclass packet-queue()
   ((enqueue-count :type counter :accessor enqueue-count :initform 0
@@ -144,9 +144,8 @@ Return True if time for a forced loss. May also be used for egress filtering")
 (defmethod empty-p((q drop-tail))
   (empty-p (slot-value q 'queue)))
 
-(defmethod delete-packets-if((predicate function) (queue drop-tail)
-                             &key (key #'identity))
-  (setf (alg::list-queue-head (slot-value queue 'queue))
+(defun list-queue-delete-if-helper(predicate queue list-queue key)
+  (setf (alg::list-queue-head list-queue)
         (mapcan
          #'(lambda(packet)
              (if (funcall predicate (funcall key packet))
@@ -155,18 +154,64 @@ Return True if time for a forced loss. May also be used for egress filtering")
                    (decf (length-bytes queue) (length-bytes packet))
                    nil)
                  (list packet)))
-         (alg::list-queue-head (slot-value queue 'queue))))
-  (setf (alg::list-queue-tail (slot-value queue 'queue)) (last (alg::list-queue-head (slot-value queue 'queue))))
+         (alg::list-queue-head list-queue)))
+  (setf (alg::list-queue-tail list-queue)
+        (last (alg::list-queue-head list-queue))))
+
+(defmethod delete-packets-if((predicate function) (queue drop-tail)
+                             &key (key #'identity))
+  (list-queue-delete-if-helper predicate queue (slot-value queue 'queue) key)
   (update-average-queue-length queue))
 
-(defmethod dequeue-if((predicate function) (queue drop-tail)
-                    &key (key #'identity))
+(defmethod list-queue-dequeue-if-helper(predicate queue list-queue key)
   (traverse
    #'(lambda(packet)
        (when (funcall predicate (funcall key packet))
-         (alg::delete packet (slot-value queue 'queue))
+         (alg::delete packet list-queue)
          (decf (length-packets queue))
          (decf (length-bytes queue) (length-bytes packet))
-         (return-from dequeue-if packet)))
-   (slot-value queue 'queue))
+         (return-from list-queue-dequeue-if-helper packet)))
+   list-queue))
+
+(defmethod dequeue-if((predicate function) (queue drop-tail)
+                    &key (key #'identity))
+  (prog1
+      (list-queue-dequeue-if-helper predicate queue
+                                    (slot-value queue 'queue) key)
+    (update-average-queue-length queue)))
+
+(defclass priority-queue(packet-queue)
+  ((queues :type vector
+           :documentation "Vector of queues indexed by priority class"))
+  (:default-initargs :limit-bytes 50000)
+  (:documentation "The simple droptail or FIFO queue"))
+
+(defmethod initialize-instance :after ((q priority-queue) &key (max-priority 2) &allow-other-keys)
+  (with-slots(queues) q
+    (setf queues (make-array max-priority))
+    (dotimes(i max-priority) (setf (aref queues i) (make-queue)))))
+
+(defmethod empty-p((q priority-queue)) (every #'empty-p (slot-value q 'queues)))
+
+(defmethod enqueue(packet (q priority-queue))
+  (enqueue packet (aref (slot-value q 'queues) (priority packet))))
+
+(defmethod dequeue((q priority-queue))
+  (let ((q (find-if #'empty-p (slot-value q 'queues) :from-end t)))
+    (when q (dequeue q))))
+
+(defmethod delete-packets-if((predicate function) (queue priority-queue)
+                             &key (key #'identity))
+  (map 'nil
+       #'(lambda(q) (queue-delete-if-helper predicate queue q key))
+       (slot-value queue 'queues))
   (update-average-queue-length queue))
+
+(defmethod dequeue-if((predicate function) (queue priority-queue)
+                      &key (key #'identity))
+  (prog1
+      (find-if #'(lambda(list-queue)
+                   (list-queue-dequeue-if-helper predicate queue
+                                                 list-queue key))
+               (slot-value queue 'queues) :from-end t)
+    (update-average-queue-length queue)))

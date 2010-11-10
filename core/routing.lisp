@@ -9,8 +9,8 @@
 (defclass routing-entry()
   ((interface :type interface :reader interface :initarg :interface
               :documentation "Interface for route")
-   (next-hop :type ipaddr :reader next-hop :initarg :next-hop
-            :documentation "Next hop IP Address"))
+   (next-hop :type network-address :reader next-hop :initarg :next-hop
+            :documentation "Next hop network Address"))
   (:documentation "This class defines each entry in the routing table."))
 
 (defmethod print-object((re routing-entry) stream)
@@ -24,7 +24,7 @@
 
 (defclass routing()
   ((node :type node :initarg :node :reader node
-         :documentation "Nopde to which routing object is attached")
+         :documentation "Nope to which routing object is attached")
    (default-route :type routing-entry :initform nil :accessor default-route
                   :documentation "The default (gateway) route"))
   (:documentation "Base class for all the routing protocols that may

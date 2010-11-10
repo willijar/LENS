@@ -16,7 +16,7 @@
 
 ;;; Code:
 
-(in-package :lens.math)
+(in-package :math)
 
 (defgeneric record(value statistics &key time)
   (:documentation "Record the value and (optionally) time"))

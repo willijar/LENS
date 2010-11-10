@@ -17,6 +17,12 @@
 (defgeneric layer(pdu)
   (:documentation "Return the layer associated with a PDU"))
 
+(defgeneric priority(pdu)
+  (:documentation "Priority of a pdu for priority queueing")
+  (:method(pdu) 0))
+
+(defmethod copy((pdu pdu)) (make-instance (class-of pdu)))
+
 (defclass packet()
   ((uid :type counter
         :initform (incf *packet-count*)
@@ -79,5 +85,6 @@ The PDU is added at the top of the PDU stack"
     (when (> length 0)
       (decf (fill-pointer pdus)))))
 
+(defmethod priority((p packet)) (priority (peek-pdu packet)))
 
 

@@ -12,8 +12,11 @@
 
 ;;; Commentary:
 
-;;
-
+;; Protocols should use a split-phase interface for sending
+;; send on lower layer
+;; starts the sending process - if it returns true, false if not
+;; send-complete on upper layer is called with the packet and success arguments
+;; when sending is completed
 ;;; Code:
 
 (in-package :protocol)
@@ -31,6 +34,27 @@ See http://www.iana.org/assignments/protocol-numbers")
 (defmethod layer((protocol protocol)) (get (type-of protocol) 'layer))
 (defmethod layer((protocol symbol)) (get protocol 'layer))
 
+;; split-phase transmission (going down protocol layers)
+(defgeneric send(receiver packet sender &key &allow-other-keys)
+  (:documentation "Called by sender to start sending packet - Returns
+  true if packet accepted for transmission, false otherwise."))
+
+(defgeneric send-complete(sender packet receiver &key fail &allow-other-keys)
+  (:documentation "Called by receiver when sending completed to notify
+  receiver - fail-reason indicates if packet was dropped - null if successful")
+  (:method(sender packet receiver &key &allow-other-keys)
+    (declare (ignore sender packet receiver fail))))
+
+;; split phase reception going up protocol stack
+(defgeneric receive-start(receiver packet sender)
+  (:documentation "Called by sender to start receiver receiving a packet.")
+  (:method(receiver packet sender)
+    (declare (ignore receiver packet sender))))
+
+(defgeneric receive(receiver packet sender &key &allow-other-keys)
+  (:documentation "Called by packet when to pass received packet up to
+  receiver (once reception is complete)"))
+
 (in-package :protocol.layer2)
 
 (defclass protocol(protocol:protocol)
@@ -43,15 +67,23 @@ See http://www.iana.org/assignments/protocol-numbers")
   ((layer :initform 2 :reader protocol:layer :allocation :class))
   (:documentation "The base class for all layer two  protocol data units"))
 
+(defmethod send :around ((protocol protocol) packet layer3 &key address)
+  (cond ((or (typep address 'hardware-address) (eql address :broadcast))
+         (call-next-method))
+        ((arp interface)
+         (send (arp interface) packet layer3 :address address))
+        (t
+         (call-next-method protocol packet layer3
+                           :address (network-to-hardware-address address interface)))))
+
+
 (defgeneric build-pdu(protocol src-address dst-address packet &optional type)
   (:documentation "Build and append a layer2 pdu to the specified packet."))
 
 (in-package :protocol.layer3)
 
 (defclass protocol(protocol:protocol)
-  ((layer :initform 3 :reader layer :allocation :class)
-   (node :initarg :node :reader node
-         :documentation "Local Node"))
+  ((layer :initform 3 :reader layer :allocation :class))
   (:documentation "Layer 3 protocol"))
 
 (defclass pdu(packet:pdu)

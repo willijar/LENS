@@ -6,26 +6,43 @@
 
 (in-package :node)
 
+(defstruct location
+  (x 0.0 :type short-float :read-only t)
+  (y 0.0 :type short-float :read-only t)
+  (z 0.0 :type short-float :read-only t))
+
+(defconstant +origin+ (if (boundp '+origin+) +origin+ (make-location)))
+
+(defgeneric distance(a b)
+  (:documentation "Return distance between a and b")
+  (:method((a location) (b location))
+    (let ((dx (- (location-x a) (location-x b)))
+          (dy (- (location-y a) (location-y b)))
+          (dz (- (location-z a) (location-z b))))
+      (sqrt (+ (* dx dx) (* dy dy) (* dz dz)))))
+  (:method(a b)
+    (distance (location a) (location b))))
+
 (defclass node()
   ((uid :type fixnum :reader uid
         :documentation "Unique id of this node - also index in nodes array")
-   (location :initform nil :type location :accessor location
-             :documentation "Location of this node")
-   (ipaddr :type ipaddr :initform nil :initarg :ipaddr :reader ipaddr
-           :documentation "IP address of this node")
+   (location :initform +origin+ :type location :accessor location
+             :documentation "Physical Location of this node")
+   (network-address :type network-address :initform (ipaddr :next)
+                    :initarg :ipaddr :reader ipaddr :reader network-address
+                    :documentation "network address of this node")
    (interfaces :type (vector interface *)
-               :initform (make-array 1 :adjustable t :fill-pointer 0)
+               :initform (make-array 2 :adjustable t :fill-pointer 0)
                :reader interfaces
                :documentation "Vector of interfaces for this node")
+   (layer3:protocols :type list :initform nil
+                     :documentation "List of layer 3 protocol entities")
+   (layer4:protocols :type list :initform nil
+                     :documentation "List of layer 4 protocol entities")
    (up-p :type boolean :initform t :reader up-p
           :documentation "True if node up, false if failed")
    (routing :initarg :routing :accessor routing
             :documentation "Routing object for this node")
-   (protocol-graph :initarg :protocol-graph
-                   :initform protocol:*common-protocol-graph*
-                   :accessor protocol-graph
-                   :documentation "Protocol graph for this node")
-   (port-demux :documentation "Port demultiplexer")
    (callbacks :type list :initform nil :accessor callbacks
               :documentation "List of callbacks on this node"))
   (:documentation "Class PDU serves as the base class for all the
@@ -34,10 +51,10 @@ form the packets are derived from this class."))
 
 (defmethod print-object((node node) stream)
   (print-unreadable-object (node stream :type t :identity t)
-    (format stream "~D~@[ ~A~]" (uid node) (ipaddr node))))
+    (format stream "~D~@[ ~A~]" (uid node) (network-address node))))
 
 (defvar *nodes*
-  (make-array 64 :initial-element nil :adjustable t :fill-pointer 0)
+  (make-array 1024 :initial-element nil :adjustable t :fill-pointer 0)
   "Global vector of all nodes")
 
 (defun nodes() "Return the vector of all nodes" *nodes*)
@@ -198,10 +215,6 @@ no-leaf is true do not include leaf nodes in the list")
 
 ;; port demultiplexing - maps layer 4 protocol instances to bindings
 
-(defun port-demux(node)
-  (if (slot-boundp node 'port-demux)
-      (slot-value node 'port-demux)
-      (setf (slot-value node 'port-demux) (make-hash-table :test #'equalp))))
 
 (defun lookup-by-port(protocol-number node
                       &key local-port local-addr peer-port peer-addr)
@@ -267,18 +280,3 @@ no-leaf is true do not include leaf nodes in the list")
   (map 'nil #'reset (interfaces node))
   (map 'nil #'reset (bound-protocols node))
   (map 'nil #'reset (applications node)))
-
-(defstruct location
-  (x 0.0 :type short-float)
-  (y 0.0 :type short-float)
-  (z 0.0 :type short-float))
-
-(defgeneric distance(a b)
-  (:documentation "Return distance between a and b")
-  (:method((a location) (b location))
-    (let ((dx (- (location-x a) (location-x b)))
-          (dy (- (location-y a) (location-y b)))
-          (dz (- (location-z a) (location-z b))))
-      (sqrt (+ (* dx dx) (* dy dy) (* dz dz)))))
-  (:method(a b)
-    (distance (location a) (location b))))
