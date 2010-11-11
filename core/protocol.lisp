@@ -1,4 +1,3 @@
-;; $Id$
 ;; Protocol Stack Layer Implementation
 ;; Copyright (C) 2006 Dr. John A.R. Williams
 
@@ -37,23 +36,20 @@ See http://www.iana.org/assignments/protocol-numbers")
 ;; split-phase transmission (going down protocol layers)
 (defgeneric send(receiver packet sender &key &allow-other-keys)
   (:documentation "Called by sender to start sending packet - Returns
-  true if packet accepted for transmission, false otherwise."))
-
-(defgeneric send-complete(sender packet receiver &key fail &allow-other-keys)
-  (:documentation "Called by receiver when sending completed to notify
-  receiver - fail-reason indicates if packet was dropped - null if successful")
-  (:method(sender packet receiver &key &allow-other-keys)
-    (declare (ignore sender packet receiver fail))))
-
-;; split phase reception going up protocol stack
-(defgeneric receive-start(receiver packet sender)
-  (:documentation "Called by sender to start receiver receiving a packet.")
-  (:method(receiver packet sender)
-    (declare (ignore receiver packet sender))))
+  true if packet accepted for transmission, false otherwise.")
+  (:method :before(receiver packet (sender protocol) &key &allow-other-keys)
+     (write-trace sender (peek-pdu packet) :packet packet :text "-")))
 
 (defgeneric receive(receiver packet sender &key &allow-other-keys)
   (:documentation "Called by packet when to pass received packet up to
-  receiver (once reception is complete)"))
+  receiver (once reception is complete)")
+  (:method :before((receiver protocol) packet sender &key &allow-other-keys)
+     (write-trace receiver (peek-pdu packet) :packet packet :text "+")))
+
+(defgeneric drop(entity packet &key node &allow-other-keys)
+  (:documentation "Drop a packet")
+  (:method :after (entity packet &key text &allow-other-keys)
+    (write-trace entity :drop :packet packet :text text)))
 
 (in-package :protocol.layer2)
 
@@ -63,7 +59,7 @@ See http://www.iana.org/assignments/protocol-numbers")
               :documentation "Interface for this protocol"))
   (:documentation "Layer 2 protocol base class"))
 
-(defclass pdu(protocol:pdu)
+(defclass pdu(packet:pdu)
   ((layer :initform 2 :reader protocol:layer :allocation :class))
   (:documentation "The base class for all layer two  protocol data units"))
 
@@ -75,7 +71,6 @@ See http://www.iana.org/assignments/protocol-numbers")
         (t
          (call-next-method protocol packet layer3
                            :address (network-to-hardware-address address interface)))))
-
 
 (defgeneric build-pdu(protocol src-address dst-address packet &optional type)
   (:documentation "Build and append a layer2 pdu to the specified packet."))
@@ -128,17 +123,17 @@ is true add it to the list of standard protocols"
 
 (defmethod delete-protocol((protocol integer) node)
   (setf (slot-value node 'protocols)
-        (delete-protocol protocol (slot-value node 'protocols))))
+        (delete-protocol protocol (slot-value node 'layer3:protocols))))
 
 (defmethod find-protocol((protocol-number integer) node)
   "Find an already existent protocol or add one"
-  (or (find-protocol protocol-number (slot-value node 'protocols))
+  (or (find-protocol protocol-number (slot-value node 'layer3:protocols))
       (let ((protocol (find-protocol protocol-number *standard-protocols*)))
         (when protocol (make-instance protocol :node node)))))
 
 (defmethod register-protocol((protocol protocol) node &optional (replace nil))
-  (setf (slot-value node 'protocols)
-        (register-protocol protocol (slot-value node 'protocols) replace)))
+  (setf (slot-value node 'layer3:protocols)
+        (register-protocol protocol (slot-value node 'layer3:protocols) replace)))
 
 (defmethod initialize-instance :after ((protocol protocol)
                                        &key &allow-other-keys)
@@ -195,8 +190,8 @@ protocols")
             (register-protocol protocol *standard-protocols*))))
 
 (defmethod delete-protocol((protocol integer) node)
-  (setf (slot-value node 'protocols)
-        (delete-protocol protocol (slot-value node 'protocols))))
+  (setf (slot-value node 'layer4:protocols)
+        (delete-protocol protocol (slot-value node 'layer4:protocols))))
 
 (defmethod find-protocol((protocol-number integer) node)
   (or (find-protocol protocol-number (slot-value node 'protocols))
@@ -204,8 +199,8 @@ protocols")
         (when protocol (make-instance protocol :node node)))))
 
 (defmethod register-protocol((protocol protocol) node &optional (replace nil))
-  (setf (slot-value node 'protocols)
-        (register-protocol protocol (slot-value node 'protocols) replace)))
+  (setf (slot-value node 'layer4:protocols)
+        (register-protocol protocol (slot-value node 'layer4:protocols) replace)))
 
 (defmethod initialize-instance :after ((protocol protocol)
                                        &key &allow-other-keys)

@@ -53,12 +53,20 @@
   (:export #:pdu #:pdus #:length-bytes #:layer #:packet #:created #:routing
            #:push-pdu #:skip-pdu #:peek-pdu #:pop-pdu #:priority))
 
+(defpackage :trace
+   (:documentation "Packet Trace handling")
+   (:use :cl :trivial-gray-streams :common)
+;   (:import-from :address #:print-ip-format)
+   (:import-from :scheduler #:simulation-time #:time-type)
+   (:export #:trace-status #:trace-detail #:trace-stream #:time-format
+            #:*lens-trace-output* #:trace #:write-pdu-slots #:pdu-trace))
+
 (defpackage :protocol
   (:documentation "Protocol stack layer implementations")
-  (:use :cl #:common)
+  (:use :cl #:common #:trace)
   (:import-from :packet #:pdu #:layer #:length-bytes)
   (:export #:protocol-number #:protocol #:layer #:pdu #:length-bytes
-           #:send #:send-complete #:receive-start #:receive))
+           #:send #:receive #:drop))
 
 (defpackage :address
   (:documentation "network and hardware addressing")
@@ -80,7 +88,7 @@
   (:export #:node #:nodes #:clear-nodes
            #:interfaces #:ipaddrs #:bind #:unbind #:local-ipaddr-p
            #:add-interface #:find-interface
-            #:neighbours
+           #:neighbours
            #:receive-packet #:callbacks #:call-callbacks #:make-callback
            #:lookup-by-port #:bound-protocols #:applications
            #:make-location #:location #:distance))
@@ -93,9 +101,9 @@
   (:import-from :alg  #:make-queue
                 #:enqueue #:dequeue #:list-queue #:traverse #:empty-p)
   (:import-from :packet #:length-bytes #:priority)
-  (:import-from :scheduler
-                #:time-type #:simulation-time #:schedule)
-  (:export #:packet-queue  #:make-queue
+  (:import-from :scheduler #:time-type #:simulation-time #:schedule)
+  (:import-from :protocol #:send #:receive #:drop)
+  (:export #:interface #:packet-queue  #:make-queue
            #:enqueu #:dequeue #:dequeue-if #:empty-p
            #:delete-packets-if #:drop-packet-p #:buffer-available-p
            #:average-queue-length #:reset-average-queue-length
@@ -108,19 +116,18 @@
    (:documentation "Link layer protocol interface")
    (:nicknames :layer2 :layer.link)
    (:use :cl :address :common :protocol)
+   (:shadow #:protocol #:pdu)
    (:import-from :node #:node)
-   (:export #:pdu #:protocol #:interface
-            ;; specific default layer 2 protocols
-            #:ieee802.3 #:llcsnap #:snap-ethtype #:ieee802.11 #:arp))
+   (:export #:ieee802.3 #:llcsnap #:snap-ethtype #:ieee802.11 #:arp))
 
  (defpackage :protocol.layer3
    (:documentation "Network Layer protocol interface")
    (:nicknames :layer3 :layer.network)
    (:use :cl :common :address :protocol)
+   (:shadow #:protocol #:pdu)
    (:import-from :node #:node #:nodes #:ipaddrs #:neighbours #:find-interface)
    (:import-from :layer1 #:interface #:peer-node-ipaddr)
-   (:export #:protocol #:pdu
-            #:register-protocol #:protocols #:find-protocol #:delete-protocol
+   (:export #:register-protocol #:protocols #:find-protocol #:delete-protocol
             #:routing #:lookup-route
             #:find-route #:add-route #:rem-route
             #:initialise-routes #:reinitialise-routes #:default-route
@@ -133,10 +140,11 @@
   (:documentation "Transport Layer protocol interface")
   (:nicknames :layer4 :layer.transport)
   (:use :cl :common :address :protocol)
+  (:shadow #:protocol #:pdu)
   (:import-from :alg
                 #:enqueue #:dequeue #:make-queue
                 #:empty-p)
-  (:export #:protocol #:pdu
+  (:export
             #:register-protocol #:protocols #:find-protocol #:delete-protocol
             #:peer-address #:peer-port #:local-port #:local-address
             ;;#:ipport #:protocol
@@ -151,6 +159,7 @@
   (:documentation "Application Layer protocol interface")
   (:nicknames :layer5 :data :layer.application)
   (:use :cl :common :address :protocol)
+  (:shadow #:protocol #:pdu)
   (:export #:data #:contents #:msg-size #:response-size #:checksum
            #:copy-from-offset #:size-from-seq #:copy-from-seq
            #:add-data #:remove-data))
@@ -164,14 +173,6 @@
 ;;            #:transmit-helper
 ;;            #:point-to-point #:busy-p #:peer-node-ipaddr
 ;;            #:make-new-interface))
-
-(defpackage :trace
-   (:documentation "Packet Trace handling")
-   (:use :cl :trivial-gray-streams :common)
-;   (:import-from :address #:print-ip-format)
-   (:import-from :scheduler #:simulation-time #:time-type)
-   (:export #:trace-status #:trace-detail #:trace-stream #:time-format
-            #:*lens-trace-output* #:trace #:write-pdu-slots #:pdu-trace))
 
 
 

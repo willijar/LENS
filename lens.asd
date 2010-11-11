@@ -41,12 +41,11 @@
                (:file "protocol" :depends-on ("address" "common"))
                #+nil(:file "interface"
                       :depends-on ("defpackage" "packet-queue" "link"))
-               #+nil(:file "trace" :depends-on
+               (:file "trace" :depends-on
                       ("defpackage" "common" "scheduler" "compatibility"))
-
-
-;;                (:file "node"
-;;                       :depends-on ("common" "address" "routing" "protocol"))
+               (:file "routing" :depends-on ("common" "address"))
+               (:file "node"
+                       :depends-on ("common" "address" "routing" "protocol"))
 ;;                (:file "application"
 ;;                       :depends-on ("common" "scheduler" "protocol"))
 ;;                (:file "interface"
@@ -54,7 +53,6 @@
 ;;                (:file "link"
 ;;                       :depends-on ("common" "scheduler" "queues" "random"
 ;;                                    "address" "packet-queue" "node"))
-;;                (:file "routing" :depends-on ("common" "address"))
                #+nil(:file "statistics" :depends-on ("common" "scheduler"))
 
 
