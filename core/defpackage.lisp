@@ -26,7 +26,8 @@
            #:uid #:counter #:name
            #:octet #:word #:counter #:seq #:fid
            #:interface #:link #:node #:application
-           #:copy #:copy-with-slots))
+           #:copy #:copy-with-slots
+           #:notifier #:add-notify #:do-notifications))
 
 (defpackage :scheduler
   (:documentation "LENS Discrete Event Scheduler")
@@ -84,6 +85,25 @@
            #:lookup-by-port #:bound-protocols #:applications
            #:make-location #:location #:distance))
 
+(defpackage :layer1
+  (:documentation "Physical layer implementation")
+  (:nicknames :physical)
+  (:use :cl :common :address)
+  (:import-from :node #:node)
+  (:import-from :alg  #:make-queue
+                #:enqueue #:dequeue #:list-queue #:traverse #:empty-p)
+  (:import-from :packet #:length-bytes #:priority)
+  (:import-from :scheduler
+                #:time-type #:simulation-time #:schedule)
+  (:export #:packet-queue  #:make-queue
+           #:enqueu #:dequeue #:dequeue-if #:empty-p
+           #:delete-packets-if #:drop-packet-p #:buffer-available-p
+           #:average-queue-length #:reset-average-queue-length
+           #:enqueue-count #:drop-count #:egress-filter
+           #:length-packets #:length-bytes #:limit-packets #:limit-bytes
+           #:drop-tail
+           #:interface #:haredware-address))
+
  (defpackage :protocol.layer2
    (:documentation "Link layer protocol interface")
    (:nicknames :layer2 :layer.link)
@@ -91,19 +111,23 @@
    (:import-from :node #:node)
    (:export #:pdu #:protocol #:interface
             ;; specific default layer 2 protocols
-            #:ieee802.3 #:llcsnap #:snap-ethtype #:ieee802.11))
+            #:ieee802.3 #:llcsnap #:snap-ethtype #:ieee802.11 #:arp))
 
  (defpackage :protocol.layer3
    (:documentation "Network Layer protocol interface")
    (:nicknames :layer3 :layer.network)
    (:use :cl :common :address :protocol)
-   (:import-from :node #:node)
+   (:import-from :node #:node #:nodes #:ipaddrs #:neighbours #:find-interface)
+   (:import-from :layer1 #:interface #:peer-node-ipaddr)
    (:export #:protocol #:pdu
             #:register-protocol #:protocols #:find-protocol #:delete-protocol
-            ;;#:send #:receive
-            ;;#:find-interface #:protocol-number
+            #:routing #:lookup-route
+            #:find-route #:add-route #:rem-route
+            #:initialise-routes #:reinitialise-routes #:default-route
+            #:*default-routing* #:topology-changed
+            #:routing-manual #:routing-static
             ;; some specific default layer 3 protocols
-            #:ipv4 #:arp))
+            #:ipv4))
 
 (defpackage :protocol.layer4
   (:documentation "Transport Layer protocol interface")
@@ -131,26 +155,6 @@
            #:copy-from-offset #:size-from-seq #:copy-from-seq
            #:add-data #:remove-data))
 
-(defpackage :layer1
-  (:documentation "Physical layer implementation")
-  (:nicknames :physical)
-  (:use :cl :common :address)
-  (:import-from :node #:node)
-  (:import-from :alg  #:make-queue
-                #:enqueue #:dequeue #:list-queue #:traverse #:empty-p)
-  (:import-from :packet #:length-bytes)
-  (:import-from :scheduler
-                #:time-type #:simulation-time #:schedule)
-  (:export #:packet-queue  #:make-queue
-           #:enqueu #:dequeue #:dequeue-if #:empty-p
-           #:delete-packets-if #:drop-packet-p #:buffer-available-p
-           #:average-queue-length #:reset-average-queue-length
-           #:enqueue-count #:drop-count #:egress-filter
-           #:length-packets #:length-bytes #:limit-packets #:limit-bytes
-           #:drop-tail
-           #:interface #:haredware-address))
-
-
 ;; #:link #:local-interface #:peer-interfaces #:peer-node-p
 ;;            #:default-peer-interface #:ip-to-mac #:find-interface #:busy-p
 ;;            #:bandwidth #:delay #:bit-error-rate  #:jitter #:weight
@@ -160,19 +164,6 @@
 ;;            #:transmit-helper
 ;;            #:point-to-point #:busy-p #:peer-node-ipaddr
 ;;            #:make-new-interface))
-
-
-;; (defpackage :routing
-;;   (:documentation "Routing implementation")
-;;   (:use :cl :address :common)
-;;   (:import-from :interface #:interface #:peer-node-ipaddr)
-;;   (:import-from :node #:node #:nodes #:ipaddrs #:neighbours #:find-interface)
-;;   (:export #:routing-entry #:next-hop #:lookup-route
-;;            #:find-route #:add-route #:rem-route
-;;            #:initialise-routes #:reinitialise-routes #:default-route
-;;            #:*default-routing* #:topology-changed
-;;            #:routing-manual #:routing-static
-;;            #:make-neighbour))
 
 (defpackage :trace
    (:documentation "Packet Trace handling")

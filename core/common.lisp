@@ -197,4 +197,20 @@ Examples:
                     scale)))
       (princ arg os)))
 
+;;; Notifications mechanism
 
+(defclass notifier()
+  ((notifications :initform (make-instance 'alg:list-queue)
+                  :documentation "Queue of notifcations to call when not busy"))
+  (:documentation "Base for entities which can call notifications"))
+
+(defgeneric add-notify(notifier notification)
+  (:documentation "Add a notification to end of queue")
+  (:method((notification function) (notifier notifier) )
+    (alg:push notification (slot-value notifier 'notifications))))
+
+(defgeneric do-notifications(notifier)
+  (:method((notifier notifier))
+    (with-slots(notifications) notifier
+      (while (not (or (busy-p notifier) (alg:empty-p notifications)))
+        (funcall (alg:pop notifications))))))
