@@ -63,19 +63,10 @@ See http://www.iana.org/assignments/protocol-numbers")
   ((layer :initform 2 :reader protocol:layer :allocation :class))
   (:documentation "The base class for all layer two  protocol data units"))
 
-(defmethod send :around ((protocol protocol) packet layer3 &key address)
-  (cond ((or (typep address 'hardware-address) (eql address :broadcast))
-         (call-next-method))
-        ((arp interface)
-         (send (arp interface) packet layer3 :address address))
-        (t
-         (call-next-method protocol packet layer3
-                           :address (network-to-hardware-address address interface)))))
-
-(defgeneric build-pdu(protocol src-address dst-address packet &optional type)
-  (:documentation "Build and append a layer2 pdu to the specified packet."))
+;; Link layer will be sent packets either from ARP or from interface and will send to link.
 
 (in-package :protocol.layer3)
+;; Network layer should send to appropriate interface and will receive packets from transport layer
 
 (defclass protocol(protocol:protocol)
   ((layer :initform 3 :reader layer :allocation :class))
@@ -144,6 +135,7 @@ is true add it to the list of standard protocols"
 
 (in-package :protocol.layer4)
 
+;; layer 4 will receive packets from application and send to network layer
 (defvar *standard-protocols* nil "List of standard registered layer 4
 protocols")
 

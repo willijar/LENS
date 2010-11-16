@@ -59,12 +59,15 @@ called after all entities created before running simulation")
    (halted :type boolean :initform t :accessor halted)
    (thread :initform nil :reader scheduler-thread
 	    :documentation "Thread running scheduler")
-   (event-queue :initform
-                (make-binary-heap 1024 :extend-size 1.4
-                                  :element-type 'event
-                                  :key-fn #'event-time
-                                  :comp-fn #'<
-                                  :index #'event-rank))))
+   (event-queue
+    :initform
+    (make-binary-heap
+     :initial-size 1024
+     :extend-size 1.4
+     :element-type 'event
+     :key-fn #'event-time
+     :comp-fn #'<
+     :index #'event-rank))))
 
 (defmethod print-object((scheduler scheduler) stream)
   (print-unreadable-object (scheduler stream :type t :identity t)

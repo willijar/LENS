@@ -48,6 +48,14 @@ they are sent down on the link"))
             (length-packets q) (limit-packets q)
             (length-bytes q) (limit-bytes q))))
 
+(defmethod reset((q alg::list-queue))
+  (setf (alg::list-queue-head q) nil
+        (alg::list-queue-tail q) nil))
+
+(defmethod reset((q alg:vector-queue))
+  (setf (alg::vector-queue-head q) 0
+        (alg::vector-queue-tail q) 0))
+
 (defmethod reset((q packet-queue))
   (until (empty-p q) (dequeue q))
   (reset-average-queue-length q)
@@ -79,11 +87,11 @@ they are sent down on the link"))
       (decf (length-bytes queue) (length-bytes packet))
       packet)))
 
-(defgeneric dequeue-if(predicate queue &key key)
+(defgeneric dequeue-if(predicate queue)
   (:documentation "Remove the first packet on the queue for which
 predicate is true and return it, nil if none."))
 
-(defgeneric delete-packets-if(predicate queue &key key)
+(defgeneric delete-packets-if(predicate queue)
   (:documentation "Delete packets on queue for for which predicate is
 true. Return count of number of packets removed"))
 
@@ -131,7 +139,7 @@ Return True if time for a forced loss. May also be used for egress filtering")
     (setf (last-update queue) now)))
 
 (defclass drop-tail(packet-queue)
-  ((queue :initform (make-queue)))
+  ((queue :initform (make-instance 'alg:list-queue)))
   (:default-initargs :limit-bytes 50000)
   (:documentation "The simple droptail or FIFO queue"))
 
@@ -144,40 +152,33 @@ Return True if time for a forced loss. May also be used for egress filtering")
 (defmethod empty-p((q drop-tail))
   (empty-p (slot-value q 'queue)))
 
-(defun list-queue-delete-if-helper(predicate queue list-queue key)
-  (setf (alg::list-queue-head list-queue)
-        (mapcan
-         #'(lambda(packet)
-             (if (funcall predicate (funcall key packet))
-                 (progn
-                   (decf (length-packets queue))
-                   (decf (length-bytes queue) (length-bytes packet))
-                   nil)
-                 (list packet)))
-         (alg::list-queue-head list-queue)))
-  (setf (alg::list-queue-tail list-queue)
-        (last (alg::list-queue-head list-queue))))
+(defmethod reset((q drop-tail))
+  (reset (slot-value q 'queue))
+  (call-next-method))
 
-(defmethod delete-packets-if((predicate function) (queue drop-tail)
-                             &key (key #'identity))
-  (list-queue-delete-if-helper predicate queue (slot-value queue 'queue) key)
-  (update-average-queue-length queue))
+(defun deletion-helper(predicate queue)
+  #'(lambda(packet)
+      (when (funcall predicate  packet)
+        (decf (length-packets queue))
+        (decf (length-bytes queue) (length-bytes packet))
+        t)))
 
-(defmethod list-queue-dequeue-if-helper(predicate queue list-queue key)
+(defmethod delete-packets-if((predicate function) (queue drop-tail))
+  (alg:delete-if (deletion-helper predicate queue) (slot-value queue 'queue)))
+
+(defun list-queue-dequeue-if-helper(predicate queue list-queue)
+  (let ((f (deletion-helper predicate queue)))
   (traverse
    #'(lambda(packet)
-       (when (funcall predicate (funcall key packet))
+       (when (funcall f packet)
          (alg::delete packet list-queue)
-         (decf (length-packets queue))
-         (decf (length-bytes queue) (length-bytes packet))
          (return-from list-queue-dequeue-if-helper packet)))
-   list-queue))
+   list-queue)))
 
-(defmethod dequeue-if((predicate function) (queue drop-tail)
-                    &key (key #'identity))
+(defmethod dequeue-if((predicate function) (queue drop-tail))
   (prog1
       (list-queue-dequeue-if-helper predicate queue
-                                    (slot-value queue 'queue) key)
+                                    (slot-value queue 'queue))
     (update-average-queue-length queue)))
 
 (defclass priority-queue(packet-queue)
@@ -200,18 +201,20 @@ Return True if time for a forced loss. May also be used for egress filtering")
   (let ((q (find-if #'empty-p (slot-value q 'queues) :from-end t)))
     (when q (dequeue q))))
 
-(defmethod delete-packets-if((predicate function) (queue priority-queue)
-                             &key (key #'identity))
+(defmethod delete-packets-if((predicate function) (queue priority-queue))
   (map 'nil
-       #'(lambda(q) (queue-delete-if-helper predicate queue q key))
+       #'(lambda(q) (alg:delete-if (deletion-helper predicate queue) q))
        (slot-value queue 'queues))
   (update-average-queue-length queue))
 
-(defmethod dequeue-if((predicate function) (queue priority-queue)
-                      &key (key #'identity))
+(defmethod dequeue-if((predicate function) (queue priority-queue))
   (prog1
       (find-if #'(lambda(list-queue)
                    (list-queue-dequeue-if-helper predicate queue
-                                                 list-queue key))
+                                                 list-queue))
                (slot-value queue 'queues) :from-end t)
     (update-average-queue-length queue)))
+
+(defmethod reset((q priority-queue))
+  (map 'nil #'reset (slot-value q 'queues))
+  (call-next-method))

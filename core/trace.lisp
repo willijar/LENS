@@ -35,9 +35,6 @@
   (:documentation "Return the trace detail for given entity on stream. t means all")
   (:method(entity stream) (declare (ignore entity stream)) t))
 
-(defgeneric trace(entity packet &key &allow-other-keys)
-  (:documentation "Called by entity to trace an action on a packet"))
-
 ;; specific trace stream implementation of interface
 
 (defclass trace-stream(fundamental-stream)
@@ -206,15 +203,14 @@ output according to detail onto stream")
   (:method((pdu (eql :drop)) detail stream &key packet text)
     "Trace a packet drop"
     (declare (ignore detail))
-    (break)
     (format stream " D-~A ~D" text (uid packet))
     (eol stream))
   (:method((pdu null) detail stream &key packet text)
     (format stream " ~A ~D" text (uid packet))))
 
-(defun write-trace(node protocol pdu &key packet text (stream *lens-trace-output*))
+(defun write-trace(protocol pdu &key (node (node protocol)) packet text (stream *lens-trace-output*))
   (dolist(stream (if (listp stream) stream (list stream)))
-        (when (trace-enabled-p node protocol stream)
+    (when (trace-enabled-p node protocol stream)
       (setf (slot-value stream 'node) node)
       (pdu-trace pdu
                  (if protocol (trace-detail protocol stream) nil)

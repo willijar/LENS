@@ -1,8 +1,7 @@
-;; $Id$
-;; Interfaces
-;; Copyright (C) 2007 Dr. John A.R. Williams
+;; Interface
+;; Copyright (C) 2010 John A.R. Williams
 
-;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
+;; Author: John A.R. Williams <J.A.R.Williams@jarw.org.uk>
 ;; Keywords:
 
 ;; This file is part of Lisp Educational Network Simulator (LENS)
@@ -24,33 +23,39 @@
    protocol (or not). All interfaces on the same link must support ARP
    for it to work")
 
-(defclass interface()
-  ((node :initarg :node :type node :reader node
-         :documentation "Associated node")
-   (network-address :type network-address
-                    :initarg :network-address
-                    :reader network-address
-                    :documentation "local network address for this interface")
-   (hardware-address  ::initarg :hardware-address
-                     initform (macaddr :next)
-                     :type hardware-address
-                     :reader hardware-address
-                     :documentation "layer2 address for this interface")
-   (link :initarg :link :type link :reader link
-         :documentation "Associated link")
-   (layer2:protocol :initarg :protocol
-                    :type layer2:protocol :reader layer2:protocol
-                    :documentation "The Layer 2 protocol object")
-   (queue :initarg :packet-queue
-          :initform (make-instance (if *default-arp* 'priority-queue 'drop-tail))
-          :reader packet-queue :type packet-queue
-          :documentation "Associated packet queue for an interface")
-   (layer2:arp :initform nil :reader layer2:arp
-        :documentation "The Arp protocol or nil if don't use arp")
-   (up-p :initform t :type boolean :reader up-p
-         :documentation "State of router - up or down")
-   (receiving :type packet :documentation "Packet being received - if
-   interface goes down reception is not completed."))
+(defclass interface(notifier)
+  ((node
+    :initarg :node :type node :reader node
+    :documentation "Associated node")
+   (network-address
+    :type network-address :initarg :network-address
+    :reader network-address
+    :documentation "local network address for this interface")
+   (network-mask
+    :initarg :network-mask :reader network-mask :initform nil
+    :documentation "Subnet mask for this interface")
+   (hardware-address
+    :initarg :hardware-address :initform (macaddr :next)
+    :type hardware-address :reader hardware-address
+    :documentation "layer2 address for this interface")
+   (link
+    :initarg :link :type link :reader link :documentation "Associated link")
+   (layer2:protocol
+    :initarg :protocol :type layer2:protocol :reader layer2:protocol
+    :documentation "The Layer 2 protocol object")
+   (queue
+    :initarg :packet-queue
+    :initform (make-instance (if *default-arp* 'priority-queue 'drop-tail))
+    :reader packet-queue :type packet-queue
+    :documentation "Associated transmission packet queue (layer 2 packets)")
+   (layer2:arp
+    :initform nil :reader layer2:arp
+    :documentation "The Arp protocol or nil if don't use arp")
+   (up-p
+    :initform t :type boolean :reader up-p
+    :documentation "State of router - up or down")
+   (rx-packet
+    :type packet :initform nil :documentation "Packet being received"))
    (:documentation "Base class for all interfaces"))
 
 (defmethod print-object((interface interface) stream)
@@ -76,89 +81,72 @@
            (network-address (node interface)))))
 
 (defmethod send((interface interface) packet protocol &key address &allow-other-keys)
-  "Send to local address attached to this interface using layer 2 protocols"
-  (when (up-p interface)
-    (cond
-      ((or (eql address :broadcast) (typep address 'hardware-address))
-       (send (layer2:protocol interface) packet protocol :address address))
-      ((arp interface)
-       (send (arp interface) packet protocol :address address))
-      (t
-       (send (layer2:protocol interface) packet protocol
-             :address (network-to-hardware-address address interface))))))
+  "Called by upper layers to send packets - may return null if interface is busy. Requires address"
+  (if (up-p interface)
+      (etypecase address
+        ((eql :broadcast)
+         (send (layer2:protocol interface) packet protocol
+               :address (macaddr :broadcast)))
+        (hardware-address
+         (send (layer2:protocol interface) packet protocol :address address))
+        (network-address
+         (if (arp interface)
+             (send (arp interface) packet protocol :address address)
+             (send (layer2:protocol interface) packet protocol
+                 :address (network-to-hardware-address address interface)))))
+      (drop interface packet :text "L2-ID")))
 
-    (if (busy-p (link interface))
-        (enqueue packet (packet-queue interface))
-        (send (link interface) packet interface)))
+(defmethod send-complete((interface interface) packet link
+                         &key fail &allow-other-keys)
+  (assert (eql packet (pop-packet (queue interface))))
+  (when fail (drop interface packet :text fail)))
 
-(defmethod (setf up-p)(value (interface interface))
+
+(defmethod (setf up)(up (interface interface) &key (inform-routing t))
   ;; if fail during packet drop received packet
-  (unless (eql value (up-p interface))
-    (setf (slot-value interface 'receiving) nil)
-    (setf (slot-value interface 'up-p) value)))
+  (unless (eql up (up-p interface))
+    (setf (slot-value interface 'rx-packet) nil)
+    (setf (slot-value interface 'up-p) up)
+    (when inform-routing (layer3:topology-changed interface)))
+  (unless up
+    (until (empty-p (queue interface))
+      (drop interface (dequeue (queue interface)) :text "L2-ID"))))
 
-(defmethod send-complete((interface interface) packet link &optional fail)
-  (send-complete (layer2:protocol interface) packet interface fail))
+(defmethod reset((interface interface))
+  (reset (queue interface))
+  (reset (layer2:protocol interface))
+  (reset (arp interface))
+  (setf (slot-value interface 'rx-packet) nil)
+  (reset (link interface)))
 
-;; (defmethod receive-start((interface interface) packet link)
-;;   (if (up-p interface)
-;;       (progn
-;;         (setf (slot-value interface 'receiving) packet)
-;;         (receive-start (layer2:protocol interface) packet interface))
-;;       (setf (slot-value interface 'receiving) nil)))
+(defmethod receive-start((interface interface) packet link)
+  (when (up-p interface)
+    (with-slots(rx-packet) interface
+      (when rx-packet
+        (drop interface packet :text "L2-ID")
+        (setf rx-packet packet)))))
 
-;; (defmethod receive((interface interface) packet link &key errors &allow-other-keys)
-;;   (when (eql packet (slot-value interface 'receiving))
-;;     (receive (layer2:protocol interface) packet interface :errors errors))
-;;   (setf (slot-value interface 'receiving) nil))
+(defmethod receive((interface interface) packet link &key errors &allow-other-keys)
+  (with-slots(rx-packet) interface
+    (assert (eql packet rx-packet))
+    (setf rx-packet nil))
+  (if (zerop errors)
+      (receive (layer2:protocol interface) packet interface)
+      (drop interface packet :text "L2-BER")))
 
+(defmethod busy-p((interface interface)) (busy-p (link interface)))
 
-;; (defmethod up((interface interface) &key (inform-routing t))
-;;   (unless (slot-value interface 'up-p)
-;;     (setf (slot-value interface 'up-p) t)
-;;     (when inform-routing
-;;       (routing:topology-changed interface))))
+(defmethod network-to-hardware-address((addr network-address) (interface interface))
+   (when-bind(peer-interface (find addr (peer-interfaces interface) :key #'network-address))
+     (hardware-address peer-interface)))
 
-;; (defmethod down((interface interface) &key (inform-routing t))
-;;   (when (slot-value interface 'up-p)
-;;     (setf (slot-value interface 'up-p) nil)
-;;     (when inform-routing
-;;       (routing:topology-changed interface))))
+(defmethod peer-interfaces((interface interface) &key only-if-up-p)
+  (when (or (not only-if-up-p) (up-p interface))
+    (remove interface (peer-interfaces (link interface))
+            :only-if-up-p only-if-up-p)))
 
-;; (defmethod buffer-available-p(size (interface interface))
-;;   (buffer-available-p size (queue interface)))
-
-;; (defmethod send((interface interface) (packet packet) (dst ipaddr)
-;;                 &optional (type #x0800))
-;;   (send interface packet (or (arp interface) (ip-to-mac dst interface)) type))
-
-;; (defmethod send((interface interface) (packet packet) (dst (eql nil))
-;;                 &optional (type #x0800))
-;;   (send interface packet (macaddr (default-peer-interface interface)) type))
-
-;; (defmethod send((interface interface) (packet packet) (dst macaddr)
-;;                 &optional (type #x0800))
-;;   (unless (up-p interface)
-;;      ;; if down down't forward - just trace drop
-;;     (write-trace (node interface)  nil :drop nil :packet packet :text "L2-ID")
-;;     (return-from send nil))
-;;   (let ((protocol (layer2:protocol interface)))
-;;     (layer2:build-pdu protocol (macaddr interface) dst packet type)
-;;     (cond
-;;       ((not (layer2:busy-p protocol))
-;;        (layer2:send protocol packet))
-;;       (t (enque packet interface)))))
-
-;; (defmethod enque(packet (interface interface))
-;;   (or (enque packet (queue interface))
-;;       (progn
-;;         ;; not enqued so trace as dropped
-;;         (write-trace (node interface)  nil
-;;                      :drop nil :packet packet :text "L2-QD")
-;;         (when (notification packet)
-;;           ;; sender has requested notification so schedule one in 1ms
-;;           (schedule 1e-3 (notification packet)))
-;;         nil)))
+(defmethod default-peer-interface((interface interface))
+   (default-peer-interface (link interface)))
 
 ;; (defmethod notify((interface interface))
 ;;   "Link has finished previous transmit"
@@ -197,15 +185,7 @@
 ;; (defun cancel-notify(notification interface)
 ;;   (queues:extract notification (notifications interface)))
 
-;; (defmethod peer-node-p((node node) (interface interface))
-;;   (peer-node-p node (link interface)))
 
-;; (defmethod network-to-hardware-address((addr network-address) (interface interface))
-;;   (when-bind(peer-interface (find addr (peer-interfaces interface) :key #'network-address))
-;;             (hardware-address peer-interface)))
-
-;; (defmethod peer-interfaces((interface interface))
-;;   (remove interface (peer-interfaces (link interface))))
 
 ;; (defgeneric neighbours(link)
 ;;   (:documentation "Return the routing neighbours to this interface")
@@ -213,37 +193,10 @@
 ;;     (let ((link (link interface)))
 ;;       (mapcan #'(lambda(peer-interface)
 ;;                   (unless (eql peer-interface interface)
-;;                     (list (routing:make-neighbour
+;;                     (list (layer3:make-neighbour
 ;;                            :node (node peer-interface)
 ;;                            :interface interface
 ;;                            :weight (weight link)))))
 ;;               (peer-interfaces link)))))
 
-;; (defmethod default-peer-interface((interface interface))
-;;   (default-peer-interface (link interface)))
 
-;; (defmethod peer-node-ipaddr ((node node) (interface interface))
-;;   (peer-node-ipaddr node (link interface)))
-
-;; (defmethod local-ipaddr-p((ipaddr ipaddr) (interface interface))
-;;   (if (ipmask interface)
-;;       (address= (subnet ipaddr (ipmask interface))
-;;                 (subnet (ipaddr interface) (ipmask interface)))
-;;       (address= ipaddr (ipaddr interface))))
-
-;; (defmethod receive((interface interface) packet &optional lostp)
-;;   (if lostp
-;;       (write-trace (node interface)  nil :drop nil :packet packet
-;;                    :text "L2-BER")
-;;       (layer2:receive (layer2:protocol interface) packet)))
-
-;; (defmethod make-new-interface(link &key ipaddr ipmask)
-;;   (make-instance 'interface :link link :ipaddr ipaddr :ipmask ipmask))
-
-;; (defmethod reset((interface interface))
-;;   (reset (link interface))
-;;   (cancel-all-timers interface)
-;;   (setf (pending-notification interface) nil))
-
-;; (defmethod node:location((interface interface))
-;;   (node:location (node interface)))

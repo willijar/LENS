@@ -23,7 +23,7 @@
   (:export #:+c+ #:start #:stop #:reset #:busy-p #:*reset-hooks*
            #:while #:until #:filter #:defenumeration
            #:when-bind #:when-bind*
-           #:uid #:counter #:name
+           #:uid #:counter #:name #:node
            #:octet #:word #:counter #:seq #:fid
            #:interface #:link #:node #:application
            #:copy #:copy-with-slots
@@ -73,14 +73,14 @@
   (:use :cl)
   (:import-from :split-sequence #:split-sequence)
   (:import-from :protocol #:length-bytes #:protocol-number)
-  (:export  #:address #:hardware-address #:network-address
+  (:export  #:address #:hardware-address #:network-address #:network-mask
             #:address= #:broadcast-p
             #:macaddr #:ipaddr #:ipport #:ipmask
             #:*print-ip-format* #:print-ip-form
             #:ipaddr #:ipport #:ipmask #:macaddr
             #:src-address #:dest-address
             #:address-condition #:address-out-of-range
-            #:subnet #:ipaddr-allocator))
+            #:subnet #:ipaddr-allocator #:local-network-address-p))
 
  (defpackage :node
   (:documentation "Node implementations")
@@ -103,14 +103,13 @@
   (:import-from :packet #:length-bytes #:priority)
   (:import-from :scheduler #:time-type #:simulation-time #:schedule)
   (:import-from :protocol #:send #:receive #:drop)
-  (:export #:interface #:packet-queue  #:make-queue
+  (:export #:interface #:packet-queue
            #:enqueu #:dequeue #:dequeue-if #:empty-p
            #:delete-packets-if #:drop-packet-p #:buffer-available-p
            #:average-queue-length #:reset-average-queue-length
            #:enqueue-count #:drop-count #:egress-filter
            #:length-packets #:length-bytes #:limit-packets #:limit-bytes
-           #:drop-tail
-           #:interface #:haredware-address))
+           #:drop-tail #:interface #:peer-interfaces))
 
  (defpackage :protocol.layer2
    (:documentation "Link layer protocol interface")
@@ -118,7 +117,7 @@
    (:use :cl :address :common :protocol)
    (:shadow #:protocol #:pdu)
    (:import-from :node #:node)
-   (:export #:ieee802.3 #:llcsnap #:snap-ethtype #:ieee802.11 #:arp))
+   (:export #:protocol #:pdu #:ieee802.3 #:llcsnap #:snap-ethtype #:ieee802.11 #:arp))
 
  (defpackage :protocol.layer3
    (:documentation "Network Layer protocol interface")
@@ -126,13 +125,14 @@
    (:use :cl :common :address :protocol)
    (:shadow #:protocol #:pdu)
    (:import-from :node #:node #:nodes #:ipaddrs #:neighbours #:find-interface)
-   (:import-from :layer1 #:interface #:peer-node-ipaddr)
+   (:import-from :layer1 #:interface)
    (:export #:register-protocol #:protocols #:find-protocol #:delete-protocol
             #:routing #:lookup-route
             #:find-route #:add-route #:rem-route
             #:initialise-routes #:reinitialise-routes #:default-route
             #:*default-routing* #:topology-changed
             #:routing-manual #:routing-static
+            #:protocol #:pdu
             ;; some specific default layer 3 protocols
             #:ipv4))
 
@@ -147,7 +147,7 @@
   (:export
             #:register-protocol #:protocols #:find-protocol #:delete-protocol
             #:peer-address #:peer-port #:local-port #:local-address
-            ;;#:ipport #:protocol
+            #:protocol #:pdu
            ;; #:receive
            ;; #:notification #:request-notification #:cancel-notification
            ;; #:ttl #:fid #:tos #:interface
@@ -162,7 +162,7 @@
   (:shadow #:protocol #:pdu)
   (:export #:data #:contents #:msg-size #:response-size #:checksum
            #:copy-from-offset #:size-from-seq #:copy-from-seq
-           #:add-data #:remove-data))
+           #:add-data #:remove-data #:protocol #:pdu))
 
 ;; #:link #:local-interface #:peer-interfaces #:peer-node-p
 ;;            #:default-peer-interface #:ip-to-mac #:find-interface #:busy-p

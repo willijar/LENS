@@ -1,10 +1,12 @@
-;;;; LENS packet header API
+;;;; LENS base node definition
 ;;;; Copyright (C) 2003-2005 John A.R. Williams <J.A.R.Williams@jarw.org.uk>
 ;;;; Released under the GNU General Public License (GPL)
 ;;;; See <http://www.gnu.org/copyleft/gpl.html> for license details
 ;;;; $Id: packet.lisp,v 1.2 2005/11/29 09:00:39 willijar Exp $
 
 (in-package :node)
+
+(import '(layer3:routing))
 
 (defstruct location
   (x 0.0 :type short-float :read-only t)
@@ -60,7 +62,7 @@ form the packets are derived from this class."))
 (defun nodes() "Return the vector of all nodes" *nodes*)
 (defun clear-nodes()
   (setf *nodes*
-        (make-array 64 :initial-element nil :adjustable t :fill-pointer 0)))
+        (make-array 1024 :initial-element nil :adjustable t :fill-pointer 0)))
 
 (eval-when(:load-toplevel :execute)
   (pushnew *nodes* *reset-hooks*))
@@ -68,18 +70,18 @@ form the packets are derived from this class."))
 (defmethod initialize-instance :after ((node node) &key &allow-other-keys)
   (setf (slot-value node 'uid) (vector-push-extend node (nodes)))
   (setf (slot-value node 'routing)
-        (apply #'make-instance (append routing:*default-routing*
+        (apply #'make-instance (append layer3::*default-routing*
                                        `(:node ,node)))))
 
 (defmethod up((node node) &key (inform-routing t))
   (unless (slot-value node 'up-p)
     (setf (slot-value node 'up-p) t)
-    (when inform-routing (routing:topology-changed node))))
+    (when inform-routing (layer3:topology-changed node))))
 
 (defmethod down((node node) &key (inform-routing t))
   (when (slot-value node 'up-p)
     (setf (slot-value node 'up-p) nil)
-    (when inform-routing (routing:topology-changed node))))
+    (when inform-routing (layer3:topology-changed node))))
 
 (defgeneric node(entity)
   (:documentation "Return the node associated with an entity")
@@ -89,6 +91,9 @@ form the packets are derived from this class."))
 
 (defgeneric (setf node)(node entity)
   (:documentation "Set the node associated with an entity"))
+
+(defmethod topology-changed((node node) )
+  (reinitialise-routes node (routing node)))
 
 (defgeneric add-interface(interface node)
   (:documentation "Add an interface to a node"))

@@ -18,6 +18,25 @@
 
 (in-package :layer1)
 
+;; links uses a split-phase approach
+;; - send starts sending a packet,
+;;   send-complete is called to signal when sending is finished.
+;; - receive-start signals the start of reception
+;;   receive is called when packet reception is finished.
+;; they receive from and send packets to interfaces
+
+(defgeneric send-complete(sender packet receiver &key fail &allow-other-keys)
+  (:documentation "Called by receiver when sending completed to notify
+  receiver - fail-reason indicates if packet was dropped - null if successful")
+  (:method(sender packet receiver &key &allow-other-keys)
+    (declare (ignore sender packet receiver))))
+
+;; split phase reception going up protocol stack
+(defgeneric receive-start(receiver packet sender)
+  (:documentation "Called by sender to start receiver receiving a packet.")
+  (:method(receiver packet sender)
+    (declare (ignore receiver packet sender))))
+
 (defvar *default-bandwidth* 1e6 "Default link bandwidth")
 (defvar *default-delay* 1e-3 "Default link delay")
 (defvar *default-ber* 0 "Default bit error rate on a link")
@@ -42,15 +61,18 @@ interfaces over link")
     (declare (ignore link local-interface peer-interface))
     *default-ber*))
 
-(defgeneric transmit-complete(link local-interface packet)
-  (:documentation "Called when a transmission is complete"))
-
 (defgeneric link(entity)
   (:documentation "Return the link associated with an entity"))
 
-(defgeneric peer-interfaces(link)
+(defgeneric peer-interfaces(link &key only-if-up-p)
   (:documentation "Return a sequence of all the peer interfaces this link
-connects to"))
+connects to")
+  (:method :around (link &key only-if-up-p)
+      (if only-if-up-p
+          (when (up-p link)
+            (mapcan #'(lambda(link) (when (up-p link) (list link)))
+                    (call-next-method)))
+          (call-next-method))))
 
 (defgeneric default-peer-interface(link)
   (:documentation "Return the default peer (gateway) on a link"))
@@ -59,7 +81,7 @@ connects to"))
   (:documentation "If true interfaces receive their own braodcast")
   (:method(link) (declare (ignore link)) nil))
 
-(defmethod send(link packet local-interface &key (peer-address (dest-address (peek-pdu packet))))
+(defmethod send(link packet local-interface &key (peer-address (dst-address (peek-pdu packet))))
   (let* ((no-bits (* 8 (length-bytes packet)))
          (txtime (/ no-bits (bandwidth link local-interface))))
     ;; schedule packet transmit complete event
@@ -91,7 +113,7 @@ connects to"))
   ((bandwidth
     :type real :initarg :bandwidth :reader bandwidth
     :initform *default-bandwidth*
-    :documentation "Link andwidth in bits/sec")
+    :documentation "Link bandwidth in bits/sec")
    (delay
     :type real :initarg :delay :initform *default-delay* :reader delay
     :documentation "Link Propagation Delay in sec")
@@ -111,7 +133,8 @@ connects to"))
     :documentation "Start of utilisation measurement interval"))
   (:documentation "Base Class for simple links"))
 
-(defmethod send :before ((link link) packet local-interface &key &allow-other-keys)
+(defmethod send :before ((link link) packet local-interface
+                         &key &allow-other-keys)
   (when (busy-p link)
     (error "Attempt to send a packet over a busy link"))
   (setf (slot-value link 'busy-p) nil))
@@ -123,8 +146,8 @@ connects to"))
   (setf (slot-value link 'busy-p) nil))
 
 (defmethod delay((link link) &optional local-interface peer-interface)
-    (declare (ignore local-interface peer-interface))
-    (slot-value link 'delay)))
+  (declare (ignore local-interface peer-interface))
+  (slot-value link 'delay))
 
 (defmethod print-object((link link) stream)
   (print-unreadable-object (link stream :type t :identity t)

@@ -30,6 +30,15 @@
 (defgeneric dst-address(entity)
   (:documentation "Return the destination address of an entity"))
 
+(defgeneric hardware-address(entity)
+  (:documentation "Return the hardware (local) address of an entity"))
+
+(defgeneric network-address(entity)
+  (:documentation "Return the network address of an entity"))
+
+(defgeneric network-mask(entity)
+  (:documentation "Return the network mask for a subnet of an entity"))
+
 (defclass address()
   ((datum :type integer :initarg :datum))
   (:documentation "Generic class for addresses"))
@@ -44,7 +53,7 @@
 
 (defgeneric broadcast-p(address)
   (:documentation "Return true if a broadcast address")
-  (:method(address) (= (slot-value address 'datum) #xFFFFFFFF)))
+  (:method((address (eql :broadcast))) t))
 
 (define-condition address-condition(condition)
   ())
@@ -65,6 +74,8 @@
   ((nextmac :initform 0 :allocation :class :type mac))
   (:documentation "Standard mac address"))
 
+(defmethod broadcast-p((addr macaddr))
+  (= (slot-value addr 'datum) #xFFFFFFFFFFFF))
 (defmethod length-bytes((addr macaddr)) 6)
 (defmethod protocol-number((addr macaddr)) 1)
 
@@ -86,7 +97,7 @@
            (setf (slot-value addr 'nextmac)
                  (max mac (slot-value addr 'nextmac)))
            mac)
-          ((eql mac :broadcast) #xFFFFFFFFFF)
+          ((eql mac :broadcast) #xFFFFFFFFFFFF)
           (t (error "Invalid Mac Address specification ~S" mac)))))
 
 (defmethod print-object((addr macaddr) stream)
@@ -99,6 +110,8 @@
   ()
   (:documentation "An IP Address"))
 
+(defmethod broadcast-p((addr macaddr))
+  (= (slot-value macaddr 'datum) #xFFFFFFFF))
 (defmethod length-bytes((addr ipaddr)) 4)
 (defmethod protocol-number((addr ipaddr)) #x0800)
 
@@ -168,7 +181,10 @@ addresses is defined.")
        (print-unreadable-object (addr stream :type t :identity t)
          (princ (ipaddr-to-dotted (slot-value addr 'datum)) stream))))))
 
-(defclass ipmask(address)
+(defclass network-mask()
+  ())
+
+(defclass ipmask(ipaddr network-mask)
   ()
   (:documentation "A network mask"))
 
@@ -221,3 +237,10 @@ addresses is defined.")
 
 (defmethod ipaddr((ip (eql :next)))
   (funcall ipaddr-allocator))
+
+(defun local-network-address-p(network-address entity &key
+                               (local-address (network-address entity))
+                               (network-mask (network-mask entity)))
+  "Return true if given network address is local to entity"
+  (address= (subnet network-address network-mask)
+            (subnet local-address network-mask)))

@@ -45,7 +45,7 @@
                       ("defpackage" "common" "scheduler" "compatibility"))
                (:file "routing" :depends-on ("common" "address"))
                (:file "node"
-                       :depends-on ("common" "address" "routing" "protocol"))
+                       :depends-on ("common" "address" "protocol"))
 ;;                (:file "application"
 ;;                       :depends-on ("common" "scheduler" "protocol"))
 ;;                (:file "interface"

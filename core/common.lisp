@@ -204,13 +204,20 @@ Examples:
                   :documentation "Queue of notifcations to call when not busy"))
   (:documentation "Base for entities which can call notifications"))
 
-(defgeneric add-notify(notifier notification)
+(defgeneric add-notification(notifier arg notification)
   (:documentation "Add a notification to end of queue")
-  (:method((notification function) (notifier notifier) )
-    (alg:push notification (slot-value notifier 'notifications))))
+  (:method(arg (notification function) (notifier notifier) )
+    (alg:push (cons notification arg) (slot-value notifier 'notifications))))
+
+(defgeneric delete-notifications(notifier arg)
+  (:documentation"Delete notifications to arg on notifier")
+  (:method((notifier notifier) arg)
+    (alg:delete-if #'(lambda(p) (eql arg (cdr p)))
+                   (slot-value notifier 'notifications))))
 
 (defgeneric do-notifications(notifier)
   (:method((notifier notifier))
     (with-slots(notifications) notifier
       (while (not (or (busy-p notifier) (alg:empty-p notifications)))
-        (funcall (alg:pop notifications))))))
+        (let ((p (alg:pop notifications)))
+          (funcall (car p) (cdr p)))))))
