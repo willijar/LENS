@@ -221,3 +221,14 @@ Examples:
       (while (not (or (busy-p notifier) (alg:empty-p notifications)))
         (let ((p (alg:pop notifications)))
           (funcall (car p) (cdr p)))))))
+
+;; taking things up and down
+
+(defgeneric up-p(entity)
+  (:documentation "Return true if entity is up (operational)"))
+
+(defgeneric mkup(entity &key inform-routing)
+  (:documentation "Ensure entity is in up state, informing routing if state has changed and inform-routing keyword is true"))
+
+(defgeneric mkdown(entity &key inform-routing)
+  (:documentation "Ensure entity is in down state, informing routing if state has changed and inform-routing keyword is true"))

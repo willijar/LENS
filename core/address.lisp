@@ -76,6 +76,7 @@
 
 (defmethod broadcast-p((addr macaddr))
   (= (slot-value addr 'datum) #xFFFFFFFFFFFF))
+
 (defmethod length-bytes((addr macaddr)) 6)
 (defmethod protocol-number((addr macaddr)) 1)
 
@@ -110,8 +111,9 @@
   ()
   (:documentation "An IP Address"))
 
-(defmethod broadcast-p((addr macaddr))
-  (= (slot-value macaddr 'datum) #xFFFFFFFF))
+(defmethod broadcast-p((addr ipaddr))
+  (= (slot-value addr 'datum) #xFFFFFFFF))
+
 (defmethod length-bytes((addr ipaddr)) 4)
 (defmethod protocol-number((addr ipaddr)) #x0800)
 

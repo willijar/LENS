@@ -12,7 +12,7 @@
 (defclass routing()
   ((node :type node :initarg :node :reader node
          :documentation "Nope to which routing object is attached")
-   (default-route :type routing-entry :initform nil :accessor default-route
+   (default-route :type next-hop :initform nil :accessor default-route
                   :documentation "The default (gateway) route"))
   (:documentation "Base class for all the routing protocols that may
 be needed for a simulation."))
@@ -38,6 +38,6 @@ changed-entity is the object in the topology who's state has changed"))
 (defgeneric topology-changed(changed-entity)
   (:documentation "Inform routing that topology has changed")
   (:method(entity)
-    (reinitialise-routes changed-entity (routing (node entity)))))
+    (reinitialise-routes (routing (node entity)) entity)))
 
 (defvar *default-routing* nil "make-instance args for default routing")

@@ -28,6 +28,7 @@
         :initform (incf *packet-count*)
         :reader uid
         :documentation "Unique id of the packet")
+   (fid :type counter :initarg :fid :documentation "FLow id useful for tracing")
    (pdus :type vector :initform (make-array 4 :adjustable t :fill-pointer 0)
          :reader pdus)
    (created :type time-type :initform (simulation-time) :reader created
@@ -85,6 +86,6 @@ The PDU is added at the top of the PDU stack"
     (when (> length 0)
       (decf (fill-pointer pdus)))))
 
-(defmethod priority((p packet)) (priority (peek-pdu packet)))
+(defmethod priority((packet packet)) (priority (peek-pdu packet)))
 
 

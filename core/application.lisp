@@ -16,7 +16,7 @@
 
 ;;; Code:
 
-(in-package :application)
+(in-package :layer5)
 
 (defclass application()
   ((name :type string :initarg :name
@@ -32,11 +32,15 @@ a web browser model with multiple simultaneous connections."))
       (slot-value app 'name)
       (string-downcase (class-name (class-of app)))))
 
-(defgeneric receive(application packet protocol &optional sequence-number)
-  (:documentation "Called by layer 4 protocol object when data is received.")
-  (:method (application packet protocol &optional sequence-number)
-    "Default do nothing"
-    (declare (ignore application packet protocol sequence-number))))
+(defmethod receive((application application) pdu flow &key &allow-other-keys)
+  "Called by layer 4 protocol object when data is received. Default - do nothing"
+    (declare (ignore application pdu flow)))
+
+(defgeneric send-complete(application packet receiver &key fail &allow-other-keys)
+  (:documentation "Called by receiver when sending completed to notify
+  receiver - fail-reason indicates if packet was dropped - null if successful")
+  (:method(sender packet receiver &key &allow-other-keys)
+    (declare (ignore sender packet receiver))))
 
 (defgeneric sent(application no-octets-sent protocol)
   (:documentation "Called by an associated layer 4 protocol when all some part

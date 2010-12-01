@@ -139,15 +139,21 @@ is true add it to the list of standard protocols"
 (defvar *standard-protocols* nil "List of standard registered layer 4
 protocols")
 
+(defvar +ephemeral-port-start+ 49152 "Start of ephemeral port range")
+
 (defclass protocol(protocol:protocol)
   ((layer :initform 4 :reader layer :allocation :class)
-   (node :initarg :node :reader node
-         :documentation "Local Node"))
-  (:documentation "Layer 3 protocol"))
+   (node :initarg :node :reader node :documentation "Local Node")
+   (bindings :type list :initform nil :reader bindings
+             :documentation "Sequence of bound connections"))
+  (:documentation "Layer 4 protocol"))
+
+(defun next-available-port(protocol)
+  (max +ephemeral-port-start+ (reduce #'max (bindings protocol) :key #'local-port)))
 
 (defclass pdu(packet:pdu)
   ((layer :initform 4 :reader protocol:layer :allocation :class))
-  (:documentation "The base class for all layer three protocol data units"))
+  (:documentation "The base class for all layer four protocol data units"))
 
 (defgeneric register-protocol(protocol entity &optional replace)
   (:documentation "Register a layer 4 protocol. If replace is true this will
@@ -198,35 +204,94 @@ protocols")
                                        &key &allow-other-keys)
   (register-protocol protocol (node protocol)))
 
-;; (defclass flow()
-;;   ((protocol :type protocol :initarg :protocol :reader protocol)
-;;    (peer-address :initarg :peer-address :initform nil :type hardware-address
-;;                  :accessor peer-address
-;;                  :documentation "IP address of peer")
-;;    (peer-port  :initarg :peer-port :initform nil
-;;                :type ipport :accessor peer-port
-;;                :documentation "Port of peer")
-;;    (local-port :initarg :local-port :initform nil
-;;                :type ipport :accessor local-port
-;;                :documentation "Local port number")
-;;    (notification
-;;     :initform nil :accessor notification
-;;     :documentation "Entity to receive notification for all packets")
-;;    (application :initarg :application :initform nil
-;;                 :type application :accessor application
-;;                 :documentation "Local application object")
-;;    (layer3:protocol :initarg :layer3 :initform (layer3:ipv4)
-;;                     :type layer3:protocol :reader layer3:protocol
-;;                     :documentation "Layer 3 protocol to use")
-;;    (ttl :accessor ttl :initform 64 :documentation "Layer 3 ttl")
-;;    (fid :accessor fid :initform 0 :documentation "Flow id")
-;;    (tos :accessor tos :initform 0
-;;         :documentation "Layer 3 type of service")
-;;    (interface :initform nil :documentation "Interface used for this flow"))
-;;   (:documentation "Base class for all layer 4 protocols states"))
+(defclass socket()
+  ((local-address :initarg :local-address :type network-address
+                  :reader local-address
+                  :documentation "local address used by this socket")
+   (local-port :initarg :local-port
+               :type ipport :accessor local-port
+               :documentation "Local bound port number")
+   (layer5:application :initarg :application :initform nil
+                       :reader layer5:application
+                       :documentation "Local application object")
+   (protocol :type protocol :initarg :protocol :reader protocol
+             :documentation "layer 4 protocol used by this flow")
+   (peer-address :initarg :peer-address :initform nil :type network-address
+                 :reader peer-address
+                 :documentation "network address of peer")
+    (peer-port  :initarg :peer-port
+                :type ipport :accessor peer-port
+                :documentation "Port of peer")
+    (fid :reader fid :documentation "Flow id")
+    (ttl :accessor ttl :initarg :ttl :initform 64
+         :documentation "Layer 3 ttl")
+    (tos :accessor tos :initarg :tos :initform 0
+         :documentation "Layer 3 type of service"))
+  (:documentation "Base class for all layer 4 protocols states"))
 
-;; (defmethod initialize-instance :after((protocol protocol) &key &allow-other-keys)
-;;   (register-protocol protocol (node protocol)))
+(defmethod initialize-instance :after
+    ((socket socket) &key
+     (local-address (network-address (node (protocol socket))))
+     (local-port (next-available-port (protocol socket)))
+     &allow-other-keys)
+  (when local-address (setf (slot-value socket 'local-adress) local-address))
+  (when local-port (bind local-port socket)))
+
+(defgeneric bind(local-port socket &key local-address )
+  (:documentation "Bind a socket to a local address and port")
+  (:method(local-port (socket socket) &key local-address)
+    (when local-address
+      (setf (slot-value socket 'local-address) local-address))
+    (unless (slot-boundp socket 'local-address)
+      (error "No local address defined to bind to"))
+    (when (slot-boundp socket 'local-port)
+      (error "Socket already bound"))
+    (when (find local-port (bindings (protocol socket)) :key #'local-port)
+      (error "Port ~D already bound" local-port))
+    (setf (slot-value socket 'local-port) local-port)
+    (push socket (slot-value (protocol socket) 'bindings))))
+
+(defgeneric unbind(socket)
+  (:documentation "Unbind a bound socket")
+  (:method((socket socket))
+    (with-slots(bindings) (protocol socket)
+      (setf bindings (delete socket bindings)))
+    (slot-makunbound socket 'local-port)))
+
+(defgeneric connect(peer-address peer-port socket)
+  (:documentation "COnnect a socket to a remote (peer) address")
+  (:method(peer-address peer-port (socket socket))
+    (setf (slot-value socket 'peer-address) peer-address
+          (slot-value socket 'peer-port) peer-port)))
+
+(defgeneric connection-complete(socket application &key failure)
+  (:documentation "Called to signal completion of connection attempt -
+  either success or if failure set failed"))
+
+(defgeneric connected-p(socket)
+  (:documentation "Return true if socket is connected")
+  (:method((socket socket)) (slot-boundp socket 'peer-port)))
+
+(defgeneric close-connection(socket)
+  (:documentation "Close an open connection")
+  (:method((socket socket))
+    (slot-makunbound socket 'peer-port)))
+
+(defmethod send(application data (socket socket)
+                &key &allow-other-keys)
+  (send (protocol socket)
+        (make-instance 'packet :data data :fid (fid socket))
+        (protocol socket)))
+
+(defmethod receive((socket socket) packet (protocol protocol)
+                   &key &allow-other-keys)
+  (receive (layer5:application socket) (pop-pdu packet) socket))
+
+(defgeneric sent(sender data protocol)
+  (:documentation "Called by protocol to inform sender that some data
+  has been successfully sent (i.e. acknowledeged by recipient")
+  (:method(sender data protocol)
+    (declare (ignore sender data protocol))))
 
 ;; (defgeneric receive(protocol node packet dst-address interface)
 ;;   (:documentation "Indication that packet has been received by layer 3
@@ -247,42 +312,10 @@ protocols")
 ;;     (send (make-instance 'layer5:data :contents data) protocol
 ;;           :dst-address dst-address :dst-port dst-port)))
 
-;; (defgeneric local-address(protocol)
-;;   (:documentation "Local IPaddress for this protocol")
-;;   (:method ((p protocol)) (ipaddr (node p))))
-
-;; (defgeneric connect(protocol peer-address peer-port)
-;;   (:documentation "Connection to a remote host. Return true if
-;; initiated OK - does not mean was successfully completed if TCP"))
-
-;; (defgeneric close-connection(protocol)
-;;   (:documentation "Close an open connection, return success"))
-
 ;; (defgeneric make-packet(protocol)
 ;;   (:documentation "Allocate a new packet")
 ;;   (:method ((protocol protocol))
 ;;     (make-instance 'packet:packet :notification (notification protocol))))
-
-;; (defgeneric bind(protocol &key port)
-;;   (:documentation "Bind to specific or available port and return successs")
-;;   (:method((protocol protocol) &key port)
-;;     (when (local-port protocol) (unbind protocol))
-;;     (when (node protocol)
-;;       (setf (local-port protocol)
-;;             (node:bind protocol (node protocol)
-;;                             :local-port port)))))
-
-;; (defgeneric unbind(protocol &key port protocol-number)
-;;   (:documentation "Unbind a protocol from a specific port")
-;;   (:method((protocol protocol)
-;;            &key (port (local-port protocol))
-;;            (protocol-number (protocol-number protocol)))
-;;     (when (node protocol)
-;;       (when (= port (local-port protocol))
-;;         (setf (local-port protocol) nil))
-;;       (node:unbind protocol (node protocol)
-;;                         :port port
-;;                         :protocol-number protocol-number))))
 
 ;; (defmethod interface((protocol protocol))
 ;;   (or (slot-value protocol 'interface)

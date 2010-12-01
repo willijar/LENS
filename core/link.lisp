@@ -1,6 +1,5 @@
-;; $Id$
 ;; <description>
-;; Copyright (C) 2007 Dr. John A.R. Williams
+;; Copyright (C) 2010 Dr. John A.R. Williams
 
 ;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
 ;; Keywords:
@@ -31,7 +30,6 @@
   (:method(sender packet receiver &key &allow-other-keys)
     (declare (ignore sender packet receiver))))
 
-;; split phase reception going up protocol stack
 (defgeneric receive-start(receiver packet sender)
   (:documentation "Called by sender to start receiver receiving a packet.")
   (:method(receiver packet sender)
@@ -42,23 +40,21 @@
 (defvar *default-ber* 0 "Default bit error rate on a link")
 
 ;; Generic interface for link
-(defgeneric delay(link local-interface peer-interface)
+(defgeneric delay(start end)
  (:documentation "Return the propagation delay in bits/sec between
-interfaces over link")
-   (:method(link &optional local-interface peer-interface)
-    (declare (ignore link local-interface peer-interface))
+two things")
+   (:method(start end)
+    (declare (ignore start end))
     *default-delay*))
 
-(defgeneric bandwidth(link &optional local-interface )
+(defgeneric bandwidth(interface)
   (:documentation "Return the bandwidth in bits/sec")
-  (:method(link &optional local-interface)
-    (declare (ignore link local-interface))
-    *default-bandwidth*))
+  (:method(entity) (declare (ignore entity)) *default-bandwidth*))
 
-(defgeneric bit-error-rate(link &optional local-interface peer-interface)
+(defgeneric bit-error-rate(sender receiver)
   (:documentation "Return the bit error rate for a simple link")
-  (:method(link &optional local-interface peer-interface)
-    (declare (ignore link local-interface peer-interface))
+  (:method(sender receiver)
+    (declare (ignore sender receiver))
     *default-ber*))
 
 (defgeneric link(entity)
@@ -87,7 +83,7 @@ connects to")
     ;; schedule packet transmit complete event
     (schedule txtime (list #'send-complete local-interface packet link))
     ;; schedule packet arrival at interface(s)
-    (flet ((schedule-receive(peer-interface-address packet)
+    (flet ((schedule-receive(peer-interface packet)
              (let ((delay (delay link local-interface peer-interface))
                    (errors
                     (1-
@@ -115,11 +111,11 @@ connects to")
     :initform *default-bandwidth*
     :documentation "Link bandwidth in bits/sec")
    (delay
-    :type real :initarg :delay :initform *default-delay* :reader delay
+    :type real :initarg :delay :initform *default-delay*
     :documentation "Link Propagation Delay in sec")
    (bit-error-rate  :initarg :bit-error-rate
-                   :accessor bit-error-rate :initform *default-ber*
-                   :documentation "Bit Error Rate for this link")
+                    :initform *default-ber*
+                    :documentation "Bit Error Rate for this link")
    (weight :type number :initarg :weight :accessor weight :initform 1
     :documentation "Link weight (for some routing protocols)")
    (bytes-sent :type integer :initform 0 :accessor bytes-sent
@@ -139,15 +135,19 @@ connects to")
     (error "Attempt to send a packet over a busy link"))
   (setf (slot-value link 'busy-p) nil))
 
-(defmethod send-complete :before (interface packet (link link) &optional fail)
+(defmethod send-complete :before (interface packet (link link) &key fail &allow-other-keys)
   (declare (ignore interface fail))
   (incf (bytes-sent link) (length-bytes packet))
   (incf (packets-sent link))
   (setf (slot-value link 'busy-p) nil))
 
-(defmethod delay((link link) &optional local-interface peer-interface)
-  (declare (ignore local-interface peer-interface))
+(defmethod delay((link link) peer-interface)
+  (declare (ignore peer-interface))
   (slot-value link 'delay))
+
+(defmethod bit-error-rate((link link) receiver)
+  (declare (ignore receiver))
+  (slot-value link 'bit-error-rate))
 
 (defmethod print-object((link link) stream)
   (print-unreadable-object (link stream :type t :identity t)

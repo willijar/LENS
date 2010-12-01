@@ -43,7 +43,7 @@
    (layer2:protocol
     :initarg :protocol :type layer2:protocol :reader layer2:protocol
     :documentation "The Layer 2 protocol object")
-   (queue
+   (packet-queue
     :initarg :packet-queue
     :initform (make-instance (if *default-arp* 'priority-queue 'drop-tail))
     :reader packet-queue :type packet-queue
@@ -67,18 +67,26 @@
               (hardware-address interface)
               (ipmask interface)))))
 
+(defmethod bandwidth((interface interface)) (bandwidth (link interface)))
+
+(defmethod delay((start interface) end) (delay (link start) end))
+(defmethod bit-error-rate((interface interface) end)
+  (bit-error-rate (link interface) end))
+
 (defmethod initialize-instance :after ((interface interface)
                                        &key
                                        &allow-other-keys)
-  (when *use-arp*
-    (setf (slot-value interface 'arp)
+  (when *default-arp*
+    (setf (slot-value interface 'layer2:arp)
           (make-instance *default-arp* :interface interface)))
   (setf (interface (layer2:protocol interface)) interface)
-  (setf (interface (queue interface)) interface)
+  (setf (interface (packet-queue interface)) interface)
   (node:add-interface interface (node interface))
   (unless (slot-boundp interface 'network-address)
     (setf  (slot-value interface 'network-address)
            (network-address (node interface)))))
+
+
 
 (defmethod send((interface interface) packet protocol &key address &allow-other-keys)
   "Called by upper layers to send packets - may return null if interface is busy. Requires address"
@@ -90,32 +98,35 @@
         (hardware-address
          (send (layer2:protocol interface) packet protocol :address address))
         (network-address
-         (if (arp interface)
-             (send (arp interface) packet protocol :address address)
+         (if (layer2:arp interface)
+             (send (layer2:arp interface) packet protocol :address address)
              (send (layer2:protocol interface) packet protocol
                  :address (network-to-hardware-address address interface)))))
       (drop interface packet :text "L2-ID")))
 
 (defmethod send-complete((interface interface) packet link
                          &key fail &allow-other-keys)
-  (assert (eql packet (pop-packet (queue interface))))
+  (assert (eql packet (dequeue (packet-queue interface))))
   (when fail (drop interface packet :text fail)))
 
 
-(defmethod (setf up)(up (interface interface) &key (inform-routing t))
-  ;; if fail during packet drop received packet
-  (unless (eql up (up-p interface))
-    (setf (slot-value interface 'rx-packet) nil)
-    (setf (slot-value interface 'up-p) up)
-    (when inform-routing (layer3:topology-changed interface)))
-  (unless up
-    (until (empty-p (queue interface))
-      (drop interface (dequeue (queue interface)) :text "L2-ID"))))
+(defmethod mkup((interface interface) &key (inform-routing t))
+  (unless (up-p interface)
+    (setf (slot-value interface 'up-p) t)
+    (when inform-routing (layer3:topology-changed interface))))
+
+(defmethod mkdown((interface interface) &key (inform-routing t))
+  (when (up-p interface)
+    (setf  (slot-value interface 'rx-packet) nil
+           (slot-value interface 'up-p) nil)
+    (when inform-routing (layer3:topology-changed interface))
+    (until (empty-p (packet-queue interface))
+      (drop interface (dequeue (packet-queue interface)) :text "L2-ID"))))
 
 (defmethod reset((interface interface))
-  (reset (queue interface))
+  (reset (packet-queue interface))
   (reset (layer2:protocol interface))
-  (reset (arp interface))
+  (reset (layer2:arp interface))
   (setf (slot-value interface 'rx-packet) nil)
   (reset (link interface)))
 
@@ -136,14 +147,16 @@
 
 (defmethod busy-p((interface interface)) (busy-p (link interface)))
 
-(defmethod network-to-hardware-address((addr network-address) (interface interface))
+(defgeneric network-to-hardware-address(network-address interface)
+  (:documentation "map a network address to hardware adewaa on a link")
+  (:method ((addr network-address) (interface interface))
    (when-bind(peer-interface (find addr (peer-interfaces interface) :key #'network-address))
-     (hardware-address peer-interface)))
+     (hardware-address peer-interface))))
 
 (defmethod peer-interfaces((interface interface) &key only-if-up-p)
   (when (or (not only-if-up-p) (up-p interface))
-    (remove interface (peer-interfaces (link interface))
-            :only-if-up-p only-if-up-p)))
+    (remove interface
+            (peer-interfaces (link interface) :only-if-up-p only-if-up-p))))
 
 (defmethod default-peer-interface((interface interface))
    (default-peer-interface (link interface)))

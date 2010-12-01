@@ -27,7 +27,8 @@
            #:octet #:word #:counter #:seq #:fid
            #:interface #:link #:node #:application
            #:copy #:copy-with-slots
-           #:notifier #:add-notify #:do-notifications))
+           #:notifier #:add-notify #:do-notifications
+           #:up-p #:mkup #:mkdown))
 
 (defpackage :scheduler
   (:documentation "LENS Discrete Event Scheduler")
@@ -50,7 +51,7 @@
   (:documentation "Packet implementation")
   (:use :cl :common)
   (:import-from :scheduler #:simulation-time #:time-type)
-  (:export #:pdu #:pdus #:length-bytes #:layer #:packet #:created #:routing
+  (:export #:pdu #:pdus #:length-bytes #:layer #:packet #:created
            #:push-pdu #:skip-pdu #:peek-pdu #:pop-pdu #:priority))
 
 (defpackage :trace
@@ -59,12 +60,14 @@
 ;   (:import-from :address #:print-ip-format)
    (:import-from :scheduler #:simulation-time #:time-type)
    (:export #:trace-status #:trace-detail #:trace-stream #:time-format
-            #:*lens-trace-output* #:trace #:write-pdu-slots #:pdu-trace))
+            #:*lens-trace-output* #:trace #:write-pdu-slots #:pdu-trace
+            #:write-trace))
 
 (defpackage :protocol
   (:documentation "Protocol stack layer implementations")
   (:use :cl #:common #:trace)
-  (:import-from :packet #:pdu #:layer #:length-bytes)
+  (:import-from :packet #:pdu #:layer #:length-bytes #:peek-pdu)
+  (:import-from :trace #:write-trace)
   (:export #:protocol-number #:protocol #:layer #:pdu #:length-bytes
            #:send #:receive #:drop))
 
@@ -78,7 +81,7 @@
             #:macaddr #:ipaddr #:ipport #:ipmask
             #:*print-ip-format* #:print-ip-form
             #:ipaddr #:ipport #:ipmask #:macaddr
-            #:src-address #:dest-address
+            #:src-address #:dst-address
             #:address-condition #:address-out-of-range
             #:subnet #:ipaddr-allocator #:local-network-address-p))
 
@@ -100,7 +103,7 @@
   (:import-from :node #:node)
   (:import-from :alg  #:make-queue
                 #:enqueue #:dequeue #:list-queue #:traverse #:empty-p)
-  (:import-from :packet #:length-bytes #:priority)
+  (:import-from :packet #:packet #:length-bytes #:priority #:peek-pdu)
   (:import-from :scheduler #:time-type #:simulation-time #:schedule)
   (:import-from :protocol #:send #:receive #:drop)
   (:export #:interface #:packet-queue
@@ -141,45 +144,30 @@
   (:nicknames :layer4 :layer.transport)
   (:use :cl :common :address :protocol)
   (:shadow #:protocol #:pdu)
-  (:import-from :alg
-                #:enqueue #:dequeue #:make-queue
-                #:empty-p)
-  (:export
-            #:register-protocol #:protocols #:find-protocol #:delete-protocol
+  (:import-from :packet #:packet #:pop-pdu)
+  (:import-from :alg #:enqueue #:dequeue #:make-queue #:empty-p)
+  (:export #:register-protocol #:protocols #:find-protocol #:delete-protocol
             #:peer-address #:peer-port #:local-port #:local-address
-            #:protocol #:pdu
-           ;; #:receive
+            #:bind #:unbind #:connect #:connection-complete
+            #:close-connection #:connected-p
+            #:send #:receive #:sent
+            #:fid
            ;; #:notification #:request-notification #:cancel-notification
            ;; #:ttl #:fid #:tos #:interface
-           ;; #:send #:connect #:close-connection #:bind #:unbind #:make-packet
+           ;; #:send  #:make-packet
            ;; specific default layer 4 protocols
            #:udp #:tcp #:icmp #:demux #:tcp-tahoe #:tcp-reno #:tcp-newreno))
 
 (defpackage :protocol.layer5
   (:documentation "Application Layer protocol interface")
   (:nicknames :layer5 :data :layer.application)
-  (:use :cl :common :address :protocol)
+  (:use :cl :common :address :protocol.layer4)
   (:shadow #:protocol #:pdu)
   (:export #:data #:contents #:msg-size #:response-size #:checksum
            #:copy-from-offset #:size-from-seq #:copy-from-seq
-           #:add-data #:remove-data #:protocol #:pdu))
-
-;; #:link #:local-interface #:peer-interfaces #:peer-node-p
-;;            #:default-peer-interface #:ip-to-mac #:find-interface #:busy-p
-;;            #:bandwidth #:delay #:bit-error-rate  #:jitter #:weight
-;;            #:notifications #:*default-link* #:*default-bandwidth*
-;;            #:*default-delay* #:*default-jitter*
-;;            #:transmit #:transmit-complete #:rx-own-broadcast
-;;            #:transmit-helper
-;;            #:point-to-point #:busy-p #:peer-node-ipaddr
-;;            #:make-new-interface))
-
-
-
-;; ;; each protocol layer has its own pdu and protocol class
-;; ;; as it should be made explicit in other packages which
-;; ;; layer is being refered to. They all have different APIs
-
+           #:add-data #:remove-data #:protocol #:pdu
+           #:application
+           #:cbr-source #:udp-sink))
 
 ;; (defpackage :application
 ;;    (:documentation "Application Implementations")
@@ -195,51 +183,6 @@
 ;;             #:connection-failed #:server-connection-complete
 ;;             #:connection-from-peer #:data #:checksum
 ;;             #:cbr-source #:udp-sink))
-
-;; (defpackage :link
-;;   (:documentation "Node link implementation")
-;;   (:use :cl :common :address :lens.math)
-;;   (:import-from :node #:node)
-;;   (:import-from :queues #:queue #:insert #:extract-head #:empty-p)
-;;   (:import-from :protocol.layer2 #:busy-p)
-;;   (:import-from :scheduler
-;;                 #:time-type #:simulation-time #:schedule #:schedule-timer)
-;;   (:import-from :packet #:notification #:size)
-;;   (:export #:link #:local-interface #:peer-interfaces #:peer-node-p
-;;            #:default-peer-interface #:ip-to-mac #:find-interface #:busy-p
-;;            #:bandwidth #:delay #:bit-error-rate  #:jitter #:weight
-;;            #:notifications #:*default-link* #:*default-bandwidth*
-;;            #:*default-delay* #:*default-jitter*
-;;            #:transmit #:transmit-complete #:rx-own-broadcast
-;;            #:transmit-helper
-;;            #:point-to-point #:busy-p #:peer-node-ipaddr
-;;            #:make-new-interface))
-
-;; (defpackage :interface
-;;   (:documentation "Node interface implementation")
-;;   (:use :cl :address :common)
-;;   (:import-from :queues #:queue #:insert #:extract-head #:empty-p)
-;;   (:import-from :node #:node #:local-ipaddr-p)
-;;   (:import-from :link
-;;                 #:link #:bandwidth #:ip-to-mac #:default-peer-interface
-;;                 #:peer-node-p #:make-new-interface #:weight
-;;                 #:peer-interfaces #:peer-node-ipaddr)
-;;   (:import-from :scheduler
-;;                 #:schedule #:simulation-time #:cancel-all-timers
-;;                 #:schedule-timer #:time-type #:timers-manager)
-;;   (:import-from :packet #:packet #:size #:notification #:push-pdu)
-;;   (:import-from :trace #:write-trace)
-;;   (:import-from :protocol.layer3 #:arp)
-;;   (:export #:interface #:receive #:neighbours
-;;            #:peer-interfaces #:peer-node-p #:queue
-;;            #:packet-queue #:enque #:deque #:peek-deque #:deque-if
-;;            #:delete-packets-if #:length-packets #:length-bytes
-;;            #:buffer-available-p #:egress-filter
-;;            #:limit-packets #:limit-bytes #:average-queue-length
-;;            #:reset-average-queue-length #:queueing-delay
-;;            #:drop-tail #:add-notify #:cancel-notify
-;;            #:peers #:peer-p #:default-peer-interface #:ip-to-mac
-;;            #:peer-node-ipaddr #:local-ipaddr-p #:node #:send #:link))
 
 
 ;; ;; backward symbol dependencies
