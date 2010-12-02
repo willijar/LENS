@@ -22,7 +22,6 @@
 (deftype octet() "8-bit byte type" '(unsigned-byte 8))
 (deftype word() "16-bit word type" '(unsigned-byte 16))
 (deftype seq() "a sequence number type" 'fixnum)
-(deftype fid() "a flow id number type" 'fixnum)
 (defconstant +c+ 299792458 "Speed of Light in m/sec")
 
 (defmacro while (test &body body)
@@ -231,4 +230,12 @@ Examples:
   (:documentation "Ensure entity is in up state, informing routing if state has changed and inform-routing keyword is true"))
 
 (defgeneric mkdown(entity &key inform-routing)
-  (:documentation "Ensure entity is in down state, informing routing if state has changed and inform-routing keyword is true"))
+  (:documentation "Ensure entity is in down state, informing routing
+  if state has changed and inform-routing keyword is true"))
+
+(define-condition lens-error(simple-error)
+  (:documentation "Base for simulation internal errors"))
+
+(declaim (inline lens-error))
+(defun lens-error(format-control &rest args)
+  (signal 'lens-error :format-control format-control :format-arguments args))

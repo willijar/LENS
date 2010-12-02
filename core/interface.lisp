@@ -11,7 +11,21 @@
 
 ;;; Commentary:
 
-;;
+
+;; Link layer will be sent packets either from ARP or from interface
+;; and will send to link.
+
+
+;; Interfaces are made up of a link, a layer 2 protocol, a packet
+;; queue and possibley an arp unit.  layer 3 protocols send to and
+;; receive from interfaces interfaces convert network address to
+;; hardware address (using arp module if present) and then use the
+;; layer 2 protocol to send packets over the link using the packet
+;; queue The layer 2 protocol is responsible for managing the queue
+;; and link and for notifications against the interface.
+
+;; received packets go link -> interface -> layer 2 -> layer 3
+;; transmitted packets go layer 3 -> interface -> layer 2 -> link
 
 ;;; Code:
 
@@ -25,7 +39,7 @@
 
 (defclass interface(notifier)
   ((node
-    :initarg :node :type node :reader node
+    :type node :reader node
     :documentation "Associated node")
    (network-address
     :type network-address :initarg :network-address
@@ -86,10 +100,9 @@
     (setf  (slot-value interface 'network-address)
            (network-address (node interface)))))
 
-
-
-(defmethod send((interface interface) packet protocol &key address &allow-other-keys)
-  "Called by upper layers to send packets - may return null if interface is busy. Requires address"
+(defmethod send((interface interface) packet (protocol layer3:protocol) &key address &allow-other-keys)
+  "Called by upper layers to send packets - may return null if
+interface is busy. Requires address"
   (if (up-p interface)
       (etypecase address
         ((eql :broadcast)
@@ -104,11 +117,51 @@
                  :address (network-to-hardware-address address interface)))))
       (drop interface packet :text "L2-ID")))
 
-(defmethod send-complete((interface interface) packet link
+(defmethod receive-start((interface interface) packet link)
+  (when (up-p interface)
+    (with-slots(rx-packet) interface
+      (when rx-packet
+        (drop interface rx-packet :text "L2-ID")
+        (setf rx-packet packet)
+        (receive-start (layer2:protocol interface) packet interface)))))
+
+(defmethod receive((interface interface) packet link
+                   &key errors &allow-other-keys)
+  (with-slots(rx-packet) interface
+    (assert (eql packet rx-packet))
+    (setf rx-packet nil))
+  (if (zerop errors)
+      (receive (layer2:protocol interface) packet interface)
+      (drop interface packet :text "L2-BER")))
+
+(defmethod send-complete((protocol layer3:protocol) packet (interface interface)
                          &key fail &allow-other-keys)
   (assert (eql packet (dequeue (packet-queue interface))))
-  (when fail (drop interface packet :text fail)))
+  (when fail (drop interface packet :text fail))
+  (send-complete (layer2:protocol interface) packet interface))
 
+(defmethod send-complete((protocol layer2:protocol) packet (interface interface)
+                         &key fail &allow-other-keys)
+  (call-notifications interface))
+
+;; (defmethod notify((interface interface))
+;;   "Link has finished previous transmit"
+;;   (unless (up-p interface)
+;;     ;; interface has failed - drop all packets
+;;     (loop
+;;      (let ((p (deque (queue interface))))
+;;        (unless p (return))
+;;        (write-trace (node interface)  nil :drop nil :packet p
+;;                     :text "L2-ID"))))
+;;   (unless (layer2:busy-p (layer2:protocol interface))
+;;     (let ((packet (deque (queue interface))))
+;;       (when packet
+;;         (layer2:send (layer2:protocol interface) packet)))
+;;       ;; send queue space available notification
+;;     (call-notification interface nil) ))
+
+
+  (do-notifications interface))
 
 (defmethod mkup((interface interface) &key (inform-routing t))
   (unless (up-p interface)
@@ -130,22 +183,7 @@
   (setf (slot-value interface 'rx-packet) nil)
   (reset (link interface)))
 
-(defmethod receive-start((interface interface) packet link)
-  (when (up-p interface)
-    (with-slots(rx-packet) interface
-      (when rx-packet
-        (drop interface packet :text "L2-ID")
-        (setf rx-packet packet)))))
-
-(defmethod receive((interface interface) packet link &key errors &allow-other-keys)
-  (with-slots(rx-packet) interface
-    (assert (eql packet rx-packet))
-    (setf rx-packet nil))
-  (if (zerop errors)
-      (receive (layer2:protocol interface) packet interface)
-      (drop interface packet :text "L2-BER")))
-
-(defmethod busy-p((interface interface)) (busy-p (link interface)))
+(defmethod busy-p((interface interface)) (busy-p (layer2:protocol interface)))
 
 (defgeneric network-to-hardware-address(network-address interface)
   (:documentation "map a network address to hardware adewaa on a link")
@@ -153,13 +191,11 @@
    (when-bind(peer-interface (find addr (peer-interfaces interface) :key #'network-address))
      (hardware-address peer-interface))))
 
-(defmethod peer-interfaces((interface interface) &key only-if-up-p)
-  (when (or (not only-if-up-p) (up-p interface))
-    (remove interface
-            (peer-interfaces (link interface) :only-if-up-p only-if-up-p))))
+(defmethod peer-interfaces((interface interface))
+  (remove interface (peer-interfaces (link interface))))
 
 (defmethod default-peer-interface((interface interface))
-   (default-peer-interface (link interface)))
+  (default-peer-interface (link interface)))
 
 ;; (defmethod notify((interface interface))
 ;;   "Link has finished previous transmit"

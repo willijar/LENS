@@ -18,12 +18,6 @@
 
 (in-package :node)
 
-(defmethod (setf ipaddr)((ipaddr ipaddr) (node node))
-  (prog1
-      (setf (slot-value node 'ipaddr) ipaddr)
-    (when (= 1 (length (interfaces node))) ;; 1 interface - set to same ipaddr
-      (setf (ipaddr (aref (interfaces node) 0)) ipaddr))))
-
 (defmethod ipaddrs((node node))
   (let ((local-found-p nil)
         (local-ipaddr (ipaddr node))

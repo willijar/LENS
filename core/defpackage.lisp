@@ -28,7 +28,8 @@
            #:interface #:link #:node #:application
            #:copy #:copy-with-slots
            #:notifier #:add-notify #:do-notifications
-           #:up-p #:mkup #:mkdown))
+           #:up-p #:mkup #:mkdown
+           #:lens-error))
 
 (defpackage :scheduler
   (:documentation "LENS Discrete Event Scheduler")
@@ -63,11 +64,23 @@
             #:*lens-trace-output* #:trace #:write-pdu-slots #:pdu-trace
             #:write-trace))
 
+(defpackage :node
+  (:documentation "Node implementations")
+  (:use :cl :common :address)
+  (:export #:node #:nodes #:clear-nodes
+           #:interfaces #:ipaddrs #:local-ipaddr-p
+           #:add-interface #:find-interface  #:neighbours
+           #:receive-packet
+           #:lookup-by-port #:bound-protocols #:applications
+           #:make-location #:location #:distance
+           #:callbacks #:make-callback #:add-callback #:call-callbacks))
+
 (defpackage :protocol
   (:documentation "Protocol stack layer implementations")
   (:use :cl #:common #:trace)
   (:import-from :packet #:pdu #:layer #:length-bytes #:peek-pdu)
   (:import-from :trace #:write-trace)
+  (:import-from :node #:call-callbacks)
   (:export #:protocol-number #:protocol #:layer #:pdu #:length-bytes
            #:send #:receive #:drop))
 
@@ -85,16 +98,7 @@
             #:address-condition #:address-out-of-range
             #:subnet #:ipaddr-allocator #:local-network-address-p))
 
- (defpackage :node
-  (:documentation "Node implementations")
-  (:use :cl :common :address)
-  (:export #:node #:nodes #:clear-nodes
-           #:interfaces #:ipaddrs #:bind #:unbind #:local-ipaddr-p
-           #:add-interface #:find-interface
-           #:neighbours
-           #:receive-packet #:callbacks #:call-callbacks #:make-callback
-           #:lookup-by-port #:bound-protocols #:applications
-           #:make-location #:location #:distance))
+
 
 (defpackage :layer1
   (:documentation "Physical layer implementation")
@@ -169,74 +173,50 @@
            #:application
            #:cbr-source #:udp-sink))
 
-;; (defpackage :application
-;;    (:documentation "Application Implementations")
-;;    (:use :cl :common :address :protocol.layer4 :lens.math)
-;;    (:import-from :protocol #:size #:layer)
-;;    (:import-from :node #:node)
-;;    (:import-from :packet #:push-pdu #:pop-pdu #:peek-pdu)
-;;    (:import-from :scheduler
-;;                  #:start #:stop #:cancel #:schedule #:handle
-;;                  #:simulation-time #:time-type)
-;;    (:export #:application #:start #:stop #:receive #:sent #:protocol
-;;             #:close-request #:closed #:connection-complete
-;;             #:connection-failed #:server-connection-complete
-;;             #:connection-from-peer #:data #:checksum
-;;             #:cbr-source #:udp-sink))
 
+(defpackage :lens-user
+   (:documentation "LENS User interface")
+   (:use :cl :cl-user :address :common :math)
+   (:import-from :scheduler
+                 #:scheduler #:simulation-time #:schedule)
+   (:import-from :trace
+                 #:*lens-trace-output* #:trace-status #:trace-detail
+                 #:time-format #:trace-stream)
+   (:import-from :packet #:length-bytes #:created #:fid #:pdus)
+   (:import-from #:protocol
+                 #:protocol-number #:layer #:src-address #:dst-address
+                 #:*common-protocol-graph* #:size #:insert-protocol)
+   (:import-from :address #:*print-ip-format* #:src-address #:dst-address
+                 #:broadcast-p #:address= #:subnet  #:ipaddr #:macaddr #:ipmask
+                 #:ipaddr-allocator #:local-network-address-p)
+   (:import-from :node
+                 #:node #:nodes #:clear-nodes #:interfaces #:neighbours
+                 #:mkup #:mkdown #:add-interface
+                 #:make-callback
+                 #:interfaces #:applications
+                 #:make-callback #:add-callback)
 
-;; ;; backward symbol dependencies
-;; (in-package :protocol)
-;; (import '(packet:packet node:node))
-;; (in-package :protocol.layer4)
-;; (import '(interface:buffer-available-p packet:packet))
-;; (in-package :trace)
-;; (import '(protocol:layer))
-;; (in-package :node)
-;; (import '(interface:interface interface:peer-node-p
-;;           routing:add-route routing:rem-route routing:find-route
-;;           routing:initialise-routes routing:reinitialise-routes))
+   (:import-from :protocol.layer2 #:IEEE802.3)
+   (:import-from :protocol.layer3 #:arp #:ipv4)
+   (:import-from :protocol.layer4
+                 #:udp #:icmp  #:tcp-tahoe #:tcp-reno #:tcp-newreno)
+   (:import-from :application #:cbr-source #:udp-sink)
+   (:import-from :lens.math
+                 #:time-value #:average-min-max
+                 #:histogram #:inter-arrival-histogram)
 
-;; ;; the user interface package
-;; (in-package :cl-user)
-
-;; (defpackage :lens-user
-;;    (:documentation "LENS User interface")
-;;    (:use :cl :cl-user :address :common :lens.math)
-;;    (:import-from :scheduler
-;;                  #:scheduler #:simulation-time #:schedule #:cancel
-;;                  #:start #:stop #:reset)
-;;    (:import-from :trace
-;;                  #:*lens-trace-output* #:trace-status #:trace-detail
-;;                  #:time-format)
-;;    (:import-from #:protocol
-;;                  #:layer #:src-address #:dst-address
-;;                  #:*common-protocol-graph* #:size #:insert-protocol)
-;;    (:import-from :protocol.layer2 #:IEEE802.3)
-;;    (:import-from :protocol.layer3 #:arp #:ipv4)
-;;    (:import-from :protocol.layer4
-;;                  #:udp #:icmp  #:tcp-tahoe #:tcp-reno #:tcp-newreno)
-;;    (:import-from :application #:cbr-source #:udp-sink)
-;;    (:import-from :lens.math
-;;                  #:time-value #:average-min-max
-;;                  #:histogram #:inter-arrival-histogram)
-;;    (:import-from :node
-;;                  #:callbacks #:add-interface
-;;                  #:make-callback #:node #:nodes #:clear-nodes
-;;                  #:interfaces #:bind #:unbind)
-;;    (:import-from :link
-;;                  #:*default-link* #:*default-bandwidth* #:*default-delay*
-;;                  #:*default-jitter* #:delay #:bandwidth #:jitter
-;;                  #:ip-to-mac #:bit-error-rate #:local-interface
-;;                  #:point-to-point)
-;;    (:import-from :packet #:size)
-;;    (:import-from :interface
-;;                  #:packet-queue #:interface #:length-packets #:length-bytes
-;;                  #:limit-packets #:limit-bytes #:egress-filter
-;;                  #:reset-average-queue-length #:average-queue-length
-;;                  #:queueing-delay #:drop-tail #:make-new-interface)
-;;    (:import-from :routing
-;;                  #:default-route #:*default-routing* #:routing-manual
-;;                  #:routing-static #:find-route #:add-route #:rem-route
-;;                  #:topology-changed))
+   (:import-from :link
+                 #:*default-link* #:*default-bandwidth* #:*default-delay*
+                 #:*default-jitter* #:delay #:bandwidth #:jitter
+                 #:ip-to-mac #:bit-error-rate #:local-interface
+                 #:point-to-point)
+   (:import-from :interface
+                 #:packet-queue #:interface #:length-packets #:length-bytes
+                 #:limit-packets #:limit-bytes #:egress-filter
+                 #:reset-average-queue-length #:average-queue-length
+                 #:queueing-delay #:drop-tail #:make-new-interface)
+   (:import-from :routing
+                 #:default-route #:*default-routing* #:routing-manual
+                 #:routing-static #:find-route #:add-route #:rem-route
+                 #:topology-changed))
 

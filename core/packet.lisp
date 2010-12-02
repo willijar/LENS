@@ -28,7 +28,8 @@
         :initform (incf *packet-count*)
         :reader uid
         :documentation "Unique id of the packet")
-   (fid :type counter :initarg :fid :documentation "FLow id useful for tracing")
+   (fid :type counter :initarg :fid :documentation "FLow id useful for tracing"
+        :reader fid)
    (pdus :type vector :initform (make-array 4 :adjustable t :fill-pointer 0)
          :reader pdus)
    (created :type time-type :initform (simulation-time) :reader created

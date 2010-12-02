@@ -38,13 +38,17 @@ See http://www.iana.org/assignments/protocol-numbers")
   (:documentation "Called by sender to start sending packet - Returns
   true if packet accepted for transmission, false otherwise.")
   (:method :before(receiver packet (sender protocol) &key &allow-other-keys)
-     (write-trace sender (peek-pdu packet) :packet packet :text "-")))
+           (write-trace sender (peek-pdu packet) :packet packet :text "-"))
+  (:method :around (receiver packet (sender protocol) &key &allow-other-keys)
+           (when (call-callbacks :tx sender) (call-next-method))))
 
 (defgeneric receive(receiver packet sender &key &allow-other-keys)
   (:documentation "Called by packet when to pass received packet up to
   receiver (once reception is complete)")
   (:method :before((receiver protocol) packet sender &key &allow-other-keys)
-     (write-trace receiver (peek-pdu packet) :packet packet :text "+")))
+           (write-trace receiver (peek-pdu packet) :packet packet :text "+"))
+  (:method :around((receiver protocol) packet sender &key &allow-other-keys)
+           (when (call-callbacks :rx receiver) (call-next-method))))
 
 (defgeneric drop(entity packet &key node &allow-other-keys)
   (:documentation "Drop a packet")
@@ -55,18 +59,19 @@ See http://www.iana.org/assignments/protocol-numbers")
 
 (defclass protocol(protocol:protocol)
   ((layer :initform 2 :reader layer :allocation :class)
-   (interface :initarg :iface :accessor interface
+   (interface :initarg :iface :initarg :interface :accessor interface
               :documentation "Interface for this protocol"))
   (:documentation "Layer 2 protocol base class"))
+
+(defmethod initialize-instance :after((protocol protocol)
+                                      &key &allow-other-keys)
+  (setf (slot-value protocol 'node) (node interface)))
 
 (defclass pdu(packet:pdu)
   ((layer :initform 2 :reader protocol:layer :allocation :class))
   (:documentation "The base class for all layer two  protocol data units"))
 
-;; Link layer will be sent packets either from ARP or from interface and will send to link.
-
 (in-package :protocol.layer3)
-;; Network layer should send to appropriate interface and will receive packets from transport layer
 
 (defclass protocol(protocol:protocol)
   ((layer :initform 3 :reader layer :allocation :class))
@@ -139,7 +144,7 @@ is true add it to the list of standard protocols"
 (defvar *standard-protocols* nil "List of standard registered layer 4
 protocols")
 
-(defvar +ephemeral-port-start+ 49152 "Start of ephemeral port range")
+(defvar +min-ephemeral-port+ 49152 "Start of ephemeral port range")
 
 (defclass protocol(protocol:protocol)
   ((layer :initform 4 :reader layer :allocation :class)
@@ -149,7 +154,9 @@ protocols")
   (:documentation "Layer 4 protocol"))
 
 (defun next-available-port(protocol)
-  (max +ephemeral-port-start+ (reduce #'max (bindings protocol) :key #'local-port)))
+  (1+
+   (reduce #'max (bindings protocol) :key #'local-port
+           :initial-value  +min-ephemeral-port+)))
 
 (defclass pdu(packet:pdu)
   ((layer :initform 4 :reader protocol:layer :allocation :class))
@@ -205,37 +212,40 @@ protocols")
   (register-protocol protocol (node protocol)))
 
 (defclass socket()
-  ((local-address :initarg :local-address :type network-address
-                  :reader local-address
+  ((local-address :type network-address :reader local-address
                   :documentation "local address used by this socket")
-   (local-port :initarg :local-port
-               :type ipport :accessor local-port
-               :documentation "Local bound port number")
+   (local-port :type ipport :accessor local-port
+               :documentation "Local bound service access port")
    (layer5:application :initarg :application :initform nil
                        :reader layer5:application
                        :documentation "Local application object")
    (protocol :type protocol :initarg :protocol :reader protocol
              :documentation "layer 4 protocol used by this flow")
-   (peer-address :initarg :peer-address :initform nil :type network-address
+   (peer-address :initform nil :type network-address
                  :reader peer-address
                  :documentation "network address of peer")
-    (peer-port  :initarg :peer-port
-                :type ipport :accessor peer-port
-                :documentation "Port of peer")
-    (fid :reader fid :documentation "Flow id")
-    (ttl :accessor ttl :initarg :ttl :initform 64
-         :documentation "Layer 3 ttl")
-    (tos :accessor tos :initarg :tos :initform 0
-         :documentation "Layer 3 type of service"))
+   (peer-port  :type ipport :accessor peer-port
+               :documentation "Service access port of peer")
+   (fid :type 'counter :reader fid :documentation "Flow id")
+   (last-fid :type 'counter :initform 0 :documentation "last allocated flow id")
+   (ttl :accessor ttl :initarg :ttl :initform 64 :type 'word
+        :documentation "Layer 3 ttl")
+   (tos :accessor tos :initarg :tos :initform 0 :type 'octet
+        :documentation "Layer 3 type of service"))
   (:documentation "Base class for all layer 4 protocols states"))
 
 (defmethod initialize-instance :after
     ((socket socket) &key
      (local-address (network-address (node (protocol socket))))
      (local-port (next-available-port (protocol socket)))
+     peer-address peer-port
      &allow-other-keys)
   (when local-address (setf (slot-value socket 'local-adress) local-address))
-  (when local-port (bind local-port socket)))
+  (when local-port (bind local-port socket :local-address local-address))
+  (when (and peer-address peer-port) (connect peer-address peer-port socket)))
+
+(defun listener-p(socket)
+  (not (slot-boundp socket 'peer-address)))
 
 (defgeneric bind(local-port socket &key local-address )
   (:documentation "Bind a socket to a local address and port")
@@ -245,10 +255,19 @@ protocols")
     (unless (slot-boundp socket 'local-address)
       (error "No local address defined to bind to"))
     (when (slot-boundp socket 'local-port)
-      (error "Socket already bound"))
-    (when (find local-port (bindings (protocol socket)) :key #'local-port)
-      (error "Port ~D already bound" local-port))
+      (lens-error "Socket already bound"))
     (setf (slot-value socket 'local-port) local-port)
+    (if (listener-p socket)
+        (when (find local-port (bindings (protocol socket)) :key #'local-port)
+          (error "Port ~D already bound" local-port))
+        (with-slots((lpa local-port) (paa peer-address) (ppa peer-port)) socket
+          (when (find-if
+                 #'(lambda(socket)
+                     (with-slots((lpb local-port) (pab peer-address)
+                                 (ppb peer-port)) socket
+                     (and (eql lpa lpb) (eql paa pab) (eql ppa ppb))))
+                 (bindings (protocol socket)))
+            (error "Port ~D Socket alread bound to ~A:~A" lpa paa ppa))))
     (push socket (slot-value (protocol socket) 'bindings))))
 
 (defgeneric unbind(socket)
@@ -259,10 +278,11 @@ protocols")
     (slot-makunbound socket 'local-port)))
 
 (defgeneric connect(peer-address peer-port socket)
-  (:documentation "COnnect a socket to a remote (peer) address")
+  (:documentation "Connect a socket to a remote (peer) address")
   (:method(peer-address peer-port (socket socket))
     (setf (slot-value socket 'peer-address) peer-address
-          (slot-value socket 'peer-port) peer-port)))
+          (slot-value socket 'peer-port) peer-port
+          (slot-value socket 'fid) (incf (slot-value socket 'last-fid)))))
 
 (defgeneric connection-complete(socket application &key failure)
   (:documentation "Called to signal completion of connection attempt -
@@ -274,24 +294,47 @@ protocols")
 
 (defgeneric close-connection(socket)
   (:documentation "Close an open connection")
-  (:method((socket socket))
-    (slot-makunbound socket 'peer-port)))
+  (:method((socket socket)) (slot-makunbound socket 'peer-port)))
+
+(defgeneric closed(application protocol)
+  (:documentation "Called by an associated layer 4 protocol when a connection
+has completely closed")
+  (:method(app protocol) (declare (ignore app protocol))))
+
+(defgeneric close-request(application protocol)
+  (:documentation "Called by an associated layer 4 protocol when a connection
+close request has been received from a peer.  Applications should
+respond by calling the corresponding close-connection routine")
+  (:method(app protocol)
+    (declare (ignore app))
+    (close-connection protocol)))
 
 (defmethod send(application data (socket socket)
-                &key &allow-other-keys)
-  (send (protocol socket)
+                &key (peer-address (peer-address socket))
+                (peer-port (peer-port socket)) &allow-other-keys)
+  (send socket
         (make-instance 'packet :data data :fid (fid socket))
-        (protocol socket)))
+        (protocol socket) :peer-address peer-address :peer-port peer-port))
 
 (defmethod receive((socket socket) packet (protocol protocol)
                    &key &allow-other-keys)
   (receive (layer5:application socket) (pop-pdu packet) socket))
 
-(defgeneric sent(sender data protocol)
-  (:documentation "Called by protocol to inform sender that some data
-  has been successfully sent (i.e. acknowledeged by recipient")
-  (:method(sender data protocol)
-    (declare (ignore sender data protocol))))
+(defgeneric sent(application no-octets-sent protocol)
+  (:documentation "Called by an associated layer 4 protocol when all some part
+of the outstanding data has been sent.  For TCP protocols,
+this occurs when the acknowledgement is received from the peer.")
+  (:method(application no-octets-sent protocol)
+    (declare (ignore application no-octets-sent protocol))))
+
+(defgeneric connection-from-peer(application protocol &key peer-address peer-port)
+  (:documentation "Called when a listening socket receives a
+connection request. Return true if connection accepted.")
+  (:method(application protocol src-address)
+    (declare (ignore application protocol src-address))
+    t))
+
+
 
 ;; (defgeneric receive(protocol node packet dst-address interface)
 ;;   (:documentation "Indication that packet has been received by layer 3

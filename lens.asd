@@ -37,28 +37,27 @@
                (:file "packet" :depends-on ("defpackage" "scheduler"))
                (:file "address" :depends-on ("defpackage" "common"))
                (:file "packet-queue"
-                      :depends-on ("defpackage" "common" "scheduler" "packet"))
+                      :depends-on ("defpackage" "common" "scheduler" "packet"
+                                                "protocol"))
                (:file "protocol" :depends-on ("address" "common"))
-               #+nil(:file "interface"
+               (:file "interface"
                       :depends-on ("defpackage" "packet-queue" "link"))
                (:file "trace" :depends-on
                       ("defpackage" "common" "scheduler" "compatibility"))
                (:file "routing" :depends-on ("common" "address"))
                (:file "node"
-                       :depends-on ("common" "address" "protocol"))
-;;                (:file "application"
-;;                       :depends-on ("common" "scheduler" "protocol"))
-;;                (:file "interface"
-;;                       :depends-on ("defpackage" "packet-queue" "link"))
-;;                (:file "link"
-;;                       :depends-on ("common" "scheduler" "queues" "random"
-;;                                    "address" "packet-queue" "node"))
+                       :depends-on ("common" "address" "protocol" "routing"))
+               (:file "link"
+                       :depends-on ("common" "scheduler" "random"
+                                    "address" "packet-queue" "node"))
+               (:file "application"
+                       :depends-on ("common" "scheduler" "protocol"))
                #+nil(:file "statistics" :depends-on ("common" "scheduler"))
 
 
-;;                (:file "user"
-;;                       :depends-on ("common" "address" "scheduler" "link"
-;;                                             "node"))))
+                (:file "user"
+                       :depends-on ("common" "address" "scheduler" "link"
+                                             "node"))))
 ))
      #+nil(:module "nodes" :depends-on ("core")
               :components

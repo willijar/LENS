@@ -41,3 +41,17 @@ changed-entity is the object in the topology who's state has changed"))
     (reinitialise-routes (routing (node entity)) entity)))
 
 (defvar *default-routing* nil "make-instance args for default routing")
+
+(defun routing-neighbours(node &key no-leaf)
+  "Return list of routing neighours for a node - if no-leaf is true do
+ not include leaf nodes in the list. Only uses up interfaces and
+ nodes."
+  (when (up-p node)
+    (mapcan
+     #'(lambda(interface)
+         (let ((peers (filter #'up-p (peer-interfaces interface))))
+           (unless (and no-lead (<= (length peers) 1))
+             (mapcar
+              #'(lambda(peer) (make-next-hop interface (network-address peer)))
+              peers))))
+     (filter #'up-p (interfaces node)))))

@@ -60,15 +60,9 @@ two things")
 (defgeneric link(entity)
   (:documentation "Return the link associated with an entity"))
 
-(defgeneric peer-interfaces(link &key only-if-up-p)
+(defgeneric peer-interfaces(link)
   (:documentation "Return a sequence of all the peer interfaces this link
-connects to")
-  (:method :around (link &key only-if-up-p)
-      (if only-if-up-p
-          (when (up-p link)
-            (mapcan #'(lambda(link) (when (up-p link) (list link)))
-                    (call-next-method)))
-          (call-next-method))))
+connects to"))
 
 (defgeneric default-peer-interface(link)
   (:documentation "Return the default peer (gateway) on a link"))
@@ -76,33 +70,6 @@ connects to")
 (defgeneric receive-own-broadcast-p(link)
   (:documentation "If true interfaces receive their own braodcast")
   (:method(link) (declare (ignore link)) nil))
-
-(defmethod send(link packet local-interface &key (peer-address (dst-address (peek-pdu packet))))
-  (let* ((no-bits (* 8 (length-bytes packet)))
-         (txtime (/ no-bits (bandwidth link local-interface))))
-    ;; schedule packet transmit complete event
-    (schedule txtime (list #'send-complete local-interface packet link))
-    ;; schedule packet arrival at interface(s)
-    (flet ((schedule-receive(peer-interface packet)
-             (let ((delay (delay link local-interface peer-interface))
-                   (errors
-                    (1-
-                     (expt
-                      (1- (bit-error-rate link local-interface peer-interface))
-                      no-bits))))
-               (schedule delay
-                         (list #'receive-start peer-interface packet link))
-               (schedule (+ delay txtime)
-                         (list #'receive peer-interface packet link
-                               :errors errors)))))
-      (if (broadcast-p peer-address)
-          (dolist(peer-interface (peer-interfaces link))
-            (schedule-receive peer-interface (copy packet)))
-          (schedule-receive
-           (if peer-address
-               (find peer-address (peer-interfaces link) :key #'hardware-address :test #'address=)
-               (default-peer-interface link))
-           packet)))))
 
 ;; this is equivalent to link-real in GTNetS
 (defclass link()
@@ -129,14 +96,45 @@ connects to")
     :documentation "Start of utilisation measurement interval"))
   (:documentation "Base Class for simple links"))
 
-(defmethod send :before ((link link) packet local-interface
+(defmethod send :before ((link link) packet protocol
                          &key &allow-other-keys)
   (when (busy-p link)
     (error "Attempt to send a packet over a busy link"))
   (setf (slot-value link 'busy-p) nil))
 
-(defmethod send-complete :before (interface packet (link link) &key fail &allow-other-keys)
-  (declare (ignore interface fail))
+(defmethod send((link link) packet (layer2:protocol layer2:protocol)
+                &key (peer-address (dst-address (peek-pdu packet))))
+  (let* ((local-interface (interface protocol))
+         (no-bits (* 8 (length-bytes packet)))
+         (txtime (/ no-bits (bandwidth link local-interface))))
+    ;; schedule packet transmit complete event
+    (schedule txtime (list #'send-complete layer2:protocol packet link))
+    ;; schedule packet arrival at interface(s)
+    (flet ((schedule-receive(peer-interface packet)
+             (let ((delay (delay link local-interface peer-interface))
+                   (errors
+                    (1-
+                     (expt
+                      (1- (bit-error-rate link local-interface peer-interface))
+                      no-bits))))
+               (schedule delay
+                         (list #'receive-start peer-interface packet link))
+               (schedule (+ delay txtime)
+                         (list #'receive peer-interface packet link
+                               :errors errors)))))
+      (if (broadcast-p peer-address)
+          (dolist(peer-interface (peer-interfaces link))
+            (schedule-receive peer-interface (copy packet)))
+          (schedule-receive
+           (if peer-address
+               (find peer-address (peer-interfaces link)
+                     :key #'hardware-address :test #'address=)
+               (default-peer-interface link))
+           packet)))))
+
+(defmethod send-complete :before ((protocol layer2:protocol) packet (link link)
+                                  &key fail &allow-other-keys)
+  (declare (ignore protocol fail))
   (incf (bytes-sent link) (length-bytes packet))
   (incf (packets-sent link))
   (setf (slot-value link 'busy-p) nil))

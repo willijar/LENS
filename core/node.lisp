@@ -29,7 +29,8 @@
    (location :initform +origin+ :type location :accessor location
              :documentation "Physical Location of this node")
    (network-address :type network-address :initform (ipaddr :next)
-                    :initarg :ipaddr :reader ipaddr :reader network-address
+                    :initarg :ipaddr :initarg :network-address
+                    :reader ipaddr :reader network-address
                     :documentation "network address of this node")
    (interfaces :type vector
                :initform (make-array 2 :adjustable t :fill-pointer 0)
@@ -92,190 +93,67 @@ form the packets are derived from this class."))
 (defmethod layer3:topology-changed((node node))
   (layer3:reinitialise-routes (layer3:routing node) node))
 
-(defgeneric add-interface(interface node)
-  (:documentation "Add an interface to a node"))
 
-(defgeneric local-ipaddr-p(ipaddr node)
-  (:documentation "Return true if ipaddr is local to node"))
+(defstruct callback
+  (direction :rx :type (member :tx :rx))
+  (layer 0 :type (integer 5))
+  (protocol-number 0 :type integer)
+  (interface nil :type interface)
+  (callback nil :type function)) ;; function of protocol entity and packet
 
-(defgeneric receive-packet(packet interface node)
-  (:documentation "Called when a packet is received on a swtich node"))
+(defun add-callback(callback node)
+  (push callback (callbacks node)))
 
-(defgeneric ipaddrs(node)
-  (:documentation
-   "Return a lists of ipaddr and ipmasks for all interfaces on this node"))
+(defun call-callbacks(direction protocol)
+  "The callback function must return true if the packet should
+ continue to be processed by the protocol stack, and false if the
+ callback function has deleted the packet. For example, if the
+ callback is implementing a firewall function, the firewall may decide
+ that the packet should not be forwarded for further processing. In
+ that case, it should drop the packet and return false."
+  (dolist(c (callbacks (node protocol)))
+     (when (and ;; check for match
+            (eql direction (direction c))
+            (or (zerop (callback-layer c))
+                (= (callback-layer c) (protocol:layer protocol)))
+            (and (= 2 (protocol:layer protocol))
+                 (eql (callback-interface c) (layer2:interface protocol)))
+            (or (zerop (callback-protocol-number c))
+                (= (callback-protocol-number c)
+                   (protocol:protocol-number protocol))))
+       (unless (funcall (callback c) protocol packet)
+        ;; if callback returns false we are done
+        (return-from call-callbacks nil))))
+  ;; all returned true or none found
+  t)
 
-
-;; (defgeneric make-callback(function direction
-;;                                    &key layer protocol-number interface)
-;;   (:documentation "Make a callback functions. Callbacks allow
-;; a function to examine every packet recieved by this node
-;; at any protocol layer, and either packet receipt or
-;; packet transmission
-
-;; direction - either :tx or :rx for transmit or receive
-;; layer     - callback only added to this layer (or all by default)
-;; proto     - callback only added for this protocol number
-;; interface - layer 2 callback may be interface specific
-
-;; Callback functions must accept 5 arguments
-;; the layer, direction, packet, node and (optionally - layer 2 only) interface
-;; Should return false if deleted the packet
-;; "))
-
-;; (defgeneric call-callbacks(layer proto direction packet node
-;;                                  &optional interface)
-;;   (:documentation "Call the list of callbacks. Arguments as per make-callback.
-;; First to return false causes packet to be dropped"))
-
-;; (defclass packet-callback()
-;;     ((layer :type integer :reader layer :initarg layer :initform nil
-;;             :documentation "layer for this callback")
-;;      (protocol-number :type integer :reader protocol-number
-;;                       :initarg :protocol-number :initform nil
-;;             :documentation "Protocol number for callback")
-;;      (direction :type (member :tx :rx) :reader direction :initarg :direction
-;;                 :documentation "Callback direction")
-;;      (interface :type interface :reader interface :initarg interface
-;;                 :documentation "Interface restriction")
-;;      (callback :type function :reader callback :initarg :callback
-;;                :documentation "Callback Function itself"))
-;;   (:documentation "Defines the callback function.  Must have six
-;; parameters that are passed to the callback by the GTNetS protocol
-;; layer processors:
-
-;; Layer is the protocol layer that is calling the callback.
-
-;; Proto is the protocol number that is calling the callback.
-
-;; Type is :TX (packet transmission) or :RX (Packet receipt).
-
-;; Packet is the packet itself. The top of the PDU stack in the
-;; packet will have the PDU from the calling layer.  In other words,
-;; if the callback is from layer 2, the layer 2 pdu will be the
-;; top of the stack.
-
-;; Node is the node that is processing the packet when the callback
-
-;; Interface is the interface that received or is transmitting the
-;; packet (valid only for layer 2 callbacks).
-
-;; IMPORTANT: The callback function must return true if the packet should
-;; continue to be processed by the protocol stack, and false if the
-;; callback function has deleted the packet.  For example, if the
-;; callback is implementing a firewall function, the firewall may decide
-;; that the packet should not be forwarded for further processing. In
-;; that case, it should drop the packet and return false."))
-
-;; (defmethod make-callback(function direction &key
-;;                          layer protocol-number interface)
-;;   (make-instance 'packet-callback
-;;                  :layer layer
-;;                  :protocol-number protocol-number
-;;                  :direction direction
-;;                  :interface interface
-;;                  :callback function))
-
-;; (defmethod call-callbacks(layer proto direction packet (node node)
-;;                           &optional interface)
-;;   (dolist(c (callbacks node))
-;;     (when (and ;; check for match
-;;            (eql direction (direction c))
-;;            (or (not (layer c)) (= (layer c) layer))
-;;            (or (not (interface c)) (eql (interface c) interface))
-;;            (or (not (protocol-number c)) (eql (protocol-number c) proto)))
-;;       (unless (funcall (callback c)
-;;                        layer proto direction packet node interface)
-;;         ;; if callback returns false we are done
-;;         (return-from call-callbacks nil))))
-;;   ;; all returned true or none found
-;;   t)
-
-;; (defgeneric neighbours(node &key no-leaf)
-;;   (:documentation "Return the list of neigbour records for a node - if
-;; no-leaf is true do not include leaf nodes in the list")
-;;   (:method((node node) &key no-leaf)
-;;     (reduce
-;;      #'nconc
-;;      (map
-;;       'list
-;;       #'(lambda(interface)
-;;           (let ((neighbours (layer2:neighbours interface)))
-;;             (unless (and no-leaf ;; check for leaf neighbors with local route
-;;                          (= (length neighbours) 1) ;; only 1 neighbour
-;;                          (when-bind*
-;;                              ((peer-interface
-;;                                (first (layer2::peer-interfaces interface)))
-;;                               (node (node peer-interface))
-;;                               (ip (when (<= (length (neighbours node)) 1)
-;;                                     (ipaddr node))))
-;;                            (local-ipaddr-p ip interface)))
-;;               (copy-list neighbours))))
-;;       (interfaces node)))))
-
-;; ;; port demultiplexing - maps layer 4 protocol instances to bindings
-
-
-;; (defun lookup-by-port(protocol-number node
-;;                       &key local-port local-addr peer-port peer-addr)
-;;   (assert local-port (local-port))
-;;   (let ((demux (port-demux node)))
-;;     (or
-;;      (gethash
-;;       (list protocol-number local-port local-addr peer-port peer-addr)
-;;       demux)
-;;      (gethash (list protocol-number local-port local-addr) demux)
-;;      (gethash (list protocol-number local-port) demux))))
-
-;; (defvar *min-transient-port* 10000 "Minimum port number for transient ports")
-
-;; (defun bind-key(proto lp la rp ra)
-;;   `(,proto ,lp ,@(when la (list la)) ,@(when rp (list rp ra))))
-
-;; (defun bind(protocol node
-;;             &key (protocol-number (layer4:protocol-number protocol))
-;;             local-port local-addr remote-port remote-addr)
-;;   (let ((demux (port-demux node)))
-;;     (when (or (not local-port) (zerop local-port))
-;;       ;; bind to an available port
-;;       (let ((port 0))
-;;         (maphash
-;;          #'(lambda(k v)
-;;              (declare (ignore v))
-;;              (when (= protocol-number (first k))
-;;                (setf port (max port (second k)))))
-;;          demux)
-;;         (setf local-port (if (= port 0) *min-transient-port* (1+ port)))))
-;;     (let ((k (bind-key protocol-number
-;;                        local-port local-addr remote-port remote-addr)))
-;;       (unless (gethash k demux)
-;;         (setf (gethash k demux) protocol)))))
-
-;; (defun unbind(protocol node
-;;               &key (protocol-number (layer4:protocol-number protocol))
-;;               local-port local-addr remote-port remote-addr)
-;;   (let ((k (bind-key protocol-number
-;;                      local-port local-addr remote-port remote-addr))
-;;         (demux (port-demux node)))
-;;     (let ((bound-protocol (gethash k demux)))
-;;       (when (eql protocol bound-protocol)
-;;         (remhash k demux)))))
-
-;; (defun bound-protocols(node)
-;;   "Return the list of bound protocols for this node"
-;;   (let ((result nil))
-;;     (maphash #'(lambda(k v) (declare (ignore k)) (push v result))
-;;              (port-demux node))
-;;     result))
-
-;; (defun applications(node)
-;;   (mapcan
-;;    #'(lambda(protocol)
-;;        (when-bind(app (layer4:application protocol))
-;;          (list app)))
-;;    (bound-protocols node)))
+(defun applications(node)
+   (delete-duplicates
+    (mapcan
+     #'(lambda(protocol)
+         (mapcar #'layer:application (layer4:bindings protocol)))
+     (layer4:protocols node))))
 
 (defmethod reset((node node))
   (layer3:initialise-routes node)
   (dolist(slot '(layer3:protocols layer4:protocols interfaces applications))
     (reset (slot-value node slot))))
+
+(defmethod (setf network-address)((addr network-address) (node node))
+  (prog1
+      (setf (slot-value 'node 'network-address) addr)
+    (when (= 1 (length (interfaces node))) ;; 1 interface - set to same ipaddr
+      (setf (network-address (aref (interfaces node) 0)) addr))))
+
+(defgeneric add-interface(interface node)
+  (:documentation "Add an interface to a node")
+  (:method(interface (node node))
+    (when (slot-boundp interface 'node)
+      (error "Attempt to add a bound interface to another node"))
+    (setf (slot-value interface 'node) node)
+    (vector-push-extend interface (interfaces node))
+    (when (and (= 1 (length (interfaces node)))
+               (not (slot-boundp interface 'node)))
+      (setf (slot-value interface 'network-address)
+            (network-address node)))
+    interface))
