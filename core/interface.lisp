@@ -69,7 +69,9 @@
     :initform t :type boolean :reader up-p
     :documentation "State of router - up or down")
    (rx-packet
-    :type packet :initform nil :documentation "Packet being received"))
+    :type packet :initform nil :documentation "Packet being received")
+   (tx-packet
+    :type packet :initform nil :documentation "Packet being transmitted"))
    (:documentation "Base class for all interfaces"))
 
 (defmethod print-object((interface interface) stream)
@@ -82,7 +84,6 @@
               (ipmask interface)))))
 
 (defmethod bandwidth((interface interface)) (bandwidth (link interface)))
-
 (defmethod delay((start interface) end) (delay (link start) end))
 (defmethod bit-error-rate((interface interface) end)
   (bit-error-rate (link interface) end))
@@ -117,6 +118,24 @@ interface is busy. Requires address"
                  :address (network-to-hardware-address address interface)))))
       (drop interface packet :text "L2-ID")))
 
+(defmethod send((interface interface) packet (protocol layer2:protocol) &key &allow-other-keys)
+  (with-slots(tx-packet) interface
+    (when tx-packet (error "Interface cannot send two packets simultaneously"))
+    (setf tx-packet packet)
+    (send (link interface) packet interface)))
+
+(defmethod send-complete((protocol layer3:protocol) packet (interface interface)
+                         &key fail &allow-other-keys)
+  (assert (eql packet (dequeue (packet-queue interface))))
+  (when fail (drop interface packet :text fail))
+  (send-complete (layer2:protocol interface) packet interface))
+
+(defmethod send-complete((interface interface) packet (link link)
+                         &key fail &allow-other-keys)
+  (setf (slot-value interface 'tx-packet) nil)
+  (send-complete (layer2:protocol interface) packet interface :fail fail)
+  (do-notifications interface))
+
 (defmethod receive-start((interface interface) packet link)
   (when (up-p interface)
     (with-slots(rx-packet) interface
@@ -134,35 +153,6 @@ interface is busy. Requires address"
       (receive (layer2:protocol interface) packet interface)
       (drop interface packet :text "L2-BER")))
 
-(defmethod send-complete((protocol layer3:protocol) packet (interface interface)
-                         &key fail &allow-other-keys)
-  (assert (eql packet (dequeue (packet-queue interface))))
-  (when fail (drop interface packet :text fail))
-  (send-complete (layer2:protocol interface) packet interface))
-
-(defmethod send-complete((protocol layer2:protocol) packet (interface interface)
-                         &key fail &allow-other-keys)
-  (call-notifications interface))
-
-;; (defmethod notify((interface interface))
-;;   "Link has finished previous transmit"
-;;   (unless (up-p interface)
-;;     ;; interface has failed - drop all packets
-;;     (loop
-;;      (let ((p (deque (queue interface))))
-;;        (unless p (return))
-;;        (write-trace (node interface)  nil :drop nil :packet p
-;;                     :text "L2-ID"))))
-;;   (unless (layer2:busy-p (layer2:protocol interface))
-;;     (let ((packet (deque (queue interface))))
-;;       (when packet
-;;         (layer2:send (layer2:protocol interface) packet)))
-;;       ;; send queue space available notification
-;;     (call-notification interface nil) ))
-
-
-  (do-notifications interface))
-
 (defmethod mkup((interface interface) &key (inform-routing t))
   (unless (up-p interface)
     (setf (slot-value interface 'up-p) t)
@@ -170,17 +160,22 @@ interface is busy. Requires address"
 
 (defmethod mkdown((interface interface) &key (inform-routing t))
   (when (up-p interface)
-    (setf  (slot-value interface 'rx-packet) nil
-           (slot-value interface 'up-p) nil)
-    (when inform-routing (layer3:topology-changed interface))
+    (setf  (slot-value interface 'up-p) nil)
+    (dolist(s '(rx-packet tx-packet)) ; empty tx and rx buffers
+      (let ((p (slot-value interface s)))
+        (when p
+          (drop interface p :text "L2-ID")
+          (setf (slot-value interface s) nil))))
     (until (empty-p (packet-queue interface))
-      (drop interface (dequeue (packet-queue interface)) :text "L2-ID"))))
+      (drop interface (dequeue (packet-queue interface)) :text "L2-ID"))
+        (when inform-routing (layer3:topology-changed interface))))
 
 (defmethod reset((interface interface))
   (reset (packet-queue interface))
   (reset (layer2:protocol interface))
   (reset (layer2:arp interface))
   (setf (slot-value interface 'rx-packet) nil)
+  (setf (slot-value interface 'tx-packet) nil)
   (reset (link interface)))
 
 (defmethod busy-p((interface interface)) (busy-p (layer2:protocol interface)))
@@ -197,22 +192,6 @@ interface is busy. Requires address"
 (defmethod default-peer-interface((interface interface))
   (default-peer-interface (link interface)))
 
-;; (defmethod notify((interface interface))
-;;   "Link has finished previous transmit"
-;;   (unless (up-p interface)
-;;     ;; interface has failed - drop all packets
-;;     (loop
-;;      (let ((p (deque (queue interface))))
-;;        (unless p (return))
-;;        (write-trace (node interface)  nil :drop nil :packet p
-;;                     :text "L2-ID"))))
-;;   (unless (layer2:busy-p (layer2:protocol interface))
-;;     (let ((packet (deque (queue interface))))
-;;       (when packet
-;;         (layer2:send (layer2:protocol interface) packet)))
-;;       ;; send queue space available notification
-;;     (call-notification interface nil) ))
-
 ;; (defun call-notification(interface resched)
 ;;   "Notify next non-nil entry in notification list"
 ;;   (if (empty-p (notifications interface))
@@ -223,29 +202,5 @@ interface is busy. Requires address"
 ;;           (let ((notify-event (list #'call-notification interface t)))
 ;;             (schedule (queuing-delay (queue interface)) notify-event)
 ;;             (setf (pending-notification interface) notify-event))))))
-
-;; (defun add-notify(notification interface)
-;;   (queues:insert notification (notifications interface))
-;;   (unless (pending-notification interface)
-;;      (let ((notify-event (list #'call-notification interface t)))
-;;       (schedule (queuing-delay (queue interface)) notify-event)
-;;       (setf (pending-notification interface) notify-event))))
-
-;; (defun cancel-notify(notification interface)
-;;   (queues:extract notification (notifications interface)))
-
-
-
-;; (defgeneric neighbours(link)
-;;   (:documentation "Return the routing neighbours to this interface")
-;;   (:method ((interface interface))
-;;     (let ((link (link interface)))
-;;       (mapcan #'(lambda(peer-interface)
-;;                   (unless (eql peer-interface interface)
-;;                     (list (layer3:make-neighbour
-;;                            :node (node peer-interface)
-;;                            :interface interface
-;;                            :weight (weight link)))))
-;;               (peer-interfaces link)))))
 
 

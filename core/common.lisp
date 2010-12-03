@@ -206,7 +206,7 @@ Examples:
 (defgeneric add-notification(notifier arg notification)
   (:documentation "Add a notification to end of queue")
   (:method(arg (notification function) (notifier notifier) )
-    (alg:push (cons notification arg) (slot-value notifier 'notifications))))
+    (alg:enqueue (cons notification arg) (slot-value notifier 'notifications))))
 
 (defgeneric delete-notifications(notifier arg)
   (:documentation"Delete notifications to arg on notifier")
@@ -218,7 +218,7 @@ Examples:
   (:method((notifier notifier))
     (with-slots(notifications) notifier
       (while (not (or (busy-p notifier) (alg:empty-p notifications)))
-        (let ((p (alg:pop notifications)))
+        (let ((p (alg:dequeue notifications)))
           (funcall (car p) (cdr p)))))))
 
 ;; taking things up and down
