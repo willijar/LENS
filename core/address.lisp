@@ -39,17 +39,26 @@
 (defgeneric network-mask(entity)
   (:documentation "Return the network mask for a subnet of an entity"))
 
+(defgeneric address=(a b &optional mask)
+  (:documentation "Return true if addresses are equal"))
+
 (defclass address()
-  ((datum :type integer :initarg :datum))
+  ((address-bytes :type (unsigned-byte *) :initarg :bytes
+                  :reader address-bytes))
   (:documentation "Generic class for addresses"))
 
-(defun address=(a b)
-  (or (eql a b)
-      (and (eql (type-of a) (type-of b))
-           (= (slot-value a 'datum) (slot-value b 'datum)))))
 
-(defun address<(a b)
-  (< (slot-value a 'datum) (slot-value b 'datum)))
+(declaim (inline subnet))
+(defun subnet(addr mask) (logand mask (slot-value addr 'address-bytes)))
+
+(defmethod address=((a address) (b address) &optional mask)
+  (or (eql a b)
+      (if mask
+          (= (subnet a mask) (subnet b mask))
+          (= (slot-value a 'address-bytes) (slot-value b 'address-bytes)))))
+
+(defun address<(a b) ;; used for sorting
+  (< (slot-value a 'address-bytes) (slot-value b 'address-bytes)))
 
 (defgeneric broadcast-p(address)
   (:documentation "Return true if a broadcast address")
@@ -75,22 +84,22 @@
   (:documentation "Standard mac address"))
 
 (defmethod broadcast-p((addr macaddr))
-  (= (slot-value addr 'datum) #xFFFFFFFFFFFF))
+  (= (slot-value addr 'address-bytes) #xFFFFFFFFFFFF))
 
 (defmethod length-bytes((addr macaddr)) 6)
 (defmethod protocol-number((addr macaddr)) 1)
 
 (defgeneric macaddr(arg)
   (:documentation "Create a mac address entity. May be aliased")
-  (:method(mac) (make-instance 'macaddr :mac mac)))
+  (:method((mac integer)) (make-instance 'macaddr :bytes mac)))
 
 (defmethod make-load-form((macaddr macaddr) &optional env)
   (declare (ignore env))
-  `(macaddr ,(slot-value macaddr 'datum)))
+  `(macaddr ,(slot-value macaddr 'address-bytes)))
 
 (defmethod initialize-instance :after ((addr macaddr)
                                        &key mac &allow-other-keys)
-  (setf (slot-value addr 'datum)
+  (setf (slot-value addr 'address-bytes)
         (cond
           ((or (not mac) (eql mac :next)) (incf (slot-value addr 'nextmac)))
           ((numberp mac)
@@ -109,23 +118,16 @@
 
 (defclass ipaddr(network-address)
   ()
-  (:documentation "An IP Address"))
+  (:documentation "An IPv4 Address"))
 
 (defmethod broadcast-p((addr ipaddr))
-  (= (slot-value addr 'datum) #xFFFFFFFF))
+  (= (slot-value addr 'address-bytes) #xFFFFFFFF))
 
 (defmethod length-bytes((addr ipaddr)) 4)
 (defmethod protocol-number((addr ipaddr)) #x0800)
 
 (defmethod make-load-form((ipaddr ipaddr) &optional environment)
   (make-load-form-saving-slots ipaddr :environment environment))
-
-(define-condition address-out-of-range(address-condition error)
-  ((addr :initarg :addr :reader addr)
-   (subnet :initarg :subnet :initform nil :reader error-subnet))
-  (:report (lambda(c s)
-             (format s "Address ~S out of range ~@[for subnet ~S~]"
-                     (addr c) (error-subnet c)))))
 
 (defun dotted-to-ipaddr (dotted)
   "String --> number."
@@ -147,11 +149,11 @@
     (assert (typep ip 'ip)
             (ip)
             'address-out-of-range :addr ip)
-    (make-instance 'ipaddr :datum ip))
+    (make-instance 'ipaddr :bytes ip))
   (:method((dotted string))
-    (make-instance 'ipaddr :datum (dotted-to-ipaddr dotted)))
+    (make-instance 'ipaddr :bytes (dotted-to-ipaddr dotted)))
   (:method((ip (eql :broadcast)))
-    (make-instance 'ipaddr :datum #xFFFFFFFF)))
+    (make-instance 'ipaddr :bytes #xFFFFFFFF)))
 
 (defun read-address(in &optional char arg)
   (declare (ignore char arg))
@@ -174,75 +176,42 @@ addresses is defined.")
   (let ((format (print-ip-format stream)))
     (cond
       (*print-escape*
-       (format stream "#I\"~A\"" (ipaddr-to-dotted (slot-value addr 'datum))))
+       (format stream "#I\"~A\"" (ipaddr-to-dotted (slot-value addr 'address-bytes))))
       ((eql format :dotted)
-       (write-string (ipaddr-to-dotted (slot-value addr 'datum)) stream))
+       (write-string (ipaddr-to-dotted (slot-value addr 'address-bytes)) stream))
       ((integerp format)
-       (write (slot-value addr 'datum) :stream stream :base format))
+       (write (slot-value addr 'address-bytes) :stream stream :base format))
       (t
        (print-unreadable-object (addr stream :type t :identity t)
-         (princ (ipaddr-to-dotted (slot-value addr 'datum)) stream))))))
+         (princ (ipaddr-to-dotted (slot-value addr 'address-bytes)) stream))))))
 
-(defclass network-mask()
-  ())
+(defun make-address-mask(mask-len &optional (address-length 32))
+  (when (symbolp mask-len)
+    (setf mask-len (ecase mask-len (:a 8) (:b 16) (:c 24))))
+  (unless (integerp address-length)
+    (setf address-length (* 8 (length-bytes address-length))))
+  (let ((v 0))
+    (multiple-value-bind(q r) (floor mask-len 8)
+      (unless (zerop r) (error "Mask length not a multiple of 8 bits"))
+      (dotimes(x q)
+        (setf v (dpb  #xFF (byte 8 (- address-length (* 8 x))) v))))
+    v))
 
-(defclass ipmask(ipaddr network-mask)
-  ()
-  (:documentation "A network mask"))
-
-(defmethod make-load-form((ipmask ipmask) &optional env)
-  (declare (ignore env))
-  `(ipmask ,(logcount ipmask)))
-
-(defmethod print-object((mask ipmask) stream)
-  (if *print-escape*
-      (print-unreadable-object (mask stream :type t :identity nil)
-        (write (slot-value mask 'datum) :stream stream :base 16))
-      (write (slot-value mask 'datum) :stream stream :base 16)))
-
-;; we keep a static array of all 32 ipmasks
-(defvar *ipmasks*
-  (let ((array (make-array (1+ 32))))
-    (let ((m #xFFFFFFFF00000000))
-      (loop :for c :from 1 :upto 32
-            :do (setf (aref array c)
-                      (make-instance 'ipmask
-                                     :datum (ldb (byte 32 0) (ash m (- c)))))))
-    array)
-  "Static array of all 32 ipmasks")
-
-(defgeneric ipmask(entity)
-  (:documentation "Construct an ipmask from entity")
-  (:method((nobits integer)) (aref *ipmasks* nobits))
-  (:method((s string)) (aref *ipmasks* (parse-integer s :radix 16)))
-  (:method((c symbol)) (ipmask (ecase c (:a 8) (:b 16) (:c 24)))))
-
-(defun subnet(ipaddr mask)
-  (make-instance 'ipaddr
-                 :datum (logand (slot-value mask 'datum)
-                                (slot-value ipaddr 'datum))))
-
-(defun ipaddr-allocator(&optional (start (ipaddr "192.168.0.0"))
-                        (mask (ipmask 16)))
-  (let ((last start)
-        (subnet (subnet start mask)))
+(defun ipaddr-allocator(&optional
+                        (start (ipaddr "192.168.0.0"))
+                        (mask (make-address-mask 16)))
+  (let ((last start))
     #'(lambda()
-        (let ((next (ipaddr (1+ (slot-value last 'datum)))))
-          (assert (address= (subnet next mask) subnet)
-                  (next subnet)
-                  'address-out-of-range
-                  :addr next
-                  :subnet subnet)
-          (setf last next)))))
+        (setf last (ipaddr (1+  (address-bytes last))))
+          (assert (address= start last mask)
+                  (last)
+                  "Next allocated address ~A not in ~A/~A"
+                  last start (logcount mask))
+          last)))
 
 (defvar ipaddr-allocator (ipaddr-allocator) "Default ip address allocator")
 
 (defmethod ipaddr((ip (eql :next)))
   (funcall ipaddr-allocator))
 
-(defun local-network-address-p(network-address entity &key
-                               (local-address (network-address entity))
-                               (network-mask (network-mask entity)))
-  "Return true if given network address is local to entity"
-  (address= (subnet network-address network-mask)
-            (subnet local-address network-mask)))
+
