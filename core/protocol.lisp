@@ -40,7 +40,7 @@ See http://www.iana.org/assignments/protocol-numbers")
   (:method :before(receiver packet (sender protocol) &key &allow-other-keys)
            (write-trace sender (peek-pdu packet) :packet packet :text "-"))
   (:method :around (receiver packet (sender protocol) &key &allow-other-keys)
-           (when (call-callbacks :tx sender) (call-next-method))))
+           (when (node:call-callbacks :tx sender) (call-next-method))))
 
 (defgeneric receive(receiver packet sender &key &allow-other-keys)
   (:documentation "Called by packet when to pass received packet up to
@@ -48,7 +48,7 @@ See http://www.iana.org/assignments/protocol-numbers")
   (:method :before((receiver protocol) packet sender &key &allow-other-keys)
            (write-trace receiver (peek-pdu packet) :packet packet :text "+"))
   (:method :around((receiver protocol) packet sender &key &allow-other-keys)
-           (when (call-callbacks :rx receiver) (call-next-method))))
+           (when (node:call-callbacks :rx receiver) (call-next-method))))
 
 (defgeneric drop(entity packet &key node &allow-other-keys)
   (:documentation "Drop a packet")
@@ -330,7 +330,7 @@ this occurs when the acknowledgement is received from the peer.")
 (defgeneric connection-from-peer(application protocol &key peer-address peer-port)
   (:documentation "Called when a listening socket receives a
 connection request. Return true if connection accepted.")
-  (:method(application protocol src-address)
+  (:method(application protocol &key &allow-other-keys)
     (declare (ignore application protocol src-address))
     t))
 
