@@ -22,6 +22,13 @@
   (:documentation "Base class for all the routing protocols that may
 be needed for a simulation."))
 
+(defun leaf-node-p(node)
+  (with-slots(interfaces) node
+    (and (= 1 (length interfaces))
+         (= 1 (length (layer1:peer-interfaces
+                       (layer1:link (aref interfaces 0))
+                       (aref interfaces 0)))))))
+
 (defgeneric getroute(network-address routing &key packet &allow-other-keys)
   (:documentation "Lookup vertex routing entry from node to ipaddr (possibly
 using source routing in packet")
@@ -29,19 +36,13 @@ using source routing in packet")
     (declare (ignore any))
     (default-route routing)))
 
-(defgeneric (setf getroute)(vertex network-address routing &key &allow-other-keys)
+(defgeneric (setf getroute)(vertex network-address routing
+                                   &key &allow-other-keys)
   (:documentation "Add a routing entry to dest ip address using subnet mask and
 interface and next hop IP address"))
 
 (defgeneric remroute(network-address routing &key &allow-other-keys)
   (:documentation "Remove a route to dest using subnet"))
-
-(defun leaf-node-p(node)
-  (with-slots(interfaces) node
-    (and (= 1 (length interfaces))
-         (= 1 (length (layer1:peer-interfaces
-                       (layer1:link (aref interfaces 0))
-                       (aref interfaces 0)))))))
 
 (defgeneric reinitialise-routes(routing changed-entity)
   (:documentation "Reinitialise routing table due to topology change -
@@ -50,9 +51,7 @@ changed-entity is the object in the topology who's state has changed. If no chan
 (defgeneric topology-changed(changed-entity)
   (:documentation "Inform routing that topology has changed")
   (:method(entity)
-    (reinitialise-routes (routing (node entity)) entity))
-  (:method((node node))
-    (reinitialise-routes (routing node) node)))
+    (reinitialise-routes (routing (node entity)) entity)))
 
 (defvar *default-routing* nil "make-instance args for default routing")
 

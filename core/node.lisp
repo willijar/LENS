@@ -150,3 +150,6 @@ form the packets are derived from this class."))
       (setf (slot-value interface 'network-address)
             (network-address node)))
     interface))
+
+(defmethod layer3:topology-changed((node node))
+  (layer3:reinitialise-routes (routing node) node))

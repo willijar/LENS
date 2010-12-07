@@ -1,4 +1,4 @@
-;; <description>
+;; Physical Link interface and base implementation
 ;; Copyright (C) 2010 Dr. John A.R. Williams
 
 ;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
@@ -130,16 +130,6 @@ connects interface to"))
   (incf (bytes-sent link) (length-bytes packet))
   (incf (packets-sent link))
   (setf (slot-value link 'busy-p) nil))
-
-(defmethod delay((link link) peer-interface)
-  (declare (ignore peer-interface))
-  (slot-value link 'delay))
-
-(defmethod bit-error-rate((sender interface) (receiver interface))
-  (slot-value (link sender) 'bit-error-rate))
-
-(defmethod bandwidth((sender interface))
-  (slot-value (link sender) 'bandwidth))
 
 (defmethod print-object((link link) stream)
   (print-unreadable-object (link stream :type t :identity t)

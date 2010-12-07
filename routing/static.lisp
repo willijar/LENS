@@ -1,4 +1,4 @@
-;; Implementation of global static routing
+;; Implementation of static routing
 ;; Copyright (C) 2010 Dr. John A.R. Williams
 
 ;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
@@ -20,98 +20,64 @@
 
 (in-package :layer3)
 
-(defclass static-routing-table()
-  ((nodes :initarg :nodes :initform (node:nodes) :reader routing-nodes
-          :documentation "Nodes to be included in routing")
-   (costs :type (array real) :reader costs
-          :documentation "Array of routing costs")
-   (vertices :type (array real) :reader vertices
-         :documentation "Array of vertices")
-   (cost-fn :type function :initarg :cost-fn
-            :initform #'(lambda(a b)  1)))
-  (:documentation "A shared global static routing table"))
+(defclass routing-static(fib)
+  ((link-cost :type function :initarg :link-cost
+              :initform #'(lambda(a b) (declare (ignore a b)) 1)
+              :documentation "Function to determine cost of link from
+              interface a to b when determining routes"))
+  (:documentation "A static routing table which fills in static routes
+  upon demand"))
 
-(defmethod reinitialise-routes((table static-routing-table) changed)
-  ;;Naively clear route map and call initialise-routes
-  (declare (ignore changed))
-  (with-slots(nodes node-map costs vertices) table
-    (let ((n (length nodes)))
-    (setf costs (make-array (list n n)
-                            :element-type 'short-float
-                            :inital-element +infinity+)
-          vertices (make-array (list n n) :element-type 'vertex))
-      (loop :for node :across nodes
-         :do (dolist(vertex (routing-neighbours node))
-               (add-route table vertex))))))
+(defmethod getroute((address network-address) (routing routing-static)
+                      &key (link-cost (slot-value routing 'link-cost))
+                    &allow-other-keys)
+  (or (call-next-method) ;; lookup fib
+      (default-route routing) ;; or default route or use Dijkstra
+      (let* ((vertices (map 'array #'routing-neighbours (nodes)))
+             (source (node routing))
+             (destination
+              (or (node address)
+                  (error "Unable to route - no node with address ~A" address))))
+         (labels ((end-id(v) (uid (node (vertex-end v))))
+                  (edges(i) (mapcar #'end-id (aref vertices i)))
+                  (vertex(i j) (find j (aref vertices i) :key #'end-id))
+                  (cost(i j)
+                    (let ((v (vertex i j)))
+                      (funcall link-cost (vertex-start v) (vertex-end v)))))
+           (let* ((previous
+                   (alg:dijkstra
+                    (uid source) (length (nodes))
+                    :edges-fn #'edges :cost-fn #'cost))
+                  (first-hops (alg:extract-first-hops previous))
+                  (route (alg:extract-route (uid destination) previous)))
+            (when (< (aref previous (uid destination)) 0)
+              (error "Unable to route - ~A not connected to ~A"
+                     source destination))
+            ;; determine most common route and set default route to this
+            (let ((max 0) (maxhop nil))
+              (map 'nil
+                   #'(lambda(h)
+                       (let ((c (count h first-hops)))
+                         (when (> c max)
+                           (setf max c
+                                 maxhop h))))
+                   (remove-duplicates first-hops))
+              (setf (default-route routing) (vertex (uid source) maxhop))
+              ;; add in all first hops for this node
+              (dotimes(i (length (nodes)))
+                (let ((hop (aref first-hops i)))
+                  (unless (= hop maxhop)
+                    (setf (getroute (network-address (node i)) routing)
+                          (vertex (uid source) hop))))))
+            ;; add in routes to destination to other nodes
+            (dolist(dst (cdr route))
+              (setf (getroute address (routing (node dst)))
+                    (vertex dst (uid destination))))))
+        (call-next-method))))
 
-(defun node-position(node nodes)
-  (if (eql nodes (node:nodes))
-      (uid node)
-      (position (node (vertex-start vertex)) nodes)))
-
-(defmethod add-route((routing static-routing-table) vertex &key &allow-other-keys)
-  (with-slots(costs vertices nodes) table
-    (let ((i (node-position (node (vertex-start vertex)) nodes))
-          (j (node-position (node (vertex-end vertex)) nodes)))
-      (setf (aref vertices i j) vertex
-            (aref costs i j) (funcall cost-fn
-                                      (vertex-start vertex)
-                                      (vertex-end vertex))))))
-
-(defun static-table-find-route(from to table)
-  (with-slots(vertices nodes) table
-    (let ((i (node-position from nodes))
-          (j (node-position to nodes)))
-      (when (and i j) (aref vertices i j)))))
-
-(defun static-table-find-routes(source table)
-  "use Dijkstra to generate shortes routes from source"
-  (with-slots(costs vertices nodes) table
-    (multiple-value-bind(previous routecosts)
-        (dijkstra (node-postion source nodes) (length nodes)
-                  :cost-fn #'(lambda(i j) (aref costs i j))
-                  :edges-fn #'(lambda(i)
-                                (let ((acc nil))
-                                  (dotimes(j (length nodes))
-                                    (when (aref vertices i j)
-                                      (push j acc)))
-                                  acc)))
-      (dotimes(i (length nodes))
-)
-
-(defmethod find-route((node node) (routing static-routing-table) &optional packet)
-  (declare (ignore packet))
-  (static-table-find-route (node routing) node (routing-table routing)))
-
-(defclass routing-manual(routing)
-  ((routing-table :initarg :table :reader routing-table :allocation :class))
-  (:documentation "The static routing class. This routing object
-calculates all the routes needed at a single instance. Static routing
-is simple and easy to use by the user, but is memory intensive.  It is
-recommended for simulation topologies on the order of a few hundred
-Larger topologies should use either manual or nix-vector routing."))
-
-(defmethod add-route((routing routing-manual) vertex &key &allow-other-keys)
-  (assert (eql (node routing) (node (vertex-start vertex))))
-  (add-route (routing-table routing) vertex))
-
-(defmethod find-route((node node) (routing routing-manual) &optional packet)
-  (find-route node (routing-table routing) packet))
-
-(defclass routing-static(routing-manual)
-  ()
-  (:documentation "The static routing class. This routing object
-calculates all the routes needed at a single instance. Static routing
-is simple and easy to use by the user, but is memory intensive.  It is
-recommended for simulation topologies on the order of a few hundred
-Larger topologies should use either manual or nix-vector routing."))
-
-(defmethod find-route((node node) (routing routing-static) &optional packet)
-  (or
-   (static-table-find-route (node routing) node (routing-table routing))
-   (progn
-     (static-table-find-routes node (routing-table routing))
-     (static-table-find-route (node routing) node (routing-table routing)))))
+(defmethod reinitialise-routes((routing routing-static) entity)
+  (setf (default-route routing) nil)
+  (call-next-method))
 
 ;; if no default set set static as it
 (eval-when(:compile-toplevel :load-toplevel)

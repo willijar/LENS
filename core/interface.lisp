@@ -83,10 +83,14 @@
               (hardware-address interface)
               (network-mask interface) (logcount (network-mask interface))))))
 
-(defmethod bandwidth((interface interface)) (bandwidth (link interface)))
-(defmethod delay((start interface) end) (delay (link start) end))
-(defmethod bit-error-rate((interface interface) end)
-  (bit-error-rate (link interface) end))
+(defmethod bandwidth((interface interface))
+  (slot-value (link interface) 'bandwidth))
+
+(defmethod delay((start interface) (end interface))
+  (slot-value (link start) 'delay))
+
+(defmethod bit-error-rate((sender interface) (receiver interface))
+  (slot-value (link sender) 'bit-error-rate))
 
 (defmethod initialize-instance :after ((interface interface)
                                        &key

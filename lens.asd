@@ -40,7 +40,7 @@
                (:file "packet-queue"
                       :depends-on ("defpackage" "common" "scheduler" "packet"
                                                 "protocol"))
-               (:file "protocol" :depends-on ("address" "common"))
+               (:file "protocol" :depends-on ("address" "common" "packet"))
                (:file "interface"
                       :depends-on ("defpackage" "packet-queue" "link"))
                (:file "trace" :depends-on
@@ -62,4 +62,6 @@
               ((:file "p2p")))
      (:module "routing" :depends-on ("core")
               :components
-              ((:file "fib")))))
+              ((:file "fib")
+               (:file "manual" :depends-on ("fib"))
+               (:file "static" :depends-on ("fib"))))))

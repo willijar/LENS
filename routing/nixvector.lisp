@@ -1,4 +1,4 @@
-;;;; LENS packet header API
+;;;; nixvector routing
 ;;;; Copyright (C) 2003-2005 John A.R. Williams <J.A.R.Williams@jarw.org.uk>
 ;;;; Released under the GNU General Public License (GPL)
 ;;;; See <http://www.gnu.org/copyleft/gpl.html> for license details
