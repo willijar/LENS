@@ -50,7 +50,7 @@ the arguments to pass to make-instance for each variable name."
 		    (if (listp (car def)) (car def) (list (car def))))
 		defs))))
 
-(defun duplex-link
+#+nil(defun duplex-link
     (local-node remote-node &key (link-type *default-link*)
      (local-link-type link-type)
      (remote-link-type link-type)
@@ -80,7 +80,7 @@ the peer interfaces"
             (link::peer-interface (link remote-interface)) local-interface)
       (values local-interface remote-interface))))
 
-(defun connect(graph &optional (link-type *default-link*))
+#+nil(defun connect(graph &optional (link-type *default-link*))
   (dolist(row graph)
     (let ((src (first row)))
       (unless (typep src 'node) (setf src (node src)))
@@ -95,7 +95,7 @@ will run on a backgound thread."
   (scheduler::run (scheduler) :granularity granularity :step step))
 
 (defun stop-simulation()
-  (scheduler:stop (scheduler) :abort t)
+  (scheduler::stop (scheduler) :abort t)
   (format t "~%-- Simulation stopped at ~,4f~%" (simulation-time)))
 
 (defun load-test(name)
@@ -108,22 +108,12 @@ will run on a backgound thread."
 
 ;;; topology generation functions and helpers
 
-(defvar *default-ipaddrs*
-  (make-instance 'ipaddr-allocator :ipaddr #I"192.168.0.0")
-  "Default IP address allocation")
-
-(pushnew
- #'(lambda()
-     (setq  *default-ipaddrs*
-            (make-instance 'ipaddr-allocator :ipaddr #I"192.168.0.0")))
- *reset-hooks*)
-
-(defun make-nodes(n &optional (ipaddrs *default-ipaddrs*))
+(defun make-nodes(n &optional (ipaddrs ipaddr-allocator))
   (loop :for i :from 1 :upto n
         :collect (make-instance 'node
-                                :ipaddr (when ipaddrs (next-ipaddr ipaddrs)))))
+                                :ipaddr (when ipaddrs (funcall ipaddrs)))))
 
-(defun dumbell-topology(n-left n-right &key
+#+nil(defun dumbell-topology(n-left n-right &key
                         (ipaddrs (make-instance 'ipaddr-allocator))
                         (left-ipaddrs ipaddrs)
                         (right-ipaddrs left-ipaddrs)
@@ -169,7 +159,7 @@ Results:
       (duplex-link left-router right-router :link-type bottleneck))
   (values left-nodes left-router right-router right-nodes)))
 
-(defun star-topology(n-leaf &key (link-type *default-link*) node
+#+nil(defun star-topology(n-leaf &key (link-type *default-link*) node
                      (ipaddrs (make-instance
                                'ipaddr-allocator
                                :ipaddr (if node

@@ -23,6 +23,7 @@
     :author "Dr. John A.R. Williams <J.A.R.Williams@aston.ac.uk>"
     :maintainer "Dr. John A.R. Williams <J.A.R.Williams@aston.ac.uk>"
     :licence "GPL v3"
+    :version "2.0"
     :long-description "A Network Simulator in LISP inspired by NS2 and GTNetS"
     :depends-on (:split-sequence :trivial-gray-streams :clrs :closer-mop)
     :components
@@ -52,45 +53,13 @@
                                     "address" "packet-queue" "node"))
                (:file "application"
                        :depends-on ("common" "scheduler" "protocol"))
-               #+nil(:file "statistics" :depends-on ("common" "scheduler"))
-
-
-                (:file "user"
+               (:file "statistics" :depends-on ("common" "scheduler"))
+               (:file "user"
                        :depends-on ("common" "address" "scheduler" "link"
                                              "node"))))
-))
-     #+nil(:module "nodes" :depends-on ("core")
+     (:module "layer1" :depends-on ("core")
               :components
-              ((:file "node")))
-     #+nil(:module "links" :depends-on ("core")
+              ((:file "p2p")))
+     (:module "routing" :depends-on ("core")
               :components
-              ((:file "p2p")
-               (:file "ethernet")))
-     #+nil(:module "applications" :depends-on ("core" "protocols" "routing")
-              :components
-              ((:file "cbr-source")
-               (:file "udp-sink")
-               (:file "tcp-source")
-               (:file "tcp-server")))
-     #+nil(:module "protocols" :depends-on ("core")
-              :components
-              ((:file "llcsnap")
-               (:file "ieee802.3" :depends-on ("llcsnap"))
-               (:file "defpackage")
-               (:file "ipv4" :depends-on ("defpackage"))
-               (:file "udp" :depends-on ("ipv4"))
-               (:file "tcp" :depends-on ("ipv4"))
-               (:file "icmp" :depends-on ("tcp"))
-               (:file "tcp-tahoe" :depends-on ("tcp"))
-               (:file "tcp-reno" :depends-on ("tcp"))
-               (:file "tcp-newreno" :depends-on ("tcp-reno"))
-               (:file "arp")))
-     #+nil(:module "routing" :depends-on ("core")
-              :components
-              ((:file "dijkstra")
-               (:file "manual")
-               (:file "static" :depends-on ("manual" "dijkstra"))))
-     #+nil(:module "graphics" :depends-on ("core")
-              :components
-              ((:file "defpackage")
-               (:file "dot" :depends-on ("defpackage"))))))
+              ((:file "fib")))))

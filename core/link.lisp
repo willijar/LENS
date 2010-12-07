@@ -60,9 +60,9 @@ two things")
 (defgeneric link(entity)
   (:documentation "Return the link associated with an entity"))
 
-(defgeneric peer-interfaces(link)
+(defgeneric peer-interfaces(link interface)
   (:documentation "Return a sequence of all the peer interfaces this link
-connects to"))
+connects interface to"))
 
 (defgeneric default-peer-interface(link)
   (:documentation "Return the default peer (gateway) on a link"))
@@ -89,33 +89,25 @@ connects to"))
                :documentation "Total packets sent on this link")
    (packets-sent :type integer :initform 0 :accessor packets-sent
                  :documentation "Total packets sent on this link")
-   (busy-p :initform nil :reader busy-p :documentation "Busy state of link")
    (utilisation-start
     :type time-type :initform (simulation-time)
     :accessor utilisation-start
     :documentation "Start of utilisation measurement interval"))
   (:documentation "Base Class for simple links"))
 
-(defmethod send :before ((link link) packet protocol
-                         &key &allow-other-keys)
-  (when (busy-p link)
-    (error "Attempt to send a packet over a busy link"))
-  (setf (slot-value link 'busy-p) nil))
-
-(defmethod send((link link) packet (layer2:protocol layer2:protocol)
+(defmethod send((link link) packet local-interface
                 &key (peer-address (dst-address (peek-pdu packet))))
-  (let* ((local-interface (interface protocol))
-         (no-bits (* 8 (length-bytes packet)))
-         (txtime (/ no-bits (bandwidth link local-interface))))
+  (let* ((no-bits (* 8 (length-bytes packet)))
+         (txtime (/ no-bits (bandwidth local-interface))))
     ;; schedule packet transmit complete event
-    (schedule txtime (list #'send-complete layer2:protocol packet link))
+    (schedule txtime (list #'send-complete local-interface packet link))
     ;; schedule packet arrival at interface(s)
     (flet ((schedule-receive(peer-interface packet)
-             (let ((delay (delay link local-interface peer-interface))
+             (let ((delay (delay local-interface peer-interface))
                    (errors
                     (1-
                      (expt
-                      (1- (bit-error-rate link local-interface peer-interface))
+                      (1- (bit-error-rate local-interface peer-interface))
                       no-bits))))
                (schedule delay
                          (list #'receive-start peer-interface packet link))
@@ -123,18 +115,18 @@ connects to"))
                          (list #'receive peer-interface packet link
                                :errors errors)))))
       (if (broadcast-p peer-address)
-          (dolist(peer-interface (peer-interfaces link))
+          (dolist(peer-interface (peer-interfaces link local-interface))
             (schedule-receive peer-interface (copy packet)))
           (schedule-receive
            (if peer-address
-               (find peer-address (peer-interfaces link)
+               (find peer-address (peer-interfaces link local-interface)
                      :key #'hardware-address :test #'address=)
                (default-peer-interface link))
            packet)))))
 
-(defmethod send-complete :before ((protocol layer2:protocol) packet (link link)
+(defmethod send-complete :before (interface packet (link link)
                                   &key fail &allow-other-keys)
-  (declare (ignore protocol fail))
+  (declare (ignore interface fail))
   (incf (bytes-sent link) (length-bytes packet))
   (incf (packets-sent link))
   (setf (slot-value link 'busy-p) nil))
@@ -143,14 +135,19 @@ connects to"))
   (declare (ignore peer-interface))
   (slot-value link 'delay))
 
-(defmethod bit-error-rate((link link) receiver)
-  (declare (ignore receiver))
-  (slot-value link 'bit-error-rate))
+(defmethod bit-error-rate((sender interface) (receiver interface))
+  (slot-value (link sender) 'bit-error-rate))
+
+(defmethod bandwidth((sender interface))
+  (slot-value (link sender) 'bandwidth))
 
 (defmethod print-object((link link) stream)
   (print-unreadable-object (link stream :type t :identity t)
-    (format stream "~0:/print-eng/bit/sec ~0:/print-eng/sec delay"
-            (bandwidth link) (delay link))))
+    (format stream
+            "~0:/print-eng/bit/sec ~0:/print-eng/sec delay ~0:/print-eng/BER"
+            (slot-value link 'bandwidth)
+            (slot-value link 'delay)
+            (slot-value link 'bit-error-rate))))
 
 (defmethod reset((link link))
   (setf (utilisation-start link) (simulation-time)

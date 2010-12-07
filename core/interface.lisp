@@ -78,10 +78,10 @@
   (print-unreadable-object (interface stream :type t :identity t)
     (princ (type-of (layer2:protocol interface)) stream)
     (when (slot-boundp interface 'node)
-      (format stream " N~D~@[ ~A~]~@[/~A~]"
+      (format stream " N~D~@[ ~A~]~:[~;/~A~]"
               (uid (node interface))
               (hardware-address interface)
-              (ipmask interface)))))
+              (network-mask interface) (logcount (network-mask interface))))))
 
 (defmethod bandwidth((interface interface)) (bandwidth (link interface)))
 (defmethod delay((start interface) end) (delay (link start) end))
@@ -179,15 +179,15 @@ interface is busy. Requires address"
   (reset (link interface)))
 
 (defmethod busy-p((interface interface)) (busy-p (layer2:protocol interface)))
+(defmethod busy-p((protocol layer2:protocol))
+  (slot-value (interface protocol) 'tx-packet))
 
 (defgeneric network-to-hardware-address(network-address interface)
-  (:documentation "map a network address to hardware adewaa on a link")
+  (:documentation "map a network address to hardware  on a link")
   (:method ((addr network-address) (interface interface))
-   (when-bind(peer-interface (find addr (peer-interfaces interface) :key #'network-address))
-     (hardware-address peer-interface))))
-
-(defmethod peer-interfaces((interface interface))
-  (remove interface (peer-interfaces (link interface))))
+    (when-bind(peer-interface (find addr (peer-interfaces (link interface) interface)
+                                    :key #'network-address))
+              (hardware-address peer-interface))))
 
 (defmethod default-peer-interface((interface interface))
   (default-peer-interface (link interface)))

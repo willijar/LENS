@@ -65,7 +65,3 @@
 
 (defun lognormal(avg std)
   (exp (normal avg std)))
-
-
-
-

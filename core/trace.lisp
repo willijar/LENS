@@ -210,7 +210,7 @@ output according to detail onto stream")
 
 (defun write-trace(protocol pdu &key (node (node protocol)) packet text (stream *lens-trace-output*))
   (dolist(stream (if (listp stream) stream (list stream)))
-    (when (trace-enabled-p node protocol stream)
+    (when (trace-enabled-p protocol stream)
       (setf (slot-value stream 'node) node)
       (pdu-trace pdu
                  (if protocol (trace-detail protocol stream) nil)

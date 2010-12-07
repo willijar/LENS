@@ -87,7 +87,6 @@
   (= (slot-value addr 'address-bytes) #xFFFFFFFFFFFF))
 
 (defmethod length-bytes((addr macaddr)) 6)
-(defmethod protocol-number((addr macaddr)) 1)
 
 (defgeneric macaddr(arg)
   (:documentation "Create a mac address entity. May be aliased")
@@ -124,7 +123,6 @@
   (= (slot-value addr 'address-bytes) #xFFFFFFFF))
 
 (defmethod length-bytes((addr ipaddr)) 4)
-(defmethod protocol-number((addr ipaddr)) #x0800)
 
 (defmethod make-load-form((ipaddr ipaddr) &optional environment)
   (make-load-form-saving-slots ipaddr :environment environment))

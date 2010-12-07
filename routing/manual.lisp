@@ -1,5 +1,4 @@
-;;;; LENS packet header API
-;;;; Copyright (C) 2003-2005 John A.R. Williams <J.A.R.Williams@jarw.org.uk>
+;;;; Copyright (C) 2010 John A.R. Williams <J.A.R.Williams@jarw.org.uk>
 ;;;; Released under the GNU General Public License (GPL)
 ;;;; See <http://www.gnu.org/copyleft/gpl.html> for license details
 ;;;; $Id: packet.lisp,v 1.2 2005/11/29 09:00:39 willijar Exp $

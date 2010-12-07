@@ -40,7 +40,7 @@ See http://www.iana.org/assignments/protocol-numbers")
   (:method :before(receiver packet (sender protocol) &key &allow-other-keys)
            (write-trace sender (peek-pdu packet) :packet packet :text "-"))
   (:method :around (receiver packet (sender protocol) &key &allow-other-keys)
-           (when (node:call-callbacks :tx sender) (call-next-method))))
+           (when (node:call-callbacks :tx sender packet) (call-next-method))))
 
 (defgeneric receive(receiver packet sender &key &allow-other-keys)
   (:documentation "Called by packet when to pass received packet up to
@@ -48,7 +48,7 @@ See http://www.iana.org/assignments/protocol-numbers")
   (:method :before((receiver protocol) packet sender &key &allow-other-keys)
            (write-trace receiver (peek-pdu packet) :packet packet :text "+"))
   (:method :around((receiver protocol) packet sender &key &allow-other-keys)
-           (when (node:call-callbacks :rx receiver) (call-next-method))))
+           (when (node:call-callbacks :rx receiver packet) (call-next-method))))
 
 (defgeneric drop(entity packet &key node &allow-other-keys)
   (:documentation "Drop a packet")
@@ -65,11 +65,13 @@ See http://www.iana.org/assignments/protocol-numbers")
 
 (defmethod initialize-instance :after((protocol protocol)
                                       &key &allow-other-keys)
-  (setf (slot-value protocol 'node) (node interface)))
+  (setf (slot-value protocol 'node) (node (slot-value protocol 'interface))))
 
 (defclass pdu(packet:pdu)
   ((layer :initform 2 :reader protocol:layer :allocation :class))
   (:documentation "The base class for all layer two  protocol data units"))
+
+(defmethod protocol-number((addr macaddr)) 1)
 
 (in-package :protocol.layer3)
 
@@ -137,6 +139,8 @@ is true add it to the list of standard protocols"
 
 (defgeneric find-interface(protocol addr)
   (:documentation "Find the forwarding interface"))
+
+(defmethod protocol-number((addr ipaddr)) #x0800)
 
 (in-package :protocol.layer4)
 
@@ -226,11 +230,11 @@ protocols")
                  :documentation "network address of peer")
    (peer-port  :type ipport :accessor peer-port
                :documentation "Service access port of peer")
-   (fid :type 'counter :reader fid :documentation "Flow id")
-   (last-fid :type 'counter :initform 0 :documentation "last allocated flow id")
-   (ttl :accessor ttl :initarg :ttl :initform 64 :type 'word
+   (fid :type counter :reader fid :documentation "Flow id")
+   (last-fid :type counter :initform 0 :documentation "last allocated flow id")
+   (ttl :accessor ttl :initarg :ttl :initform 64 :type word
         :documentation "Layer 3 ttl")
-   (tos :accessor tos :initarg :tos :initform 0 :type 'octet
+   (tos :accessor tos :initarg :tos :initform 0 :type octet
         :documentation "Layer 3 type of service"))
   (:documentation "Base class for all layer 4 protocols states"))
 
@@ -329,9 +333,10 @@ this occurs when the acknowledgement is received from the peer.")
 
 (defgeneric connection-from-peer(application protocol &key peer-address peer-port)
   (:documentation "Called when a listening socket receives a
-connection request. Return true if connection accepted.")
+  connection request. Return true if connection accepted.")
   (:method(application protocol &key &allow-other-keys)
-    (declare (ignore application protocol src-address))
+    "Default - acceot and do nothing"
+    (declare (ignore application protocol))
     t))
 
 

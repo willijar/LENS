@@ -16,7 +16,7 @@
 
 ;;; Code:
 
-(in-package :application)
+(in-package :protocol.layer5)
 
 (defclass cbr-source(application)
   ((protocol :type protocol :reader protocol

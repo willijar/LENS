@@ -43,7 +43,8 @@
 
 (defpackage :math
   (:documentation "Various mathematical functions and classes")
-  (:use :cl)
+  (:use :cl :common)
+  (:import-from :scheduler #:simulation-time #:time-type)
   (:export
    #:random-variable #:random-value #:constant #:uniform #:normal
    #:exponential #:pareto #:paretoII #:lognormal))
@@ -78,7 +79,7 @@
   (:import-from :split-sequence #:split-sequence)
   (:import-from :protocol #:length-bytes #:protocol-number)
   (:export  #:hardware-address #:network-address
-            #:address= #:subnet #:address-bytes #:make-address--mask
+            #:address= #:subnet #:address-bytes #:make-address-mask
             #:broadcast-p #:macaddr #:ipaddr #:ipport
             #:*print-ip-format* #:print-ip-format
             #:src-address #:dst-address #:address-mask
@@ -105,7 +106,7 @@
   (:import-from :packet #:packet #:length-bytes #:priority #:peek-pdu)
   (:import-from :scheduler #:time-type #:simulation-time #:schedule)
   (:import-from :protocol #:send #:receive #:drop)
-  (:export #:interface #:packet-queue
+  (:export #:interface #:link #:packet-queue
            #:enqueu #:dequeue #:dequeue-if #:empty-p
            #:delete-packets-if #:drop-packet-p #:buffer-available-p
            #:average-queue-length #:reset-average-queue-length

@@ -234,6 +234,7 @@ Examples:
   if state has changed and inform-routing keyword is true"))
 
 (define-condition lens-error(simple-error)
+  ()
   (:documentation "Base for simulation internal errors"))
 
 (declaim (inline lens-error))

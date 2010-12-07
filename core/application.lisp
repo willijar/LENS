@@ -34,4 +34,4 @@ a web browser model with multiple simultaneous connections."))
 
 (defmethod receive((application application) pdu socket &key &allow-other-keys)
   "Called by layer 4 protocol object when data is received. Default - do nothing"
-    (declare (ignore application pdu flow)))
+    (declare (ignore application pdu socket)))

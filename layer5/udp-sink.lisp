@@ -16,7 +16,7 @@
 
 ;;; Code:
 
-(in-package :application)
+(in-package :protocol.layer5)
 
 (defclass udp-sink(application)
   ((node :initarg :node :type node :reader node

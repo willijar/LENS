@@ -71,8 +71,8 @@ form the packets are derived from this class."))
 (defmethod initialize-instance :after ((node node) &key &allow-other-keys)
   (setf (slot-value node 'uid) (vector-push-extend node (nodes)))
   (setf (slot-value node 'layer3:routing)
-        (apply #'make-instance (append layer3::*default-routing*
-                                       `(:node ,node)))))
+        (apply #'make-instance `(,@layer3::*default-routing* :node ,node))))
+
 (defmethod mkup((node node) &key (inform-routing t))
   (unless (slot-value node 'up-p)
     (setf (slot-value node 'up-p) t)
@@ -83,16 +83,15 @@ form the packets are derived from this class."))
     (setf (slot-value node 'up-p) nil)
     (when inform-routing (layer3:topology-changed node))))
 
-(defmethod  node((entity integer)) (aref (nodes) entity))
-(defmethod node((ipaddr ipaddr))
-  (find-if #'(lambda(node) (node:local-ipaddr-p ipaddr node)) (nodes)))
+
+(defgeneric node(entity)
+  (:documentation "Return a node associated with entity")
+  (:method((entity integer)) (aref (nodes) entity))
+  (:method((addr network-address))
+    (find addr (nodes) :key #'network-address)))
 
 (defgeneric (setf node)(node entity)
   (:documentation "Set the node associated with an entity"))
-
-(defmethod layer3:topology-changed((node node))
-  (layer3:reinitialise-routes (layer3:routing node) node))
-
 
 (defstruct callback
   (direction :rx :type (member :tx :rx))
@@ -104,7 +103,7 @@ form the packets are derived from this class."))
 (defun add-callback(callback node)
   (push callback (callbacks node)))
 
-(defun call-callbacks(direction protocol)
+(defun call-callbacks(direction protocol packet)
   "The callback function must return true if the packet should
  continue to be processed by the protocol stack, and false if the
  callback function has deleted the packet. For example, if the
@@ -113,15 +112,15 @@ form the packets are derived from this class."))
  that case, it should drop the packet and return false."
   (dolist(c (callbacks (node protocol)))
      (when (and ;; check for match
-            (eql direction (direction c))
+            (eql direction (callback-direction c))
             (or (zerop (callback-layer c))
                 (= (callback-layer c) (protocol:layer protocol)))
             (and (= 2 (protocol:layer protocol))
-                 (eql (callback-interface c) (layer2:interface protocol)))
+                 (eql (callback-interface c) (interface protocol)))
             (or (zerop (callback-protocol-number c))
                 (= (callback-protocol-number c)
                    (protocol:protocol-number protocol))))
-       (unless (funcall (callback c) protocol packet)
+       (unless (funcall (callback-callback c) protocol packet)
         ;; if callback returns false we are done
         (return-from call-callbacks nil))))
   ;; all returned true or none found
@@ -131,19 +130,13 @@ form the packets are derived from this class."))
    (delete-duplicates
     (mapcan
      #'(lambda(protocol)
-         (mapcar #'layer:application (layer4:bindings protocol)))
-     (layer4:protocols node))))
+         (mapcar #'layer5:application (layer4::bindings protocol)))
+     (slot-value node 'layer4:protocols))))
 
 (defmethod reset((node node))
-  (layer3:initialise-routes node)
+  (layer3:reinitialise-routes (layer3:routing node) nil)
   (dolist(slot '(layer3:protocols layer4:protocols interfaces applications))
     (reset (slot-value node slot))))
-
-(defmethod (setf network-address)((addr network-address) (node node))
-  (prog1
-      (setf (slot-value 'node 'network-address) addr)
-    (when (= 1 (length (interfaces node))) ;; 1 interface - set to same ipaddr
-      (setf (network-address (aref (interfaces node) 0)) addr))))
 
 (defgeneric add-interface(interface node)
   (:documentation "Add an interface to a node")

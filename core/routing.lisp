@@ -39,7 +39,9 @@ interface and next hop IP address"))
 (defun leaf-node-p(node)
   (with-slots(interfaces) node
     (and (= 1 (length interfaces))
-         (= 1 (length (peer-interfaces (link (aref interfaces 0))))))))
+         (= 1 (length (layer1:peer-interfaces
+                       (layer1:link (aref interfaces 0))
+                       (aref interfaces 0)))))))
 
 (defgeneric reinitialise-routes(routing changed-entity)
   (:documentation "Reinitialise routing table due to topology change -
@@ -48,11 +50,11 @@ changed-entity is the object in the topology who's state has changed. If no chan
 (defgeneric topology-changed(changed-entity)
   (:documentation "Inform routing that topology has changed")
   (:method(entity)
-    (reinitialise-routes (routing (node entity)) entity)))
+    (reinitialise-routes (routing (node entity)) entity))
+  (:method((node node))
+    (reinitialise-routes (routing node) node)))
 
 (defvar *default-routing* nil "make-instance args for default routing")
-
-
 
 (defun routing-neighbours(node &key no-leaf)
   "Return list of routing neighours for a node - if no-leaf is true do
@@ -61,14 +63,10 @@ changed-entity is the object in the topology who's state has changed. If no chan
   (when (up-p node)
     (mapcan
      #'(lambda(interface)
-         (let ((peers (filter #'up-p (peer-interfaces (link interface) interface))))
-           (unless (and no-leaf (<= (length peers) 1))
-             (mapcar
-              #'(lambda(peer) (make-vertex :start interface :end peer))
-              peers))))
-     (filter #'up-p (interfaces node)))))
-
-(defmethod find-route((addr network-address) routing &optional packet)
-  (let ((node (find addr (node:nodes) :key #'network-address)))
-    (unless node (error "Node with network address ~A not found" addr))
-    (find-route node routing packet)))
+         (when (up-p interface)
+           (let ((peers (filter #'up-p (layer1:peer-interfaces (layer1:link interface) interface))))
+             (unless (and no-leaf (<= (length peers) 1))
+               (mapcar
+                #'(lambda(peer) (make-vertex :start interface :end peer))
+                peers)))))
+     (coerce (node:interfaces node) 'list))))
