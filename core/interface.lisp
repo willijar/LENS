@@ -37,6 +37,21 @@
    protocol (or not). All interfaces on the same link must support ARP
    for it to work")
 
+(defvar *default-delay* 1e-3 "Default link delay")
+(defvar *default-ber* 0 "Default bit error rate on a link")
+
+(defgeneric delay(start end)
+ (:documentation "Return the propagation delay in bits/sec between
+two things")
+ (:method(start end)
+   (/ (distance start end) +c+)))
+
+(defgeneric bit-error-rate(sender receiver)
+  (:documentation "Return the bit error rate for a simple link")
+  (:method(sender receiver)
+    (declare (ignore sender receiver))
+    0))
+
 (defclass interface(notifier)
   ((node
     :type node :reader node
@@ -84,13 +99,22 @@
               (network-mask interface) (logcount (network-mask interface))))))
 
 (defmethod bandwidth((interface interface))
-  (slot-value (link interface) 'bandwidth))
+  (bandwidth (link interface)))
+
+(defmethod location((interface interface))
+  (location (node interface)))
 
 (defmethod delay((start interface) (end interface))
-  (slot-value (link start) 'delay))
+  (with-slots(link) start
+    (if (slot-exists-p link 'delay)
+        (slot-value (link start) 'delay)
+        (/ (distance start end) (propagation-speed link)))))
 
 (defmethod bit-error-rate((sender interface) (receiver interface))
-  (slot-value (link sender) 'bit-error-rate))
+  (with-slots(link) sender
+    (if (slot-exists-p link 'bit-error-rate)
+        (slot-value link 'bit-error-rate)
+        (call-next-method))))
 
 (defmethod initialize-instance :after ((interface interface)
                                        &key
@@ -122,22 +146,17 @@ interface is busy. Requires address"
                  :address (network-to-hardware-address address interface)))))
       (drop interface packet :text "L2-ID")))
 
-(defmethod send((interface interface) packet (protocol layer2:protocol) &key &allow-other-keys)
+(defmethod send :before ((link link) packet (interface interface) &key &allow-other-keys)
+  (when (busy-p link) (error "Unable to transmit over a busy link"))
   (with-slots(tx-packet) interface
     (when tx-packet (error "Interface cannot send two packets simultaneously"))
-    (setf tx-packet packet)
-    (send (link interface) packet interface)))
-
-(defmethod send-complete((protocol layer3:protocol) packet (interface interface)
-                         &key fail &allow-other-keys)
-  (assert (eql packet (dequeue (packet-queue interface))))
-  (when fail (drop interface packet :text fail))
-  (send-complete (layer2:protocol interface) packet interface))
+    (setf tx-packet packet)))
 
 (defmethod send-complete((interface interface) packet (link link)
                          &key fail &allow-other-keys)
+  (assert (eql packet (slot-value interface 'tx-packet)))
   (setf (slot-value interface 'tx-packet) nil)
-  (send-complete (layer2:protocol interface) packet interface :fail fail)
+  (when fail (drop interface packet :text fail))
   (do-notifications interface))
 
 (defmethod receive-start((interface interface) packet link)
@@ -182,16 +201,18 @@ interface is busy. Requires address"
   (setf (slot-value interface 'tx-packet) nil)
   (reset (link interface)))
 
-(defmethod busy-p((interface interface)) (busy-p (layer2:protocol interface)))
-(defmethod busy-p((protocol layer2:protocol))
-  (slot-value (interface protocol) 'tx-packet))
+(defmethod busy-p((interface interface))
+  (or
+   (slot-value interface 'tx-packet)
+   (slot-value interface 'rx-packet)
+   (busy-p (link interface))))
 
 (defgeneric network-to-hardware-address(network-address interface)
   (:documentation "map a network address to hardware  on a link")
   (:method ((addr network-address) (interface interface))
     (when-bind(peer-interface (find addr (peer-interfaces (link interface) interface)
                                     :key #'network-address))
-              (hardware-address peer-interface))))
+      (hardware-address peer-interface))))
 
 (defmethod default-peer-interface((interface interface))
   (default-peer-interface (link interface)))

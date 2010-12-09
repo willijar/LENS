@@ -1,4 +1,3 @@
-;; $Id$
 ;; Implementation of 802.2 llc/snap frame
 ;; Copyright (C) 2007 Dr. John A.R. Williams
 
@@ -17,7 +16,6 @@
 ;;  We get to pass the 'ethertype' into the packet.
 ;;  For now SNAP is enough but maybe we need LLC later
 
-;; This has
 ;;; Code:
 
 (in-package :layer2)
@@ -26,10 +24,26 @@
   ((dsap :type (unsigned-byte 8) :initform #xAA)
    (ssap  :type (unsigned-byte 8) :initform #xAA)
    (ctrl  :type (unsigned-byte 8) :initform #x3)
-   (oui  :type (unsigned-byte 16) :initform 0)
+   (oui  :type (unsigned-byte 24) :initform 0)
    (ethtype :type (unsigned-byte 16) :accessor ethtype
             :initform #x0800 :initarg :type
             :documentation "Protocol Number for upper level")))
+
+(defmethod default-trace-detail((pdu llcsnap-header))
+  '(ethtype))
+
+(defmethod pdu-trace((pdu llcsnap-header) detail stream &key packet text)
+    (format stream " ~@[~A ~]LLC" text)
+    (when (and packet (member 'length detail))
+      (format stream " ~A" (length-bytes packet)))
+    (write-pdu-slots pdu '((dsap " ~X")
+                           (ssap " ~X")
+                           (ctrl " ~X")
+                           (oui " ~X")
+                           (ethtype " ~X"))
+                     detail stream)
+    (when (member 'uid detail)
+      (format stream " ~D" (if packet (uid packet) 0))))
 
 (defmethod length-bytes((h llcsnap-header)) 8)
 
@@ -40,7 +54,7 @@
   ()
   (:documentation "Base class for protocols which use llcsnap sublayer"))
 
-(defmethod send :before ((protocol llcsnap) packet layer3 &key &allow-other-keys)
+(defmethod send ((protocol llcsnap) packet layer3 &key &allow-other-keys)
   (push-pdu
    (make-instance 'llcsnap-header :type (protocol-number layer3))
    packet))
@@ -56,12 +70,5 @@
       (t
        (error "Unable to find protocol ~X in protocol graph" type)))))
 
-(defmethod send-complete((protocol llcsnap) packet interface &optional fail)
-  (unless (empty-p (packet-queue interface))
-    (send (link interface) (packet-queue interface) interface))
-  (send-complete
-   (find-recipient (find 'llcsnap-header (pdus packet) :key #'type-of) protocol)
-   packet interface fail))
-
-(defmethod receive ((protocol llcsnap) packet interface &key errors &allow-other-keys)
-  (receive (find-recipient (packet:pop-pdu packet) protocol) packet protocol :errors errors))
+(defmethod receive ((protocol llcsnap) packet interface &key &allow-other-keys)
+  (receive (find-recipient (packet:pop-pdu packet) protocol) packet protocol))

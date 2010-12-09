@@ -240,3 +240,24 @@ Examples:
 (declaim (inline lens-error))
 (defun lens-error(format-control &rest args)
   (signal 'lens-error :format-control format-control :format-arguments args))
+
+(defstruct location
+  (x 0.0 :type short-float :read-only t)
+  (y 0.0 :type short-float :read-only t)
+  (z 0.0 :type short-float :read-only t))
+
+(defparameter +origin+ (if (boundp '+origin+) +origin+ (make-location)))
+
+(defgeneric location(entity)
+  (:documentation "Return the location of an entity"))
+
+(defgeneric distance(a b)
+  (:documentation "Return distance between a and b")
+  (:method((a location) (b location))
+    (let ((dx (- (location-x a) (location-x b)))
+          (dy (- (location-y a) (location-y b)))
+          (dz (- (location-z a) (location-z b))))
+      (sqrt (+ (* dx dx) (* dy dy) (* dz dz)))))
+  (:method(a b)
+    (distance (location a) (location b))))
+

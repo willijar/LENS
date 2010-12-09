@@ -50,10 +50,12 @@ See http://www.iana.org/assignments/protocol-numbers")
   (:method :around((receiver protocol) packet sender &key &allow-other-keys)
            (when (node:call-callbacks :rx receiver packet) (call-next-method))))
 
-(defgeneric drop(entity packet &key node &allow-other-keys)
+(defgeneric drop(entity packet &key text &allow-other-keys)
   (:documentation "Drop a packet")
   (:method :after (entity packet &key text &allow-other-keys)
-    (write-trace entity :drop :packet packet :text text)))
+    (write-trace entity :drop :packet packet :text text))
+  (:method(entity packet &key &allow-other-keys)
+    (declare (ignore entity packet))))
 
 (in-package :protocol.layer2)
 
@@ -63,9 +65,7 @@ See http://www.iana.org/assignments/protocol-numbers")
               :documentation "Interface for this protocol"))
   (:documentation "Layer 2 protocol base class"))
 
-(defmethod initialize-instance :after((protocol protocol)
-                                      &key &allow-other-keys)
-  (setf (slot-value protocol 'node) (node (slot-value protocol 'interface))))
+(defmethod node((protocol protocol)) (node (interface protocol)))
 
 (defclass pdu(packet:pdu)
   ((layer :initform 2 :reader protocol:layer :allocation :class))
@@ -86,73 +86,53 @@ See http://www.iana.org/assignments/protocol-numbers")
 (defvar *standard-protocols* nil "List of standard registered layer 3
 protocols")
 
-(defgeneric register-protocol(protocol entity &optional replace)
-  (:documentation "Register a layer 3 protocol. If replace is true this will
-  replace the previously registered protocol with the same number."))
-
-(defgeneric delete-protocol(protocol entity)
-  (:documentation "Delete a layer 3 protocol from entity")
-  (:method((protocol integer) (protocols sequence))
-    (delete protocol protocols :key #'protocol-number :test #'=))
-  (:method(protocol entity)
-    (delete-protocol (protocol-number protocol) entity)))
-
 (defgeneric find-protocol(protocol entity)
   (:documentation "Find a layer 3 protocol on entity")
-  (:method((protocol integer) (protocols sequence))
-    (find protocol protocols :key #'protocol-number :test #'=))
+  (:method((protocol-number integer) (seq sequence))
+    (find protocol-number seq :key #'protocol-number :test #'=))
+  (:method((protocol-type symbol) (seq sequence))
+    (assert (= (layer protocol-type) 3))
+    (find protocol-type seq :key #'type-of))
+  (:method((protocol-number integer) node)
+    (or (find protocol-number (protocols node))
+        (let ((type (find-protocol protocol-number *standard-protocols*)))
+          (when type (register-protocol type node )))))
+  (:method((protocol-type symbol) node)
+    (or (find-protocol protocol-type (protocols node))
+        (register-protocol protocol-type node))))
+
+(defgeneric register-protocol(protocol entity)
+  (:documentation "Register a layer 3 protocol.")
+  (:method((protocol symbol) node)
+    (when (find-protocol (protocol-number protocol) node)
+      (error "Unable to register a duplicate layer 3 protocol ~A" protocol))
+    (let ((instance (make-instance protocol :node node)))
+      (push instance (protocols node))
+      instance))
+  (:method((protocol-type symbol) (protocol-number integer))
+    (setf (get protocol-type 'protocol::layer) 3
+          (get protocol-type 'protocol::protocol-number) protocol-number)
+    (unless (find-protocol protocol-number *standard-protocols*)
+      (push protocol-type  *standard-protocols*))))
+
+(defgeneric delete-protocol(protocol entity)
+  (:documentation "Delete a layer 4 protocol from entity")
+  (:method((protocol protocol) entity)
+        (setf (protocols entity) (delete protocol (protocols entity))))
   (:method(protocol entity)
-    (find-protocol (protocol-number protocol) entity)))
-
-(defmethod register-protocol(protocol (protocols list) &optional replace)
-  (cons protocol
-        (if replace
-            (delete-protocol protocol protocols)
-            (when (find-protocol protocol protocols)
-              (error "Unable to register a duplicate protocol ~A" protocol)))))
-
-(defmethod register-protocol((protocol symbol) (protocol-number integer) &optional (replace t))
-  "Register the protocol number for a protocol class name, if replace
-is true add it to the list of standard protocols"
-    (setf (get protocol 'protocol::layer) 3
-          (get protocol 'protocol::protocol-number) protocol-number)
-    (when replace
-      (setf *standard-protocols* (register-protocol protocol *standard-protocols*))))
-
-(defmethod delete-protocol((protocol integer) node)
-  (setf (slot-value node 'protocols)
-        (delete-protocol protocol (slot-value node 'layer3:protocols))))
-
-(defmethod find-protocol((protocol-number integer) node)
-  "Find an already existent protocol or add one"
-  (or (find-protocol protocol-number (slot-value node 'layer3:protocols))
-      (let ((protocol (find-protocol protocol-number *standard-protocols*)))
-        (when protocol (make-instance protocol :node node)))))
-
-(defmethod register-protocol((protocol protocol) node &optional (replace nil))
-  (setf (slot-value node 'layer3:protocols)
-        (register-protocol protocol (slot-value node 'layer3:protocols) replace)))
-
-(defmethod initialize-instance :after ((protocol protocol)
-                                       &key &allow-other-keys)
-  (register-protocol protocol (node protocol)))
-
-(defgeneric find-interface(protocol addr)
-  (:documentation "Find the forwarding interface"))
+    (let ((protocol (find-protocol protocol entity)))
+      (when protocol (delete-protocol protocol entity)))))
 
 (defmethod protocol-number((addr ipaddr)) #x0800)
 
 (in-package :protocol.layer4)
 
 ;; layer 4 will receive packets from application and send to network layer
-(defvar *standard-protocols* nil "List of standard registered layer 4
-protocols")
 
 (defvar +min-ephemeral-port+ 49152 "Start of ephemeral port range")
 
 (defclass protocol(protocol:protocol)
   ((layer :initform 4 :reader layer :allocation :class)
-   (node :initarg :node :reader node :documentation "Local Node")
    (bindings :type list :initform nil :reader bindings
              :documentation "Sequence of bound connections"))
   (:documentation "Layer 4 protocol"))
@@ -166,54 +146,48 @@ protocols")
   ((layer :initform 4 :reader protocol:layer :allocation :class))
   (:documentation "The base class for all layer four protocol data units"))
 
-(defgeneric register-protocol(protocol entity &optional replace)
-  (:documentation "Register a layer 4 protocol. If replace is true this will
-  replace the previously registered protocol with the same number."))
-
-(defgeneric delete-protocol(protocol entity)
-  (:documentation "Delete a layer 4 protocol from entity")
-  (:method((protocol integer) (protocols sequence))
-    (delete protocol protocols :key #'protocol-number :test #'=))
-  (:method(protocol entity)
-    (delete-protocol (protocol-number protocol) entity)))
+(defvar *standard-protocols* nil "List of standard registered layer 4
+protocols")
 
 (defgeneric find-protocol(protocol entity)
   (:documentation "Find a layer 4 protocol on entity")
-  (:method((protocol integer) (protocols sequence))
-    (find protocol protocols :key #'protocol-number :test #'=))
+  (:method((protocol-number integer) (seq sequence))
+    (find protocol-number seq :key #'protocol-number :test #'=))
+  (:method((protocol-type symbol) (seq sequence))
+    (assert (= (layer protocol-type) 4))
+    (find protocol-type seq :key #'type-of))
+  (:method((protocol-number integer) node)
+    (or (find protocol-number (protocols node))
+        (let ((type (find-protocol protocol-number *standard-protocols*)))
+          (when type (register-protocol type node )))))
+  (:method((protocol-type symbol) node)
+    (or (find-protocol protocol-type (protocols node))
+        (register-protocol protocol-type node))))
+
+(defgeneric register-protocol(protocol entity)
+  (:documentation "Register a layer 4 protocol")
+  (:method((protocol symbol) node)
+    (when (find-protocol (protocol-number protocol) node)
+      (error "Unable to register a duplicate layer 4 protocol ~A" protocol))
+    (let ((instance (make-instance protocol :node node)))
+      (push instance (protocols node))
+      instance))
+  (:method((protocol-type symbol) (protocol-number integer))
+    (setf (get protocol-type 'protocol::layer) 4
+          (get protocol-type 'protocol::protocol-number) protocol-number)
+    (unless (find-protocol protocol-number *standard-protocols*)
+      (push protocol-type  *standard-protocols*))))
+
+(defgeneric delete-protocol(protocol entity)
+  (:documentation "Delete a layer 4 protocol from entity")
+  (:method((protocol protocol) entity)
+    (if (bindings protocol)
+        (error "Unable to remove bound protocol ~A from ~A" protocol entity)
+        (setf (protocols entity) (delete protocol (protocols entity)))))
   (:method(protocol entity)
-    (find-protocol (protocol-number protocol) entity)))
-
-(defmethod register-protocol(protocol (protocols list) &optional replace)
-  (cons protocol
-        (if replace
-            (delete-protocol protocol protocols)
-            (when (find-protocol protocol protocols)
-              (error "Unable to register a duplicate protocol ~A" protocol)))))
-
-(defmethod register-protocol((protocol symbol) (protocol-number integer) &optional (replace t))
-    (setf (get protocol 'protocol::layer) 4
-          (get protocol 'protocol::protocol-number) protocol-number)
-    (when replace
-      (setf *standard-protocols*
-            (register-protocol protocol *standard-protocols*))))
-
-(defmethod delete-protocol((protocol integer) node)
-  (setf (slot-value node 'layer4:protocols)
-        (delete-protocol protocol (slot-value node 'layer4:protocols))))
-
-(defmethod find-protocol((protocol-number integer) node)
-  (or (find-protocol protocol-number (slot-value node 'protocols))
-      (let ((protocol (find-protocol protocol-number *standard-protocols*)))
-        (when protocol (make-instance protocol :node node)))))
-
-(defmethod register-protocol((protocol protocol) node &optional (replace nil))
-  (setf (slot-value node 'layer4:protocols)
-        (register-protocol protocol (slot-value node 'layer4:protocols) replace)))
-
-(defmethod initialize-instance :after ((protocol protocol)
-                                       &key &allow-other-keys)
-  (register-protocol protocol (node protocol)))
+    (let ((protocol (find-protocol protocol entity)))
+      (when protocol
+        (delete-protocol protocol entity)))))
 
 (defclass socket()
   ((local-address :type network-address :reader local-address
@@ -288,7 +262,7 @@ protocols")
           (slot-value socket 'peer-port) peer-port
           (slot-value socket 'fid) (incf (slot-value socket 'last-fid)))))
 
-(defgeneric connection-complete(socket application &key failure)
+(defgeneric connection-complete(application socket &key failure)
   (:documentation "Called to signal completion of connection attempt -
   either success or if failure set failed"))
 

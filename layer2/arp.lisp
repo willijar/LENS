@@ -19,9 +19,9 @@
 
 (defvar *arp-max-retries* 5
   "Maximum number of retries for resolving a certain entry")
-(defvar *arp-default-rx-timeout 0.1
+(defvar *default-arp-rx-timeout* 0.1
   "default timeout for arp request in seconds")
-(defvar *-arp-default-entry-timeout* 1200
+(defvar *default-arp-entry-timeout* 1200
   "Default timeout for a arp entries")
 
 (defstruct arp-entry
@@ -32,17 +32,17 @@
   (buffer nil :type packet));; One packet buffer
 
 (defclass arp-header(pdu)
-  ((protocol-number :type work :initform #x803 :allocation :class
+  ((protocol-number :type word :initform #x803 :allocation :class
                     :reader protocol-number)
    (op :initarg :op :type (member :request :reply) :accessor op
        :documentation "Either Request or Reply")
-   (srchwaddr :initarg :srcmacaddr :type hardware-address :reader srcmacaddr
+   (srchwaddr :initarg :srcmacaddr :type hardware-address :reader srchwaddr
               :reader src-address
                :documentation "The mac address of the source of the packet")
-   (srcprotoaddr :initarg :srcprotoaddr :type network-address :reader srcipaddr
+   (srcprotoaddr :initarg :srcprotoaddr :type network-address :reader srcprotoaddr
               :documentation "The IP address of the source of the packet")
    (dsthwaddr
-    :initarg :dsthwcaddr :type hardware-address :reader dstmacaddr
+    :initarg :dsthwcaddr :type hardware-address :reader dsthwaddr
     :reader dst-address
     :documentation "The mac address of the destination of the packet")
    (dstprotoaddr
@@ -59,10 +59,9 @@
                (eql (type-of (srcprotoaddr h)) (type-of (dstprotoaddr h))))))
 
 (defmethod length-bytes((pdu arp-header))
-  (+ 8 (* 2 (+ (hwaddrsize phu) (+ (protoaddrsize pdu))))))
+  (+ 8 (* 2 (+ (hwaddrsize pdu) (+ (protoaddrsize pdu))))))
 
-
-(defmethod priority((pdu arp-header) 2)
+(defmethod priority((pdu arp-header)) 2)
 
 (defmethod copy((h arp-header))
   (copy-with-slots h '(srchwaddr srcprotoaddr dsthwaddr dstprotoaddr)
@@ -80,12 +79,12 @@
     (format stream " ~D" (if packet (uid packet) 0))))
 
 (defclass arp(protocol)
-  ((protocol-number :type work :initform #x803 :allocation :class
+  ((protocol-number :type word :initform #x803 :allocation :class
                     :reader protocol-number)
    (timeout :initform *default-arp-entry-timeout*
             :initarg :timeout :type time-type :accessor timeout
             :documentation "Timeout for the arp entries")
-   (rxtimeout :initform  *default-arp-rx-timeout :initarg :rxtimeout
+   (rxtimeout :initform  *default-arp-rx-timeout* :initarg :rxtimeout
               :accessor rxtimeout
               :documentation "Timout for retransmitting arp request")
    (cache :initform (make-hash-table) :type hash-table :accessor cache
@@ -95,9 +94,9 @@
 (defmethod default-trace-detail((entity arp))
   '(op srchwaddr srcprotoaddr dsthwaddr dstprotoaddr))
 
-(defmethod send((arp arp) packet layer3 &key address)
-  (let ((entry (or (gethash (dst-address iphdr) (cache arp))
-                   (setf (gethash (dst-address iphdr) (cache arp))
+(defmethod send((arp arp) packet layer3 &key address &allow-other-keys)
+  (let ((entry (or (gethash address (cache arp))
+                   (setf (gethash address (cache arp))
                          (make-arp-entry :state :pending))))
         (link-protocol (layer2:protocol (interface arp))))
     (when (and (eql (arp-entry-state entry) :resolved)
@@ -107,19 +106,19 @@
         (send link-protocol packet layer3 :address
               (arp-entry-hwaddr entry))))
     (when-bind(packet (arp-entry-buffer entry))
-              (send-complete link-protocol packet arp :ne))
-    (send-arp arp entry address))
-    (setf (arp-entry-buffer entry) packet))
+              (send-complete link-protocol packet arp :fail :ne))
+    (send-arp arp entry address)
+    (setf (arp-entry-buffer entry) packet)))
 
 (defun send-arp(arp entry address)
   (let*((interface (interface arp))
         (link-protocol (layer2:protocol interface)))
     (when (eql (arp-entry-state entry) :pending)
-      (cond ((or (> (incf (arp-entry-retries entry)) *max-retries*)
+      (cond ((or (> (incf (arp-entry-retries entry)) *arp-max-retries*)
                  (< (arp-entry-lifetime entry) (simulation-time)))
              ;; give up trying so inform of not sending of buffer packet
              (when-bind(packet (arp-entry-buffer entry))
-                  (send-complete link-protocol packet arp :ne))
+                  (send-complete link-protocol packet arp :fail "NE"))
              (remhash address (cache arp)))
             (t (send link-protocol
                      (make-instance
@@ -135,9 +134,10 @@
                (schedule (rxtimeout arp) (list #'send-arp arp entry address)))))))
 
 (defmethod receive((arp arp) packet layer2 &key &allow-other-keys)
-  (let ((h (pop-pdu packet))
+  (let* ((h (pop-pdu packet))
+         (interface (interface arp))
     ;; update source entry
-    (let ((entry (or (gethash (srcprotoaddr h) (cache arp))
+        (entry (or (gethash (srcprotoaddr h) (cache arp))
                      (setf (gethash (srcprotoaddr h) (cache arp))
                            (make-arp-entry)))))
       (setf (arp-entry-lifetime entry) (+ (timeout arp) (simulation-time))
@@ -146,7 +146,7 @@
             (arp-entry-retries entry) 0)
       (when-bind(packet (arp-entry-buffer entry))
                 (send layer2 packet arp :address
-                      (arp-entry-hwaddr entry))))
+                      (arp-entry-hwaddr entry)))
       (when (eql (op h) :request)
         (if (address= (network-address interface) (dstprotoaddr h))
             (send layer2
@@ -156,11 +156,11 @@
                           'arp-header
                           :op :reply
                           :dsthwaddr (srchwaddr h)
-                          :dstprotoaddr (srcprotoaddr arphdr)
+                          :dstprotoaddr (srcprotoaddr h)
                           :srchwaddr (hardware-address interface)
                           :srcprotoaddr (network-address interface)))
                   arp
                   :address (srchwaddr h))
-            (write-trace node nil :drop nil :packet packet :text "L3-NA"))))))
+            (drop (node arp) packet :text "L3-NA")))))
 
 

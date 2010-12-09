@@ -1,6 +1,5 @@
-;; $Id$
-;; Constant bit rate source application
-;; Copyright (C) 2006 Dr. John A.R. Williams
+;; Constant or average bit rate source application
+;; Copyright (C) 2010 Dr. John A.R. Williams
 
 ;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
 ;; Keywords:
@@ -16,61 +15,64 @@
 
 ;;; Code:
 
-(in-package :application)
+(in-package :protocol.layer5)
 
-(defclass abr-source(cbr-source)
-  ((protocol :type protocol :reader protocol
-             :documentation "layer 4 protocol used by this application")
-   (peer-address :initarg :peer-address :initform nil :type ipaddr
-                 :accessor peer-address
-                 :documentation "IP address of peer to send to")
-   (peer-port  :initarg :peer-port :initform nil
-               :type ipport :accessor peer-port
-               :documentation "Port of peer to send to")
-   (rate  :initarg :rate :initform 500000 :type number :accessor rate
-          :documentation "Average rate at which data is to be generated")
+(defclass abr-source(application event)
+  ((peer-address :type network-address :initarg :peer-address
+                 :accessor peer-address)
+   (peer-port :type ipport :initarg :peer-port
+              :accessor peer-port)
+   (layer4:protocol :type layer4:protocol)
+   (layer4:socket :type layer4:socket
+           :documentaton "Connected socket managing transmissions")
+   (rate  :initarg :rate :initform 500000 :accessor rate
+          :documentation "Rate at which data is generated - may be a
+random variable or an integer")
    (pkt-size  :initarg :pkt-size :initform 512 :type integer :accessor pkt-size
               :documentation "Size of packets"))
-  (:documentation "A constant bit rate source transmitting either at
-rate or as fast as possible if rate is 0"))
+  (:documentation "A constant or average bit rate source transmitting
+either at rate (which may be a random variable or a constant) or as
+fast as possible if rate is 0"))
 
 (defmethod initialize-instance :after
-    ((app cbr-source) &key (protocol 'udp) node &allow-other-keys)
-  (let ((args `(:application ,app :node ,node)))
-    (setf (slot-value app 'protocol)
-          (apply #'make-instance
-                 (if (listp protocol)
-                     (append protocol args) (cons protocol args))))))
+    ((app abr-source) &key (protocol 'layer4:udp) node
+     &allow-other-keys)
+  (let ((protocol (layer4:find-protocol protocol- node)))
+    (unless protocol
+      (error "Unable to find protocol ~A for ~A" protocol-type app))
+    (setf (slot-value app 'layer4:protocol) protocol)))
 
-(defmethod notify((app cbr-source))
+(defmethod sent((app abr-source) n socket)
   "Send a packet on every notification if rate is 0"
-  (when (zerop (rate app))
-    (send (pkt-size app) (protocol app))))
+  (when (and (numberp (rate app)) (zerop (rate app)))
+    (send socket (pkt-size app) app)))
 
-(defmethod handle((app cbr-source))
+(defmethod handle((app abr-source))
   "Send a packet and reschedule"
-  (with-slots(rate protocol pkt-size) app
-       (send pkt-size protocol)
-       (schedule (/ (* pkt-size 8) rate) app)))
+  (with-slots(rate socket pkt-size) app
+    (send socket pkt-size app)
+    (schedule (/ (* pkt-size 8) (random-value rate)) app)))
 
-(defmethod start((app cbr-source))
-  (stop app)
-  (connect (protocol app) (peer-address app) (peer-port app)))
+(defmethod start((app abr-source))
+  (unless (slot-boundp app 'socket)
+    (setf (slot-value app 'socket)
+          (make-instance
+           'socket
+           :protocol (slot-value app 'layer4:protocol)
+           :application app
+           :peer-address (peer-address app)
+           :peer-port (peer-port app)))))
 
-(defmethod connection-complete((app cbr-source) protocol)
-  (cond
-    ((zerop (rate app))
-     (setf (notification protocol) app)
-     (send (pkt-size app) protocol))
-    (t
-     (handle app))))
+(defmethod connection-complete((app abr-source) socket &key failure)
+  (unless failure
+    (with-slots(rate pkt-size) app
+      (if (and (numberp rate) (zerop rate))
+          (send socket pkt-size app)
+          (handle app)))))
 
-(defmethod stop((app cbr-source) &key abort)
-  (declare (ignore abort))
-  (cancel app)
-  (when (eql app (notification (protocol app)))
-    (setf (notification (protocol app)) nil))
-  (close-connection (protocol app)))
+(defmethod stop((app abr-source) &key &allow-other-keys)
+  (close-connection (slot-value app 'layer4:socket))
+  (call-next-method))
 
 
 

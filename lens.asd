@@ -24,7 +24,7 @@
     :maintainer "Dr. John A.R. Williams <J.A.R.Williams@aston.ac.uk>"
     :licence "GPL v3"
     :version "2.0"
-    :long-description "A Network Simulator in LISP inspired by NS2 and GTNetS"
+    :long-description "A Network Simulator in LISP inspired by GTNetS and NS2"
     :depends-on (:split-sequence :trivial-gray-streams :clrs :closer-mop)
     :components
     ((:module "core"
@@ -57,11 +57,28 @@
                (:file "user"
                        :depends-on ("common" "address" "scheduler" "link"
                                              "node"))))
-     (:module "layer1" :depends-on ("core")
-              :components
-              ((:file "p2p")))
      (:module "routing" :depends-on ("core")
               :components
               ((:file "fib")
                (:file "manual" :depends-on ("fib"))
-               (:file "static" :depends-on ("fib"))))))
+               (:file "static" :depends-on ("fib"))))
+     (:module "layer1" :depends-on ("core")
+              :components
+              ((:file "p2p")))
+     (:module "layer2" :depends-on ("core")
+              :components
+              ((:file "arp")
+               (:file "llcsnap")
+               (:file "ieee802.3" :depends-on ("llcsnap"))))
+     #+nil(:module "layer3" :depends-on ("core")
+              :components
+              ((:file "icmp")
+               (:file "ipv4" :depends-on ("icmp"))))
+     #+nil(:module "layer4" :depends-on ("layer3" "core")
+              :components
+              ((:file "udp")
+               (:file "tcp"))
+     #+nil(:module "layer5" :depends-on ("core")
+              :components
+              ((:file "abr-source")
+               (:file "udp-sink"))))))

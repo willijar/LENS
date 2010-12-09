@@ -6,22 +6,8 @@
 
 (in-package :node)
 
-(defstruct location
-  (x 0.0 :type short-float :read-only t)
-  (y 0.0 :type short-float :read-only t)
-  (z 0.0 :type short-float :read-only t))
-
-(defparameter +origin+ (if (boundp '+origin+) +origin+ (make-location)))
-
-(defgeneric distance(a b)
-  (:documentation "Return distance between a and b")
-  (:method((a location) (b location))
-    (let ((dx (- (location-x a) (location-x b)))
-          (dy (- (location-y a) (location-y b)))
-          (dz (- (location-z a) (location-z b))))
-      (sqrt (+ (* dx dx) (* dy dy) (* dz dz)))))
-  (:method(a b)
-    (distance (location a) (location b))))
+(defgeneric interfaces(entity)
+  (:documentation "Return a sequence of all the interfaces on entity"))
 
 (defclass node()
   ((uid :type fixnum :reader uid
@@ -36,9 +22,9 @@
                :initform (make-array 2 :adjustable t :fill-pointer 0)
                :reader interfaces
                :documentation "Vector of interfaces for this node")
-   (layer3:protocols :type list :initform nil
+   (layer3:protocols :type list :initform nil :accessor layer3:protocols
                      :documentation "List of layer 3 protocol entities")
-   (layer4:protocols :type list :initform nil
+   (layer4:protocols :type list :initform nil :accessor layer4:protocols
                      :documentation "List of layer 4 protocol entities")
    (applications :type list :initform nil
                  :documentation "List of applications")
@@ -152,4 +138,4 @@ form the packets are derived from this class."))
     interface))
 
 (defmethod layer3:topology-changed((node node))
-  (layer3:reinitialise-routes (routing node) node))
+  (layer3:reinitialise-routes (layer3:routing node) node))

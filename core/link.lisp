@@ -36,33 +36,21 @@
     (declare (ignore receiver packet sender))))
 
 (defvar *default-bandwidth* 1e6 "Default link bandwidth")
-(defvar *default-delay* 1e-3 "Default link delay")
-(defvar *default-ber* 0 "Default bit error rate on a link")
 
 ;; Generic interface for link
-(defgeneric delay(start end)
- (:documentation "Return the propagation delay in bits/sec between
-two things")
-   (:method(start end)
-    (declare (ignore start end))
-    *default-delay*))
+(defgeneric propagation-speed(link)
+  (:documentation "Return the signal speed on link")
+  (:method(link) (declare (ignore link)) +c+))
 
-(defgeneric bandwidth(interface)
-  (:documentation "Return the bandwidth in bits/sec")
-  (:method(entity) (declare (ignore entity)) *default-bandwidth*))
-
-(defgeneric bit-error-rate(sender receiver)
-  (:documentation "Return the bit error rate for a simple link")
-  (:method(sender receiver)
-    (declare (ignore sender receiver))
-    *default-ber*))
+(defgeneric bandwidth(link)
+  (:documentation "Return the bandwidth of a link in bits/sec"))
 
 (defgeneric link(entity)
   (:documentation "Return the link associated with an entity"))
 
 (defgeneric peer-interfaces(link interface)
-  (:documentation "Return a sequence of all the peer interfaces this link
-connects interface to"))
+  (:documentation "Return the list of interfaces this interface is connected to on link")
+  (:method(link interface) (remove interface (interfaces link))))
 
 (defgeneric default-peer-interface(link)
   (:documentation "Return the default peer (gateway) on a link"))
@@ -77,12 +65,6 @@ connects interface to"))
     :type real :initarg :bandwidth :reader bandwidth
     :initform *default-bandwidth*
     :documentation "Link bandwidth in bits/sec")
-   (delay
-    :type real :initarg :delay :initform *default-delay*
-    :documentation "Link Propagation Delay in sec")
-   (bit-error-rate  :initarg :bit-error-rate
-                    :initform *default-ber*
-                    :documentation "Bit Error Rate for this link")
    (weight :type number :initarg :weight :accessor weight :initform 1
     :documentation "Link weight (for some routing protocols)")
    (bytes-sent :type integer :initform 0 :accessor bytes-sent
@@ -95,10 +77,14 @@ connects interface to"))
     :documentation "Start of utilisation measurement interval"))
   (:documentation "Base Class for simple links"))
 
+(defmethod initialize-instance :after ((link link) &key &allow-other-keys)
+  (dolist(interface (interfaces link))
+    (setf (slot-value interface 'link) link)))
+
 (defmethod send((link link) packet local-interface
                 &key (peer-address (dst-address (peek-pdu packet))))
   (let* ((no-bits (* 8 (length-bytes packet)))
-         (txtime (/ no-bits (bandwidth local-interface))))
+         (txtime (/ no-bits (bandwidth link))))
     ;; schedule packet transmit complete event
     (schedule txtime (list #'send-complete local-interface packet link))
     ;; schedule packet arrival at interface(s)
@@ -128,8 +114,7 @@ connects interface to"))
                                   &key fail &allow-other-keys)
   (declare (ignore interface fail))
   (incf (bytes-sent link) (length-bytes packet))
-  (incf (packets-sent link))
-  (setf (slot-value link 'busy-p) nil))
+  (incf (packets-sent link)))
 
 (defmethod print-object((link link) stream)
   (print-unreadable-object (link stream :type t :identity t)
@@ -142,8 +127,7 @@ connects interface to"))
 (defmethod reset((link link))
   (setf (utilisation-start link) (simulation-time)
         (packets-sent link) 0
-        (bytes-sent link) 0)
-  (setf (slot-value link 'busy-p) nil))
+        (bytes-sent link) 0))
 
 (defvar *default-link* '(point-to-point)
   "List of default arguments for make-instance to make a default link")

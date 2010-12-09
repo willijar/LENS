@@ -31,9 +31,15 @@
   (:method(entity (stream stream))
     (when (open-stream-p stream) (call-next-method))))
 
+(defgeneric default-trace-detail(entity)
+  (:documentation "List of detail for tracing an entity")
+  (:method(entity) (declare (ignore entity)) nil))
+
 (defgeneric trace-detail(entity stream)
   (:documentation "Return the trace detail for given entity on stream. t means all")
-  (:method(entity stream) (declare (ignore entity stream)) t))
+  (:method(entity stream)
+    (declare (ignore stream))
+    (default-trace-detail entity)))
 
 ;; specific trace stream implementation of interface
 

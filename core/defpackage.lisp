@@ -20,7 +20,7 @@
 (defpackage :common
   (:documentation "Some common declarations and interfaces for LENS")
   (:use :cl)
-  (:export #:+c+ #:start #:stop #:reset #:busy-p #:*reset-hooks*
+  (:export #:start #:stop #:reset #:busy-p #:*reset-hooks*
            #:while #:until #:filter #:defenumeration
            #:when-bind #:when-bind*
            #:uid #:counter #:name #:node
@@ -29,7 +29,8 @@
            #:copy #:copy-with-slots
            #:notifier #:add-notify #:do-notifications
            #:up-p #:mkup #:mkdown
-           #:lens-error))
+           #:lens-error
+           #:make-location #:location #:distance #:+c+ #:+origin+))
 
 (defpackage :scheduler
   (:documentation "LENS Discrete Event Scheduler")
@@ -63,15 +64,15 @@
    (:import-from :scheduler #:simulation-time #:time-type)
    (:export #:trace-status #:trace-detail #:trace-stream #:time-format
             #:*lens-trace-output* #:trace #:write-pdu-slots #:pdu-trace
-            #:write-trace))
+            #:write-trace #:default-trace-detail))
 
 (defpackage :protocol
   (:documentation "Protocol stack layer implementations")
   (:use :cl #:common #:trace)
   (:import-from :packet #:pdu #:layer #:length-bytes #:peek-pdu)
-  (:import-from :trace #:write-trace)
   (:export #:protocol-number #:protocol #:layer #:pdu #:length-bytes
-           #:send #:receive #:drop))
+           #:send #:receive #:drop
+           #:pdu-trace #:write-pdu-slots #:default-trace-detail))
 
 (defpackage :address
   (:documentation "network and hardware addressing")
@@ -93,20 +94,19 @@
            #:add-interface #:find-interface  #:neighbours
            #:receive-packet
            #:lookup-by-port #:bound-protocols #:applications
-           #:make-location #:location #:distance
            #:callbacks #:make-callback #:add-callback #:call-callbacks))
 
 (defpackage :layer1
   (:documentation "Physical layer implementation")
   (:nicknames :physical)
   (:use :cl :common :address)
-  (:import-from :node #:node)
+  (:import-from :node #:node #:interfaces)
   (:import-from :alg  #:make-queue
                 #:enqueue #:dequeue #:list-queue #:traverse #:empty-p)
   (:import-from :packet #:packet #:length-bytes #:priority #:peek-pdu)
   (:import-from :scheduler #:time-type #:simulation-time #:schedule)
   (:import-from :protocol #:send #:receive #:drop)
-  (:export #:interface #:link #:packet-queue
+  (:export #:interface #:interfaces :link #:packet-queue
            #:enqueu #:dequeue #:dequeue-if #:empty-p
            #:delete-packets-if #:drop-packet-p #:buffer-available-p
            #:average-queue-length #:reset-average-queue-length
@@ -115,7 +115,7 @@
            #:interface #:peer-interfaces #:default-peer-interface
            #:receive-own-broadcast-p #:utilisation #:network-to-hardware-address
            #:*default-bandwidth* #:*default-delay* #:*default-ber*
-           #:delay #:bandwidth #:bit-error-rate
+           #:delay #:bandwidth #:bit-error-rate #:propagation-speed
            #:drop-tail #:priority-queue
            #:point-to-point #:simplex-p #:unidirectional-p))
 
@@ -124,24 +124,31 @@
    (:nicknames :layer2 :layer.link)
    (:use :cl :address :common :protocol)
    (:shadow #:protocol #:pdu)
+   (:import-from :packet #:packet #:pop-pdu #:push-pdu)
+   (:import-from :scheduler #:schedule #:event #:simulation-time #:time-type)
+   (:import-from :trace #:write-trace)
    (:import-from :node #:node)
-   (:export #:protocol #:pdu #:IEEE802.3 #:llcsnap #:snap-ethtype #:ieee802.11 #:arp))
+   (:import-from :layer1 #:packet-queue #:enqueue #:dequeue #:empty-p
+                 #:send-complete)
+   (:export #:protocol #:pdu
+            #:IEEE802.3 #:llcsnap #:snap-ethtype #:ieee802.11 #:arp))
 
  (defpackage :protocol.layer3
    (:documentation "Network Layer protocol interface")
    (:nicknames :layer3 :layer.network)
    (:use :cl :common :address :protocol)
    (:shadow #:protocol #:pdu)
+   (:import-from :packet #:push-pdu #:pop-pdu #:peek-pdu)
    (:import-from :alg #:+infinity+ #:dijkstra #:extract-route
                  #:extract-first-hops)
    (:import-from :node #:node #:nodes #:ipaddrs #:neighbours #:find-interface)
    (:import-from :layer1 #:interface)
-   (:export #:register-protocol #:protocols #:find-protocol #:delete-protocol
+   (:export #:protocol #:pdu
+            #:register-protocol #:protocols #:find-protocol #:delete-protocol
             #:routing #:getroute #:remroute
             #:initialise-routes #:reinitialise-routes #:default-route
             #:*default-routing* #:topology-changed
             #:routing-manual #:routing-static
-            #:protocol #:pdu
             ;; some specific default layer 3 protocols
             #:ipv4))
 
@@ -150,17 +157,15 @@
   (:nicknames :layer4 :layer.transport)
   (:use :cl :common :address :protocol)
   (:shadow #:protocol #:pdu)
-  (:import-from :packet #:packet #:pop-pdu)
+  (:import-from :packet #:packet #:pop-pdu #:push-pdu)
   (:import-from :alg #:enqueue #:dequeue #:make-queue #:empty-p)
-  (:export #:register-protocol #:protocols #:find-protocol #:delete-protocol
-            #:peer-address #:peer-port #:local-port #:local-address
-            #:bind #:unbind #:connect #:connection-complete
-            #:close-connection #:connected-p
-            #:send #:receive #:sent
-            #:fid
-           ;; #:notification #:request-notification #:cancel-notification
-           ;; #:ttl #:fid #:tos #:interface
-           ;; #:send  #:make-packet
+  (:export #:protocol #:pdu
+           #:register-protocol #:protocols #:find-protocol #:delete-protocol
+           #:peer-address #:peer-port #:local-port #:local-address
+           #:bind #:unbind #:connect #:connection-complete
+           #:close-connection #:connected-p
+           #:send #:receive #:sent
+           #:fid
            ;; specific default layer 4 protocols
            #:udp #:tcp #:icmp #:demux #:tcp-tahoe #:tcp-reno #:tcp-newreno))
 
@@ -173,7 +178,7 @@
            #:copy-from-offset #:size-from-seq #:copy-from-seq
            #:add-data #:remove-data #:protocol #:pdu
            #:application
-           #:cbr-source #:udp-sink))
+           #:abr-source #:udp-sink))
 
 (defpackage :lens-user
    (:documentation "LENS User interface")
@@ -187,7 +192,7 @@
    (:import-from :packet #:length-bytes #:created #:fid #:pdus)
    (:import-from #:protocol #:protocol-number #:layer)
    (:import-from :node
-                 #:node #:nodes #:clear-nodes #:location #:distance
+                 #:node #:nodes #:clear-nodes
                  #:interfaces #:applications #:add-interface
                  #:make-callback #:add-callback)
    (:import-from :layer1
@@ -206,5 +211,5 @@
                  #:topology-changed)
    (:import-from :protocol.layer4
                  #:udp #:tcp #:icmp  #:tcp-tahoe #:tcp-reno #:tcp-newreno)
-   (:import-from :protocol.layer5 #:cbr-source #:udp-sink))
+   (:import-from :protocol.layer5 #:abr-source #:udp-sink))
 

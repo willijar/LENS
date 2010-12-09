@@ -18,7 +18,13 @@
 (in-package :layer1)
 
 (defclass point-to-point(link)
-  ((simplex-p :type boolean :initarg :simplex :initform nil :reader simplex-p
+  ((delay
+    :type real :initarg :delay :initform *default-delay*
+    :documentation "Link Propagation Delay in sec")
+   (bit-error-rate  :initarg :bit-error-rate
+                    :initform *default-ber*
+                    :documentation "Bit Error Rate for this link")
+   (simplex-p :type boolean :initarg :simplex :initform nil :reader simplex-p
               :documentation "If true this is a simplex link")
    (unidirectional-p :type boolean :initarg :unidirectional :initform nil
                      :reader unidirectional-p
@@ -31,18 +37,9 @@
     :initarg :peer-interface :reader peer-interface
     :reader default-peer-interface
     :documentation "The remote (receiving) interface on this link"))
-  (:documentation "A serial point to point link"))
+  (:documentation "A serial point to point link."))
 
-(defmethod initialize-instance :after ((link point-to-point)
-                                       &key interfaces &allow-other-keys)
-  (when interfaces
-    (assert (= 2 (length interfaces))
-            (interfaces)
-            "Point-to-point link only has two interfaces")
-    (setf (slot-value link 'local-interface) (first interfaces)
-          (slot-value link 'peer-interface) (second interfaces))))
-
-(defmethod send :before ((link point-to-point) packet (interface interface)
+(defmethod send :before ((link point-to-point) packet interface
                          &key &allow-other-keys)
   (when (and (unidirectional-p link)
              (not (eql interface (local-interface link))))
@@ -52,8 +49,40 @@
              (slot-value peer-interface 'tx-packet))
     (error "Attempt to send a packet in both directions over a simplex link")))
 
+(defmethod busy-p((link point-to-point))
+  ;; Note this ignores propagation delay between peers for a simplex link
+  (let ((l (slot-value local-interface 'tx-packet))
+        (p (slot-value peer-interface 'tx-packet)))
+    (cond((unidirectional-p link)  l)
+         ((simplex-p link) (or l p)))))
+
+(defmethod interfaces((link point-to-point))
+  (list (local-interface link) (peer-interface link)))
+
 (defmethod peer-interfaces((link point-to-point) interface)
   (if (eql interface (local-interface link))
       (list (peer-interface link))
       (unless (unidirectional-p link)
         (list (local-interface link)))))
+
+(defun point-to-point(a b &key
+                      (delay *default-delay*)
+                      (bandwidth *default-bandwidth)
+                      (bit-error-rate *default-ber*)
+                      simplex
+                      unidirectional)
+  (make-instance
+   'point-to-point
+   :delay delay
+   :bandwidth bandwidth
+   :bit-error-rate  bit-error-rate
+   :simplex simplex
+   :unidirectional unidirectional
+   :local-interface (make-instance
+                     'interface
+                     :node a
+                     :protocol (make-instance 'layer2:llcsnap :node a))
+   :peer-interface (make-instance
+                    'interface
+                    :node b
+                    :protocol (make-instance 'layer2:llcsnap :node b))))
