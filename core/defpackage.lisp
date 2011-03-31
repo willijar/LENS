@@ -107,6 +107,7 @@
   (:import-from :scheduler #:time-type #:simulation-time #:schedule)
   (:import-from :protocol #:send #:receive #:drop)
   (:export #:interface #:interfaces :link #:packet-queue
+           #:send-complete
            #:enqueu #:dequeue #:dequeue-if #:empty-p
            #:delete-packets-if #:drop-packet-p #:buffer-available-p
            #:average-queue-length #:reset-average-queue-length
@@ -125,7 +126,7 @@
    (:use :cl :address :common :protocol)
    (:shadow #:protocol #:pdu)
    (:import-from :packet #:packet #:pop-pdu #:push-pdu)
-   (:import-from :scheduler #:schedule #:event #:simulation-time #:time-type)
+   (:import-from :scheduler #:schedule #:simulation-time #:time-type)
    (:import-from :trace #:write-trace)
    (:import-from :node #:node)
    (:import-from :layer1 #:packet-queue #:enqueue #:dequeue #:empty-p
@@ -141,7 +142,8 @@
    (:import-from :packet #:push-pdu #:pop-pdu #:peek-pdu)
    (:import-from :alg #:+infinity+ #:dijkstra #:extract-route
                  #:extract-first-hops)
-   (:import-from :node #:node #:nodes #:ipaddrs #:neighbours #:find-interface)
+   (:import-from :node #:node #:nodes #:ipaddrs #:neighbours #:interfaces
+                 #:find-interface)
    (:import-from :layer1 #:interface)
    (:export #:protocol #:pdu
             #:register-protocol #:protocols #:find-protocol #:delete-protocol
@@ -159,6 +161,7 @@
   (:shadow #:protocol #:pdu)
   (:import-from :packet #:packet #:pop-pdu #:push-pdu)
   (:import-from :alg #:enqueue #:dequeue #:make-queue #:empty-p)
+  (:import-from :node #:node #:interfaces #:find-interface)
   (:export #:protocol #:pdu
            #:register-protocol #:protocols #:find-protocol #:delete-protocol
            #:peer-address #:peer-port #:local-port #:local-address

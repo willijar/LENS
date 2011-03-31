@@ -9,6 +9,11 @@
 (defgeneric interfaces(entity)
   (:documentation "Return a sequence of all the interfaces on entity"))
 
+(defgeneric find-interface(attribute node)
+  (:documentation "Find a local interface by attribute")
+  (:method((test function) (node node))
+    (find-if test (interfaces node))))
+
 (defclass node()
   ((uid :type fixnum :reader uid
         :documentation "Unique id of this node - also index in nodes array")

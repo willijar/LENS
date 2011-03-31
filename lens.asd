@@ -70,7 +70,7 @@
               ((:file "arp")
                (:file "llcsnap")
                (:file "ieee802.3" :depends-on ("llcsnap"))))
-     #+nil(:module "layer3" :depends-on ("core")
+     (:module "layer3" :depends-on ("core")
               :components
               ((:file "icmp")
                (:file "ipv4" :depends-on ("icmp"))))

@@ -19,6 +19,7 @@
 (in-package :protocol.layer3)
 
 (defparameter *default-ipv4-ttl* 64)
+(defparameter *icmp-enabled-default* nil)
 
 (defclass ipv4-header-option(pdu)
   ((option-number :type octet :initarg :option-number :reader option-number))
@@ -39,15 +40,14 @@
    (fragment-offset :initform 0 :type word)
    (ttl :initform *default-ipv4-ttl* :type octet :initarg :ttl :accessor ttl
         :documentation "Default ttl")
-   (layer4:protocol-number
+   (protocol-number
     :initform #x0800 :type octet :initarg :protocol-number
-    :reader layer4:protocol-number
-    :documentation "Layer 4 protocol number")
+    :reader protocol-number
+    :documentation "Protocol number for transport layer")
    (header-checksum :initform 0 :type word)
    (src-address :type ipaddr :accessor src-address :initarg :src-address)
    (dst-address :type ipaddr :accessor dst-address :initarg :dst-address)
-   (options :type list :accessor options
-            :initform nil))
+   (options :type list :accessor options :initform nil))
   (:documentation "The IP version 4 header"))
 
 (defmethod length-bytes((pdu ipv4-header))
@@ -81,20 +81,18 @@
    (version :initform 4 :reader version :allocation :class)
    (route-locally :type boolean :initform nil :accessor route-locally
                   :documentation "Allows transport layer protocols on the same
-node to communicate with each other."))
+node to communicate with each other.")
+   (icmp-enabled :initform *icmp-enabled-default* :initarg :icmp-enabled
+                 :reader icmp-enabled-p))
   (:documentation "IP v4 implementation"))
 
-;; singleton instance accessed through function of same name
+(register-protocol 'ipv4 #x0800)
+
 
 (defmethod default-trace-detail((entity ipv4-header))
-  '(ttl layer4:protocol-number src-address dst-address))
+  '(ttl protocol-number src-address dst-address))
 
-(defun find-local-interface(network-address node)
-  "Find the local interface by network address"
-  (find network-address (interfaces node) :key #'network-address :test #'address=))
-
-(defmethod send((ipv4 ipv4) packet layer4
-                        &rest args
+(defmethod send((ipv4 ipv4) packet sender
                 &key
                 (src-address (network-address (node ipv4)))
                 (dst-address :broadcast)
@@ -102,32 +100,42 @@ node to communicate with each other."))
                  (tos 0)
                 &allow-other-keys)
   (let ((iphdr (make-instance 'ipv4-header
-                              :src-address src-address node
+                              :src-address src-address
                               :dst-address dst-address
                               :ttl ttl
-                              :protocol-number (protocol-number layer4)
+                              :protocol-number (protocol-number sender)
                               :service-type tos))
         (node (node ipv4)))
     (push-pdu iphdr packet)
-    (setf (total-length iphdr) (size packet))
+    (setf (total-length iphdr) (length-bytes packet))
   (cond
     ((broadcast-p dst-address) ;; broadcast address
-     (do(interface (interfaces node))
-        (when (up-p interface)
-          (send interface (copy packet) ipv4 :address :broadcast))))
+     ;; if src-address is broadcast then all interfaces
+     ;; else only interface(s) with given network address
+     (pop-pdu iphdr)
+     (map 'nil
+          #'(lambda(interface)
+              (when (and (up-p interface)
+                   (or (broadcast-p src-address)
+                       (address= (network-address interface) src-address)))
+          (let ((iphdr (copy iphdr))
+                (packet (copy packet)))
+            (when (broadcast-p src-address)
+              (setf (src-address iphdr)  (network-address interface)))
+            (push-pdu iphdr packet)
+            (send interface packet ipv4 :address :broadcast))))
+          (interfaces node)))
     ((and (route-locally ipv4)
-          (let ((interface (find-local-interface dst-address node)))
+          (let ((interface (find-interface dst-address node)))
             (when interface
               ;; route locally - send back up stack
               (receive ipv4 packet interface)
               t))))
-    (t ;; send packet over interface
-     (let ((routing-entry
-            (getroute dst-address (routing (node ipv4))) :packet packet))
-       (send (vertex-start routing-entry)
-             packet
-             ipv4
-             :address (network-address (vertex-end routing-entry))))))))
+    (t ;; forward packet over interface
+     (let ((route
+            (getroute dst-address (routing node) :packet packet)))
+       (when route
+         (send (interface route) packet ipv4 :address (dst-address route))))))))
 
 (defgeneric process-ip-option(option interface packet)
   (:documentation "Process an ip option")
@@ -144,90 +152,58 @@ node to communicate with each other."))
         (process-ip-option option interface packet))
       (cond
         ((or (eql dst-address (network-address node))
-             (find-local-interface dst-adress node)
+             (find-interface dst-address node)
              (broadcast-p dst-address))
          ;; destined for this node
-         (receive (layer4:find-protocol (layer4:protocol-number iphdr) node)
-                  packet
-                  ipv4))
+         (let ((proto (protocol-number iphdr)))
+           (if (= proto (protocol-number 'icmp))
+               (icmp-receive ipv4 packet iphdr)
+               (let ((protocol (layer4:find-protocol proto node)))
+                 (if protocol
+                     (receive protocol packet ipv4)
+                     (progn
+                       (drop ipv4 packet :text "L3-NP")
+                       (destination-unreachable ipv4
+                                       iphdr
+                                        (pop-pdu packet)
+                                       :code 'protocol-unreachable)))))))
         ((zerop (decf (ttl iphdr)))
          ;; TTL expired - drop, log and notify ICMP
          (drop ipv4 packet :text "L3-TTL")
-         (icmp:time-exceeded node packet iphdr :ttl-exceeded))
-        ((not (interface route))
-         ;; can't route so drop it
-         (write-trace node ipv4 :drop nil :packet packet :text "L3-NR")
-         (icmp:destination-unreachable
-          node packet iphdr (peek-pdu packet 1)
-          :host-unreachable))
-        ((eql (interface route) interface)
-         ;; routing loop - log dropped packet
-         (write-trace node ipv4 :drop nil :packet packet :text "L3-RL"))
+         (time-exceeded ipv4 iphdr :code 'ttl-exceeded))
         (t
-         (let   ((route (find-route dst-address node packet))))
-          ;; forward to next hop
-          (write-trace node ipv4 iphdr nil :packet packet :text "-")
-          (interface:send
-           (interface route) packet (routing:next-hop route)
-            (protocol-number ipv4)))))))
+         (let ((route (getroute dst-address node :packet packet)))
+           (cond
+             ((not route) ;; can't route so drop it
+              (drop ipv4 packet :text "L3-NR")
+              (destination-unreachable ipv4
+                                       iphdr (pop-pdu packet)
+                                       :code 'host-unreachable))
+             ((eql (interface route) interface) ;; routing loop - drop packet
+              (drop ipv4 packet :text "L3-RL"))
+             (t ;; forward to next hop
+              (send (interface route) packet ipv4
+                    :address (dst-address route)))))))))
 
-(defun broadcast(ipv4 node packet
-                 &key src-address dst-address (ttl 64)
-                 protocol-number (tos 0))
-  "IPV4 broadcast.
-First Common processing (before looping on all interfaces)
-For broadcasts, the \"src\" argument is used to determine
-which interfaces the packet is broadcast to.  If it is nil
-or broadcast-p then it is sent on all interfaces.  If not,
-it is sent only on the interface with an IP address matching
-the specified src address."
-     (let ((iphdr (make-instance
-                   'ipv4-header
-                   :src-address  (ipaddr node)
-                   :dst-address dst-address
-                   :ttl ttl
-                   :protocol protocol-number
-                   :service-type tos))
-           (broadcast-p (or (not src-address) (broadcast-p src-address))))
-       (push-pdu iphdr packet)
-       (setf (total-length iphdr) (size packet))
-       (loop :for iface :across (node:interfaces node)
-             :when (and (interface:link iface)
-                        (or broadcast-p (address= (ipaddr iface) src-address)))
-             :do
-             (setf (src-address iphdr)
-                   (if broadcast-p
-                       (or (ipaddr iface) (ipaddr node))
-                       src-address))
-             (let ((p (copy packet)))
-               (write-trace node (ipv4) iphdr nil :packet p :text "-")
-               (interface:send iface p (macaddr :broadcast)
-                                    (protocol-number ipv4))))))
 
-(defmethod find-interface((ipv4 ipv4) (node node) (addr ipaddr))
-  (interface (find-route addr node nil)))
 
-(defclass ipv4-demux(layer4:demux)
-  ()
-  (:documentation "Base class for TCP or UDP demux"))
-
-(defmethod layer4:receive((demux ipv4-demux)
-                                  node packet dst-address
-                                  interface)
-  (when (node:call-callbacks
-           (layer demux) (layer4:protocol-number demux)
-           :rx packet node interface)
-    (let* ((pdu (peek-pdu packet))
-           (layer4protocol
-            (node:lookup-by-port (layer4:protocol-number pdu) node
-                                 :local-port (dst-port pdu))))
-      (cond
-        (layer4protocol
-         (layer4:receive
-          layer4protocol node packet dst-address interface))
-        (t ; no port - log and discard
-         (write-trace node (ipv4)
-                      :drop nil :packet packet :text "L3-NP")
-         (icmp:destination-unreachable node packet
-                                       (peek-pdu packet -1)
-                                       pdu :port-unreachable))))))
+;; (defmethod layer4:receive((demux ipv4-demux)
+;;                                   node packet dst-address
+;;                                   interface)
+;;   (when (node:call-callbacks
+;;            (layer demux) (protocol-number demux)
+;;            :rx packet node interface)
+;;     (let* ((pdu (peek-pdu packet))
+;;            (layer4protocol
+;;             (node:lookup-by-port (protocol-number pdu) node
+;;                                  :local-port (dst-port pdu))))
+;;       (cond
+;;         (layer4protocol
+;;          (layer4:receive
+;;           layer4protocol node packet dst-address interface))
+;;         (t ; no port - log and discard
+;;          (write-trace node (ipv4)
+;;                       :drop nil :packet packet :text "L3-NP")
+;;          (destination-unreachable node packet
+;;                                        (peek-pdu packet -1)
+;;                                        pdu :port-unreachable))))))

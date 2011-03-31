@@ -28,9 +28,9 @@
         :initform (incf *packet-count*)
         :reader uid
         :documentation "Unique id of the packet")
-   (fid :type counter :initarg :fid :documentation "FLow id useful for tracing"
+   (fid :type counter :initarg :fid :documentation "Flow id useful for tracing"
         :reader fid)
-   (pdus :type vector :initform (make-array 4 :adjustable t :fill-pointer 0)
+   (pdus :type vector :initform (make-array 5 :adjustable t :fill-pointer 0)
          :reader pdus)
    (created :type time-type :initform (simulation-time) :reader created
             :initarg :created :documentation "Time the packet was created")
@@ -56,11 +56,12 @@ protocol data units (PDUs)."))
   (reduce #'+ (pdus p) :key #'length-bytes))
 
 (defmethod copy((packet packet))
+  ;; note this does not copy the pdu's for efficiency reasons.
   (let ((copy (copy-with-slots packet '(uid created routing))))
     (let ((pdus (make-array (length (pdus packet))
                             :adjustable t :fill-pointer 0)))
       (setf (slot-value copy 'pdus) pdus)
-      (map nil #'(lambda(pdu) (vector-push-extend (copy pdu) pdus))
+      (map nil #'(lambda(pdu) (vector-push-extend pdu pdus))
            (pdus packet)))
     copy))
 

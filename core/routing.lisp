@@ -14,6 +14,11 @@
   (and (eql (vertex-start a) (vertex-start b))
        (eql (vertex-end a) (vertex-end b))))
 
+(defmethod interface((vertex vertex))
+  (vertex-start vertex))
+(defmethod dst-address((vertex vertex))
+  (network-address (vertex-end vertex)))
+
 (defclass routing()
   ((node :type node :initarg :node :reader node
          :documentation "Node to which routing object is attached")
