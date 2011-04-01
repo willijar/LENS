@@ -79,7 +79,7 @@
   (:use :cl)
   (:import-from :split-sequence #:split-sequence)
   (:import-from :protocol #:length-bytes #:protocol-number)
-  (:export  #:hardware-address #:network-address
+  (:export  #:hardware-address #:network-address #:network-mask
             #:address= #:subnet #:address-bytes #:make-address-mask
             #:broadcast-p #:macaddr #:ipaddr #:ipport
             #:*print-ip-format* #:print-ip-format

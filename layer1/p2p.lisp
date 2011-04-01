@@ -45,14 +45,14 @@
              (not (eql interface (local-interface link))))
     (error "Attempt to send packet the wrong way along a unidirectional link"))
   (when (and (simplex-p link)
-             (slot-value local-interface 'tx-packet)
-             (slot-value peer-interface 'tx-packet))
+             (slot-value (local-interface link) 'tx-packet)
+             (slot-value (peer-interface link) 'tx-packet))
     (error "Attempt to send a packet in both directions over a simplex link")))
 
 (defmethod busy-p((link point-to-point))
   ;; Note this ignores propagation delay between peers for a simplex link
-  (let ((l (slot-value local-interface 'tx-packet))
-        (p (slot-value peer-interface 'tx-packet)))
+  (let ((l (slot-value (local-interface link) 'tx-packet))
+        (p (slot-value (peer-interface link) 'tx-packet)))
     (cond((unidirectional-p link)  l)
          ((simplex-p link) (or l p)))))
 
@@ -67,7 +67,7 @@
 
 (defun point-to-point(a b &key
                       (delay *default-delay*)
-                      (bandwidth *default-bandwidth)
+                      (bandwidth *default-bandwidth*)
                       (bit-error-rate *default-ber*)
                       simplex
                       unidirectional)

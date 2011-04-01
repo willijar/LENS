@@ -47,9 +47,11 @@
                   :reader address-bytes))
   (:documentation "Generic class for addresses"))
 
-
 (declaim (inline subnet))
-(defun subnet(addr mask) (logand mask (slot-value addr 'address-bytes)))
+(defun subnet(addr mask)
+  (if mask
+      (logand mask (slot-value addr 'address-bytes))
+      (slot-value addr 'address-bytes)))
 
 (defmethod address=((a address) (b address) &optional mask)
   (or (eql a b)
@@ -194,6 +196,9 @@ addresses is defined.")
       (dotimes(x q)
         (setf v (dpb  #xFF (byte 8 (- address-length (* 8 x))) v))))
     v))
+
+(defmethod network-mask(entity)
+  (make-address-mask entity))
 
 (defun ipaddr-allocator(&optional
                         (start (ipaddr "192.168.0.0"))

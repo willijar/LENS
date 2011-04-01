@@ -62,6 +62,8 @@
               ((:file "fib")
                (:file "manual" :depends-on ("fib"))
                (:file "static" :depends-on ("fib"))))
+     (:module "nodes" :depends-on ("core")
+              :components ((:file "node")))
      (:module "layer1" :depends-on ("core")
               :components
               ((:file "p2p")))

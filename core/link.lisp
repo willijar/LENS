@@ -49,8 +49,8 @@
   (:documentation "Return the link associated with an entity"))
 
 (defgeneric peer-interfaces(link interface)
-  (:documentation "Return the list of interfaces this interface is connected to on link")
-  (:method(link interface) (remove interface (interfaces link))))
+  (:documentation "Return the list of interfaces this interface is
+  connected to on link"))
 
 (defgeneric default-peer-interface(link)
   (:documentation "Return the default peer (gateway) on a link"))

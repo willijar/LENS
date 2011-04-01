@@ -210,12 +210,15 @@ interface is busy. Requires address"
 (defgeneric network-to-hardware-address(network-address interface)
   (:documentation "map a network address to hardware  on a link")
   (:method ((addr network-address) (interface interface))
-    (when-bind(peer-interface (find addr (peer-interfaces (link interface) interface)
+    (when-bind(peer-interface (find addr (peer-interfaces interface)
                                     :key #'network-address))
       (hardware-address peer-interface))))
 
 (defmethod default-peer-interface((interface interface))
   (default-peer-interface (link interface)))
+
+(defmethod peer-interfaces(link (interface interface))
+  (remove interface (interfaces link)))
 
 ;; (defun call-notification(interface resched)
 ;;   "Notify next non-nil entry in notification list"

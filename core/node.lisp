@@ -11,7 +11,7 @@
 
 (defgeneric find-interface(attribute node)
   (:documentation "Find a local interface by attribute")
-  (:method((test function) (node node))
+  (:method((test function) node)
     (find-if test (interfaces node))))
 
 (defclass node()
@@ -73,7 +73,6 @@ form the packets are derived from this class."))
   (when (slot-value node 'up-p)
     (setf (slot-value node 'up-p) nil)
     (when inform-routing (layer3:topology-changed node))))
-
 
 (defgeneric node(entity)
   (:documentation "Return a node associated with entity")
@@ -144,3 +143,4 @@ form the packets are derived from this class."))
 
 (defmethod layer3:topology-changed((node node))
   (layer3:reinitialise-routes (layer3:routing node) node))
+
