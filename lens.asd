@@ -76,11 +76,11 @@
               :components
               ((:file "icmp")
                (:file "ipv4" :depends-on ("icmp"))))
-     #+nil(:module "layer4" :depends-on ("layer3" "core")
+     (:module "layer4" :depends-on ("layer3" "core")
               :components
-              ((:file "udp")
-               (:file "tcp"))
+              ((:file "udp"))
+               #+nil(:file "tcp"))
      #+nil(:module "layer5" :depends-on ("core")
               :components
               ((:file "abr-source")
-               (:file "udp-sink"))))))
+               (:file "udp-sink")))))

@@ -32,7 +32,8 @@
 
 (defclass ipv4-header(pdu)
   ((version :initarg :version :initform 4 :type octet :reader version)
-   (service-type :initform 0 :type octet :reader servive-type :reader priority
+   (service-type :initform 0 :type octet :reader servive-type
+                 :reader packet:priority
                  :initarg :service-type)
    (total-length :initform 0 :type word :accessor total-length)
    (identification :initform 0 :type word)
@@ -87,7 +88,6 @@ node to communicate with each other.")
   (:documentation "IP v4 implementation"))
 
 (register-protocol 'ipv4 #x0800)
-
 
 (defmethod default-trace-detail((entity ipv4-header))
   '(ttl protocol-number src-address dst-address))

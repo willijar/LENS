@@ -143,7 +143,7 @@ protocols")
            :initial-value  +min-ephemeral-port+)))
 
 (defclass pdu(packet:pdu)
-  ((layer :initform 4 :reader protocol:layer :allocation :class))
+  ((layer :initform 4 :reader layer :allocation :class))
   (:documentation "The base class for all layer four protocol data units"))
 
 (defvar *standard-protocols* nil "List of standard registered layer 4
@@ -189,7 +189,7 @@ protocols")
       (when protocol
         (delete-protocol protocol entity)))))
 
-(defclass socket()
+(defclass socket(protocol)
   ((local-address :type network-address :reader local-address
                   :documentation "local address used by this socket")
    (local-port :type ipport :accessor local-port
@@ -197,10 +197,8 @@ protocols")
    (layer5:application :initarg :application :initform nil
                        :reader layer5:application
                        :documentation "Local application object")
-   (protocol :type protocol :initarg :protocol :reader protocol
-             :documentation "layer 4 protocol used by this flow")
    (peer-address :initform nil :type network-address
-                 :reader peer-address
+                 :accessor peer-address
                  :documentation "network address of peer")
    (peer-port  :type ipport :accessor peer-port
                :documentation "Service access port of peer")
@@ -211,6 +209,10 @@ protocols")
    (tos :accessor tos :initarg :tos :initform 0 :type octet
         :documentation "Layer 3 type of service"))
   (:documentation "Base class for all layer 4 protocols states"))
+
+(defmethod find-interface((peer-address network-address) (socket socket))
+  (let ((r (layer3::getroute peer-address (node socket))))
+    (when r (interface r))))
 
 (defmethod initialize-instance :after
     ((socket socket) &key

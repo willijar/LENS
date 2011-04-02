@@ -27,7 +27,8 @@
            #:octet #:word #:counter #:seq #:fid
            #:interface #:link #:node #:application
            #:copy #:copy-with-slots
-           #:notifier #:add-notify #:do-notifications
+           #:notifier #:add-notification #:delete-notifications
+           #:do-notifications
            #:up-p #:mkup #:mkdown
            #:lens-error
            #:make-location #:location #:distance #:+c+ #:+origin+))
@@ -159,7 +160,7 @@
   (:nicknames :layer4 :layer.transport)
   (:use :cl :common :address :protocol)
   (:shadow #:protocol #:pdu)
-  (:import-from :packet #:packet #:pop-pdu #:push-pdu)
+  (:import-from :packet #:packet #:pop-pdu #:push-pdu #:peek-pdu)
   (:import-from :alg #:enqueue #:dequeue #:make-queue #:empty-p)
   (:import-from :node #:node #:interfaces #:find-interface)
   (:export #:protocol #:pdu

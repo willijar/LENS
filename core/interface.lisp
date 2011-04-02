@@ -98,6 +98,9 @@ two things")
               (hardware-address interface)
               (network-mask interface) (logcount (network-mask interface))))))
 
+(defmethod buffer-available-p(size (interface interface))
+  (buffer-available-p size (packet-queue interface)))
+
 (defmethod bandwidth((interface interface))
   (bandwidth (link interface)))
 
@@ -210,8 +213,9 @@ interface is busy. Requires address"
 (defgeneric network-to-hardware-address(network-address interface)
   (:documentation "map a network address to hardware  on a link")
   (:method ((addr network-address) (interface interface))
-    (when-bind(peer-interface (find addr (peer-interfaces interface)
-                                    :key #'network-address))
+    (when-bind(peer-interface
+               (find addr (peer-interfaces (link interface) interface)
+                     :key #'network-address))
       (hardware-address peer-interface))))
 
 (defmethod default-peer-interface((interface interface))
