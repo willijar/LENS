@@ -41,13 +41,16 @@
   (:import-from :closer-mop #:slot-definition-name #:slot-definition-type
                 #:class-direct-slots)
   (:export #:scheduler #:schedule #:simulation-time #:time-type
-           #:status #:with-timers #:timer #:timeout #:with-delay))
+           #:status #:with-timers #:timer #:timeout #:with-delay
+           #:event #:handle))
 
 (defpackage :math
   (:documentation "Various mathematical functions and classes")
   (:use :cl :common)
   (:import-from :scheduler #:simulation-time #:time-type)
   (:export
+   #:record #:average-min-max #:histogram #:inter-arrival-histogram
+   #:rtt-estimator #:rtt-mdev
    #:random-variable #:random-value #:constant #:uniform #:normal
    #:exponential #:pareto #:paretoII #:lognormal))
 
@@ -166,7 +169,7 @@
   (:export #:protocol #:pdu
            #:register-protocol #:protocols #:find-protocol #:delete-protocol
            #:peer-address #:peer-port #:local-port #:local-address
-           #:bind #:unbind #:connect #:connection-complete
+           #:open-connection #:connection-complete
            #:close-connection #:connected-p
            #:send #:receive #:sent
            #:fid

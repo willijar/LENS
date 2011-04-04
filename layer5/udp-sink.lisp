@@ -19,11 +19,7 @@
 (in-package :protocol.layer5)
 
 (defclass udp-sink(application)
-  ((node :initarg :node :type node :reader node
-         :documentation "Attached node.")
-   (local-port :initarg :local-port :type ipport :reader local-port
-               :documentation "Port number to bind to")
-   (protocol :type udp :accessor protocol
+  ((protocol :type udp :accessor protocol
              :documentation "The udp protocol instance")
    (loss-statistics :initarg :loss-statistics :initform nil
                     :accessor loss-statistics
@@ -35,15 +31,15 @@
     :initarg :delay-statistics :initform nil :accessor delay-statistics
     :documentation "Statistics collection object for delays")
    (stats-update-interval
-    :type type-type :initarg :stats-update-interval
+    :type scheduler:time-type :initarg :stats-update-interval
     :initform 1.0 :accessor stats-update-interval
     :documentation "interval over which statistics are recorded")
    (first-packet-rx
-    :type time-type :initform 0
+    :type scheduler:time-type :initform 0
     :documentation "Time first packet is received. Used to calculate
 overall bytes/sec data rx.")
    (last-packet-rx
-    :initform 0 :type time-type
+    :initform 0 :type  scheduler:time-type
     :documentation "Time last packet is received. Used to calculate jitter.")
    (bytes-rx  :initform 0 :type counter :reader bytes-rx
               :documentation "total number of bytes received")
@@ -53,51 +49,60 @@ overall bytes/sec data rx.")
                  :documentation "total number of packets lost")
    (next-sequence-rx :initform 0 :type seq
                      :documentation "Sequence number of next expected packet")
-   (last-log-time :initform 0 :type time-type)
+   (last-log-time :initform 0 :type  scheduler:time-type)
    (last-packets-rx :initform 0 :type counter)
    (last-bytes-rx :initform 0 :type counter)
    (last-packets-lost :initform 0 :type counter)
    (iat-statistics :initarg :iat-statistics :initform nil
                    :accessor iat-statistics
                    :documentation "Inter-arrival time distribution statistics")
-   (last-transit :initform 0 :type time-type)
+   (last-transit :initform 0 :type  scheduler:time-type)
    (jitter :initform 0 :type real))
   (:documentation "Listen and record statistics of incomming packets
 on a specific port"))
+
+(defmethod initialize-instance
+    ((app udp-sink)
+     &key local-port
+     (protocol-type 'layer4:udp)
+     &allow-other-keys)
+  (setf (slot-value app 'protocol)
+        (make-instance protocol-type
+                       :local-port local-port
+                       :node (node app) :application app)))
 
 (defmethod reset((app udp-sink))
   (dolist(s '(loss-statistics bandwidth-statistics
               delay-statistics iat-statistics))
     (when (slot-value app s) (reset (slot-value app s))))
-  (shared-initialize
-   app
-   '(first-packet-rx last-packet-rx bytes-rx packets-rx packets-lost
-     next-sequence-rx last-log-time last-packets-rx last-packets-lost
-     last-transit jitter)))
+  (dolist (slot
+            '(first-packet-rx last-packet-rx bytes-rx packets-rx packets-lost
+              next-sequence-rx last-log-time last-packets-rx last-packets-lost
+              last-transit jitter))
+    (setf (slot-value app slot) 0)))
 
-(defmethod receive((application udp-sink) packet protocol
-                   &optional sequence-number)
-  (let ((now (simulation-time)))
+(defmethod receive((application udp-sink) data protocol
+                   &key sequence-number packet-created &allow-other-keys)
+  (let ((now (scheduler:simulation-time)))
     (with-slots(first-packet-rx last-packet-rx iat-statistics
                 last-transit jitter bytes-rx packets-rx packets-lost
                 next-sequence-rx) application
       (when (zerop first-packet-rx) (setf first-packet-rx now))
       ;; do iat history
       (when iat-statistics
-        (record (- now last-packet-rx) iat-statistics))
+        (math:record (- now last-packet-rx) iat-statistics :time now))
       (setf last-packet-rx now)
       ;; calculate jitter as per RFC189
-      (let ((this-transit (- now (packet:created packet))))
+      (let ((this-transit (- now packet-created)))
         (unless (zerop last-transit)
           (let ((diff (abs (- this-transit last-transit))))
             (incf jitter (/ (- diff jitter) 16.0))))
         (setf last-transit this-transit)
         ;; record delay if requested
         (when (delay-statistics application)
-          (record this-transit (delay-statistics application))))
+          (math:record this-transit (delay-statistics application) :time now)))
       ;; do counts
-      (when-bind(d (pop-pdu packet))
-                (incf bytes-rx (size d)))
+      (incf bytes-rx (length-bytes data))
       (when (>= sequence-number next-sequence-rx)
         (incf packets-rx)
         (unless (zerop next-sequence-rx)
@@ -105,21 +110,11 @@ on a specific port"))
         (setf next-sequence-rx (1+ sequence-number))))))
 
 (defmethod start((app udp-sink))
-  (unless (slot-boundp app 'protocol)
-    ;; need to allocate udp and bind endpoint
-    (let ((udp (make-instance 'udp :node (node app) :application app)))
-      (setf (protocol app) udp)
-      (bind udp :port (local-port app))))
   (when (or (loss-statistics app) (bandwidth-statistics app))
     ;; need to set up logging event
-    (schedule (stats-update-interval app) app)))
+    (scheduler:schedule (stats-update-interval app) app)))
 
-(defmethod stop((app udp-sink) &key abort)
-  (declare (ignore abort))
-  (cancel app)
-  (unbind (protocol app)))
-
-(defmethod handle((app udp-sink))
+(defmethod scheduler:handle((app udp-sink))
   (with-slots(bytes-rx packets-rx packets-lost loss-statistics
              bandwidth-statistics last-bytes-rx last-packets-rx
              last-packets-lost last-log-time) app
@@ -128,16 +123,17 @@ on a specific port"))
             (this-lost (- packets-lost last-packets-lost))
             (loss-rate (let ((tot (+ this-rx this-lost)))
                          (if (zerop tot ) 0 (/ this-lost tot)))))
-        (record loss-rate loss-statistics)))
+        (math:record loss-rate loss-statistics)))
     (when bandwidth-statistics
       (let ((this-bytes-rx (- bytes-rx last-bytes-rx)))
-        (record (/ (* 8 this-bytes-rx) (- (simulation-time) last-log-time))
+        (math:record (/ (* 8 this-bytes-rx) (- (scheduler:simulation-time)
+                                          last-log-time))
                 bandwidth-statistics)))
     (setf last-packets-rx packets-rx
           last-bytes-rx bytes-rx
           last-packets-lost packets-lost
-          last-log-time (simulation-time)))
-  (schedule (stats-update-interval app) app))
+          last-log-time (scheduler:simulation-time)))
+  (scheduler:schedule (stats-update-interval app) app))
 
 
 

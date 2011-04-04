@@ -53,16 +53,21 @@
        (find peer (layer1:peer-interfaces (link interface) interface) :key #'node))
    (interfaces node)))
 
-(defmethod find-interface((local-ipaddr network-address) (node node))
-  "Return interface with given ipaddress"
-  (find local-ipaddr (interfaces node)
-        :test #'address=
-        :key #'network-address))
+(defmethod find-interface((address network-address) (node node))
+  "Return interface for given  network address"
+  (or
+   (find local-ipaddr (interfaces node)
+         :test #'address=
+         :key #'network-address)
+   (let ((r (layer3::getroute peer-address node)))
+     (when r (interface r)))))
 
 (defun local-ipaddr-p(ipaddr node)
   (or
    (address= ipaddr (network-address node))
-   (find-interface ipaddr node)))
+   (find local-ipaddr (interfaces node)
+         :test #'address=
+         :key #'network-address)))
 
 (defmethod layer3:getroute(address (node node) &key packet &allow-other-keys)
   (layer3:getroute address (layer3:routing node) :packet packet))

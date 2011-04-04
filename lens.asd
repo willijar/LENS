@@ -52,7 +52,7 @@
                        :depends-on ("common" "scheduler" "random"
                                     "address" "packet-queue" "node"))
                (:file "application"
-                       :depends-on ("common" "scheduler" "protocol"))
+                       :depends-on ("common" "scheduler" "protocol" "node"))
                (:file "statistics" :depends-on ("common" "scheduler"))
                (:file "user"
                        :depends-on ("common" "address" "scheduler" "link"
@@ -80,7 +80,7 @@
               :components
               ((:file "udp"))
                #+nil(:file "tcp"))
-     #+nil(:module "layer5" :depends-on ("core")
+     (:module "layer5" :depends-on ("core")
               :components
               ((:file "abr-source")
                (:file "udp-sink")))))

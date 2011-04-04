@@ -31,21 +31,22 @@
   (copy-with-slots pdu '(option-number)))
 
 (defclass ipv4-header(pdu)
-  ((version :initarg :version :initform 4 :type octet :reader version)
+  ((version :initarg :version :initform 4 :type octet :reader version
+            :allocation :class)
    (service-type :initform 0 :type octet :reader servive-type
                  :reader packet:priority
                  :initarg :service-type)
    (total-length :initform 0 :type word :accessor total-length)
    (identification :initform 0 :type word)
    (flags :initform 0 :type octet)
-   (fragment-offset :initform 0 :type word)
+   (fragment-offset :initform 0 :initarg :fragment-offset :type word)
    (ttl :initform *default-ipv4-ttl* :type octet :initarg :ttl :accessor ttl
         :documentation "Default ttl")
    (protocol-number
-    :initform #x0800 :type octet :initarg :protocol-number
+    :initform 17 :type octet :initarg :protocol-number
     :reader protocol-number
     :documentation "Protocol number for transport layer")
-   (header-checksum :initform 0 :type word)
+   (header-checksum :initform 0 :type word) ;; not used in simulation
    (src-address :type ipaddr :accessor src-address :initarg :src-address)
    (dst-address :type ipaddr :accessor dst-address :initarg :dst-address)
    (options :type list :accessor options :initform nil))
@@ -97,14 +98,16 @@ node to communicate with each other.")
                 (src-address (network-address (node ipv4)))
                 (dst-address :broadcast)
                 (ttl *default-ipv4-ttl*)
-                 (tos 0)
+                (tos 0)
+                (fragment-offset 0)
                 &allow-other-keys)
   (let ((iphdr (make-instance 'ipv4-header
                               :src-address src-address
                               :dst-address dst-address
                               :ttl ttl
                               :protocol-number (protocol-number sender)
-                              :service-type tos))
+                              :service-type tos
+                              :fragment-offset fragment-offset))
         (node (node ipv4)))
     (push-pdu iphdr packet)
     (setf (total-length iphdr) (length-bytes packet))
@@ -160,7 +163,7 @@ node to communicate with each other.")
                (icmp-receive ipv4 packet iphdr)
                (let ((protocol (layer4:find-protocol proto node)))
                  (if protocol
-                     (receive protocol packet ipv4)
+                     (receive protocol packet ipv4 :src-address (src-address iphdr))
                      (progn
                        (drop ipv4 packet :text "L3-NP")
                        (destination-unreachable ipv4

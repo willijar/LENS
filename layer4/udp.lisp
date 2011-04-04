@@ -23,8 +23,10 @@
    (dst-port :type ipport :initform 0 :accessor dst-port :initarg :dst-port)
    (msg-size :type word :initform 0 :accessor msg-size :initarg :msg-size)
    (checksum :type word :accessor checksum :initarg :checksum)
-   (seq :type seq :initform 0 :accessor seq :initarg :seq
-        :documentation "Sequence id's are not part of UDP, but are useful"))
+   (sequence-number
+    :type seq :initform 0 :reader sequence-number
+    :initarg :sequence-number
+    :documentation "Sequence id's are not part of UDP, but are useful for performing statistics in the simulation"))
   (:documentation "UDP PDU class"))
 
 (defmethod length-bytes((h udp-header)) 8)
@@ -55,25 +57,20 @@
     (format stream "~:/print-eng/bytes/~:/print-eng/bytes sent"
             (bytes-sent p) (length-bytes (data p)))))
 
-(defclass udp-demux(protocol)
+(defclass udp-dmux(protocol-dmux)
   ()
   (:documentation "Protocol demultiplexer for received UDP packets"))
 
-(register-protocol 'udp-demux 17)
+(register-protocol 'udp-dmux 17)
 
-(defmethod receive((udp udp-demux) packet (ipv4 layer3:ipv4) &key &allow-other-keys)
-  (let* ((h (peek-pdu packet))
-         (socket (find (dst-port h) (bindings udp) :test #'local-port)))
-    (if socket
-        (receive socket packet ipv4)
-        (drop udp packet :text "L4-NP"))))
-
-(defclass udp(socket)
-  ((packet-size :initform *default-udp-packet-size*
+(defclass udp(protocol-implementation)
+  ((protocol-number :type 'fixnum :initform 17 :allocation :class
+                    :reader protocol-number)
+   (packet-size :initform *default-udp-packet-size*
                 :initarg :packet-size :accessor packet-size
                 :documentation "Size of packets")
-   (seq :type seq :initform 0 :accessor seq
-        :documentation "Seq number of next packet")
+   (sequence-number :type seq :initform 0 :accessor sequence-number
+        :documentation "Sequence number of next packet")
    (pending-data :type list :initform nil :accessor pending-data
                  :documentation "Queue of pending data"))
   (:documentation "A model of the User Datagram Protocol."))
@@ -81,27 +78,20 @@
 (defmethod default-trace-detail((protocol udp))
   `(src-port dst-port msg-size))
 
-(defmethod connect((protocol udp) (peer-address ipaddr) (peer-port integer))
-  (setf (peer-address protocol) peer-address
-        (peer-port protocol) peer-port)
-  (let ((application (application protocol)))
-    (when application
-      (connection-complete application protocol))))
+(defmethod open-connection(peer-address peer-port (udp udp))
+  (call-next-method)
+  (when-bind(application (layer5:application udp))
+    (connection-complete application udp :failure nil)))
 
-(defmethod close-connection((udp udp))
-  (closed (application udp) udp)
-  (when-bind(interface (interface udp))
-    (delete-notifications udp interface))
-  t)
-
-(defmethod reset((udp udp))
-  (when-bind(interface (interface udp))
-    (delete-notifications udp interface))
-  (while (dequeue (pending-data udp))))
-
-(defmethod send((dmux udp-demux) (packet packet) (sender udp) &rest args)
-  "udp-demux just sends packet on to ipv4"
-  (apply #'send (find-protocol 'layer3:ipv4 (node dmux)) packet dmux args))
+(defmethod receive((udp udp) (packet packet) (layer3 layer3:ipv4)
+                   &key src-address &allow-other-keys)
+  (let ((udphdr (pop-pdu packet)))
+    (receive (layer5:application udp) (pop-pdu packet) udp
+             :src-address src-address
+             :src-port (src-port udphdr)
+             :fid (fid packet)
+             :packet-created (packet:created packet)
+             :sequence-number (sequence-number uphdr))))
 
 (defmethod send(application data (udp udp)
                 &key (dst-address (peer-address udp))
@@ -120,9 +110,17 @@
           (pending-data udp))))
   (udp-send-pending udp))
 
+(defmethod close-connection((udp udp))
+  (call-next-method))
+
+(defmethod reset((udp udp))
+  (dolist(interface (interfaces (node udp)))
+    (delete-notifications udp interface))
+  (while (dequeue (pending-data udp))))
+
 (defun udp-send-pending(udp)
   (dolist(pd (pending-data udp))
-    (when-bind (interface (find-interface (dst-address pd) udp))
+    (when-bind (interface (find-interface (dst-address pd) (node udp)))
       (loop
            (let ((data (if (and (= (bytes-sent pd) 0)
                                 (< (length-bytes (data pd))
@@ -131,18 +129,17 @@
                            (layer5:copy-from-offset
                             (packet-size udp) (bytes-sent pd) (data pd) ))))
              (unless (layer1:buffer-available-p
-                      (+ 20 (length-bytes data)) interface)
+                      (+ 28 (length-bytes data)) interface)
                (add-notification udp #'udp-send-pending interface)
                (return))
-             (let ((packet (make-instance 'packet)))
-               (push-pdu data packet)
+             (let ((packet (make-instance 'packet :data data :fid (fid udp))))
                (incf (bytes-sent pd) (length-bytes data))
                (push-pdu
                 (make-instance 'udp-header
                                :src-port (local-port udp)
                                :dst-port (dst-port pd)
                                :msg-size (length-bytes data)
-                               :seq (incf (seq udp)))
+                               :sequence-number (incf (sequence-number udp)))
                 packet)
                (send (find-protocol 'layer3:ipv4 (node udp)) packet udp
                      :dst-address (dst-address pd)
@@ -152,4 +149,8 @@
                (sent (application udp) (length-bytes data) udp)))
          (when (= (bytes-sent pd) (length-bytes (data pd)))
            (setf (pending-data udp) (delete pd (pending-data udp)))
-           (return))))))
+           (return)))))
+  ;; udp will call connection closed once all data has been sent
+  (unless (or (pending-data udp) (connected-p udp))
+    (dolist(interface (interfaces (node udp)))
+      (delete-notifications udp interface))))

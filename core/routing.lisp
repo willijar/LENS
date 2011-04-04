@@ -20,7 +20,7 @@
   (network-address (vertex-end vertex)))
 
 (defclass routing()
-  ((node :type node :initarg :node :reader node
+  ((node :initarg :node :reader node
          :documentation "Node to which routing object is attached")
    (default-route :type vertex :initform nil :accessor default-route
                   :documentation "The default (gateway) route"))

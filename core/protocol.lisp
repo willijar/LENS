@@ -75,16 +75,11 @@ See http://www.iana.org/assignments/protocol-numbers")
 
 (in-package :protocol.layer3)
 
-(defclass protocol(protocol:protocol)
-  ((layer :initform 3 :reader layer :allocation :class))
-  (:documentation "Layer 3 protocol"))
+;; standard layer 3 protocols may be registered so they can be
+;; instantiated on nodes on demand.
 
-(defclass pdu(packet:pdu)
-  ((layer :initform 3 :reader protocol:layer :allocation :class))
-  (:documentation "The base class for all layer three protocol data units"))
-
-(defvar *standard-protocols* nil "List of standard registered layer 3
-protocols")
+(defvar *standard-protocols* nil
+  "List of standard registered layer 3 protocols - these can be instantiated on nodes on demand")
 
 (defgeneric find-protocol(protocol entity)
   (:documentation "Find a layer 3 protocol on entity")
@@ -92,23 +87,10 @@ protocols")
     (find protocol-number seq :key #'protocol-number :test #'=))
   (:method((protocol-type symbol) (seq sequence))
     (assert (= (layer protocol-type) 3))
-    (find protocol-type seq :key #'type-of))
-  (:method((protocol-number integer) node)
-    (or (find protocol-number (protocols node))
-        (let ((type (find-protocol protocol-number *standard-protocols*)))
-          (when type (register-protocol type node )))))
-  (:method((protocol-type symbol) node)
-    (or (find-protocol protocol-type (protocols node))
-        (register-protocol protocol-type node))))
+    (find protocol-type seq :key #'type-of)))
 
 (defgeneric register-protocol(protocol entity)
   (:documentation "Register a layer 3 protocol.")
-  (:method((protocol symbol) node)
-    (when (find-protocol (protocol-number protocol) node)
-      (error "Unable to register a duplicate layer 3 protocol ~A" protocol))
-    (let ((instance (make-instance protocol :node node)))
-      (push instance (protocols node))
-      instance))
   (:method((protocol-type symbol) (protocol-number integer))
     (setf (get protocol-type 'protocol::layer) 3
           (get protocol-type 'protocol::protocol-number) protocol-number)
@@ -123,31 +105,32 @@ protocols")
     (let ((protocol (find-protocol protocol entity)))
       (when protocol (delete-protocol protocol entity)))))
 
+(defclass pdu(packet:pdu)
+  ((layer :initform 3 :reader protocol:layer :allocation :class))
+  (:documentation "The base class for all layer three protocol data units"))
+
+(defclass protocol(protocol:protocol)
+  ((layer :initform 3 :reader layer :allocation :class))
+  (:documentation "Layer 3 protocol"))
+
+
 (defmethod protocol-number((addr ipaddr)) #x0800)
 
 (in-package :protocol.layer4)
 
-;; layer 4 will receive packets from application and send to network layer
-
-(defvar +min-ephemeral-port+ 49152 "Start of ephemeral port range")
-
-(defclass protocol(protocol:protocol)
-  ((layer :initform 4 :reader layer :allocation :class)
-   (bindings :type list :initform nil :reader bindings
-             :documentation "Sequence of bound connections"))
-  (:documentation "Layer 4 protocol"))
-
-(defun next-available-port(protocol)
-  (1+
-   (reduce #'max (bindings protocol) :key #'local-port
-           :initial-value  +min-ephemeral-port+)))
-
 (defclass pdu(packet:pdu)
   ((layer :initform 4 :reader layer :allocation :class))
-  (:documentation "The base class for all layer four protocol data units"))
+  (:documentation "The base class for all layer 4 protocol data units"))
 
-(defvar *standard-protocols* nil "List of standard registered layer 4
-protocols")
+(defclass protocol(protocol:protocol)
+  ((layer :initform 4 :reader layer :allocation :class))
+  (:documentation "Layer 4 protocol base"))
+
+;; as per layer 3 standard layer 4 protocols may be registered so they
+;; can be instantiated on nodes on demand.
+
+(defvar *standard-protocols* nil
+  "List of standard registered layer 4 protocols")
 
 (defgeneric find-protocol(protocol entity)
   (:documentation "Find a layer 4 protocol on entity")
@@ -155,23 +138,10 @@ protocols")
     (find protocol-number seq :key #'protocol-number :test #'=))
   (:method((protocol-type symbol) (seq sequence))
     (assert (= (layer protocol-type) 4))
-    (find protocol-type seq :key #'type-of))
-  (:method((protocol-number integer) node)
-    (or (find protocol-number (protocols node))
-        (let ((type (find-protocol protocol-number *standard-protocols*)))
-          (when type (register-protocol type node )))))
-  (:method((protocol-type symbol) node)
-    (or (find-protocol protocol-type (protocols node))
-        (register-protocol protocol-type node))))
+    (find protocol-type seq :key #'type-of)))
 
 (defgeneric register-protocol(protocol entity)
   (:documentation "Register a layer 4 protocol")
-  (:method((protocol symbol) node)
-    (when (find-protocol (protocol-number protocol) node)
-      (error "Unable to register a duplicate layer 4 protocol ~A" protocol))
-    (let ((instance (make-instance protocol :node node)))
-      (push instance (protocols node))
-      instance))
   (:method((protocol-type symbol) (protocol-number integer))
     (setf (get protocol-type 'protocol::layer) 4
           (get protocol-type 'protocol::protocol-number) protocol-number)
@@ -189,116 +159,125 @@ protocols")
       (when protocol
         (delete-protocol protocol entity)))))
 
-(defclass socket(protocol)
+
+;; layer 4 protocols are typically implemented using two classes - a
+;; demultiplexer which is registered with the protocol number and
+;; demultiplexes packets to a specific protocol implementation
+;; instance on the basis of a port address and the implementation
+;; itself which deals with traffic to and from a specific port. This
+;; enables the possibility that nodes may run different
+;; implementations of the same protocol. It also means that all state
+;; for a specific flow is in one instance.
+
+(defclass protocol-dmux(protocol)
+  ((bindings :type list :initform nil :accessor bindings
+             :documentation "Sequence of bound connections")
+   (min-ephemeral-port :type fixnum :initform 49152))
+  (:documentation "Layer 4 protocol demultiplexer to bound protocol entities"))
+
+(defmethod receive((dmux protocol-dmux) packet
+                   (layer3protocol layer3:protocol) &rest args
+                   &key &allow-other-keys)
+  (let ((listener
+         (find (dst-port (peek-pdu packet)) (bindings dmux)
+               :test #'local-port)))
+    (if listener
+        (apply #'receive listener packet layer3protocol args)
+        (drop dmux packet :text "L4-NP"))))
+
+;; even connectionless protocols don't have a peer address or port
+;; it is convenient to use the protocol-implementation to manage this for
+;; the application in the simulation using open-connection and close-connection,
+;; however connectionless protocols may take different
+
+(defclass protocol-implementation(protocol)
   ((local-address :type network-address :reader local-address
                   :documentation "local address used by this socket")
    (local-port :type ipport :accessor local-port
                :documentation "Local bound service access port")
    (layer5:application :initarg :application :initform nil
                        :reader layer5:application
-                       :documentation "Local application object")
+                       :documentation "Application entity for this flow")
    (peer-address :initform nil :type network-address
                  :accessor peer-address
                  :documentation "network address of peer")
    (peer-port  :type ipport :accessor peer-port
                :documentation "Service access port of peer")
-   (fid :type counter :reader fid :documentation "Flow id")
-   (last-fid :type counter :initform 0 :documentation "last allocated flow id")
+   (fid :type counter :reader fid :documentation "Flow id for packets")
+   (last-fid :type counter :initform 0 :documentation "last allocated flow id"
+             :allocation :class)
    (ttl :accessor ttl :initarg :ttl :initform 64 :type word
         :documentation "Layer 3 ttl")
    (tos :accessor tos :initarg :tos :initform 0 :type octet
         :documentation "Layer 3 type of service"))
-  (:documentation "Base class for all layer 4 protocols states"))
+  (:documentation "Base class for IP layer 4 protocol implementations"))
 
-(defmethod find-interface((peer-address network-address) (socket socket))
-  (let ((r (layer3::getroute peer-address (node socket))))
-    (when r (interface r))))
+(defun next-available-port(protocol-dmux)
+  "Return next available ephemeral port for a protocol demultiplexer"
+  (1+
+   (reduce #'max (bindings protocol-dmux) :key #'local-port
+           :initial-value  (slot-value protocol-dmux 'min-ephemeral-port))))
+
+(defun protocol-dmux(protocol-implementation)
+  "Return the protocol demultiplexer associated with a protocol implementation"
+  (find-protocol (protocol-number protocol-implementation)
+                 (node protocol-implementation)))
 
 (defmethod initialize-instance :after
-    ((socket socket) &key
-     (local-address (network-address (node (protocol socket))))
-     (local-port (next-available-port (protocol socket)))
+    ((protocol protocol-implementation) &key
+     (local-address (network-address (node protocol)))
+     (dmux (protocol-dmux protocol))
+     (local-port (next-available-port dmux))
      peer-address peer-port
      &allow-other-keys)
-  (when local-address (setf (slot-value socket 'local-adress) local-address))
-  (when local-port (bind local-port socket :local-address local-address))
-  (when (and peer-address peer-port) (connect peer-address peer-port socket)))
+  (when (find local-port (bindings dmux) :key #'local-port)
+    (error "~A Port ~D already bound" protocol local-port))
+  (setf (slot-value protocol 'local-adress) local-address
+        (slot-value protocol 'local-port) local-port)
+  (push protocol (bindings dmux))
+  (when (and peer-address peer-port)
+    (open-connection peer-address peer-port protocol)))
 
-(defun listener-p(socket)
-  (not (slot-boundp socket 'peer-address)))
+(defgeneric open-connection(peer-address peer-port protocol)
+  (:documentation "Connect a protocol to a remote (peer) address")
+  (:method(peer-address peer-port (protocol protocol-implementation))
+    "Associate a peer address and port with a protocol implementation"
+    (assert (not (connected-p protocol)))
+    (setf (slot-value protocol 'peer-address) peer-address
+          (slot-value protocol 'peer-port) peer-port
+          (slot-value protocol 'fid) (incf (slot-value protocol 'last-fid)))))
 
-(defgeneric bind(local-port socket &key local-address )
-  (:documentation "Bind a socket to a local address and port")
-  (:method(local-port (socket socket) &key local-address)
-    (when local-address
-      (setf (slot-value socket 'local-address) local-address))
-    (unless (slot-boundp socket 'local-address)
-      (error "No local address defined to bind to"))
-    (when (slot-boundp socket 'local-port)
-      (lens-error "Socket already bound"))
-    (setf (slot-value socket 'local-port) local-port)
-    (if (listener-p socket)
-        (when (find local-port (bindings (protocol socket)) :key #'local-port)
-          (error "Port ~D already bound" local-port))
-        (with-slots((lpa local-port) (paa peer-address) (ppa peer-port)) socket
-          (when (find-if
-                 #'(lambda(socket)
-                     (with-slots((lpb local-port) (pab peer-address)
-                                 (ppb peer-port)) socket
-                     (and (eql lpa lpb) (eql paa pab) (eql ppa ppb))))
-                 (bindings (protocol socket)))
-            (error "Port ~D Socket alread bound to ~A:~A" lpa paa ppa))))
-    (push socket (slot-value (protocol socket) 'bindings))))
-
-(defgeneric unbind(socket)
-  (:documentation "Unbind a bound socket")
-  (:method((socket socket))
-    (with-slots(bindings) (protocol socket)
-      (setf bindings (delete socket bindings)))
-    (slot-makunbound socket 'local-port)))
-
-(defgeneric connect(peer-address peer-port socket)
-  (:documentation "Connect a socket to a remote (peer) address")
-  (:method(peer-address peer-port (socket socket))
-    (setf (slot-value socket 'peer-address) peer-address
-          (slot-value socket 'peer-port) peer-port
-          (slot-value socket 'fid) (incf (slot-value socket 'last-fid)))))
-
-(defgeneric connection-complete(application socket &key failure)
+(defgeneric connection-complete(application protocol &key failure)
   (:documentation "Called to signal completion of connection attempt -
-  either success or if failure set failed"))
+  either success or if failure set failed")
+  (:method(application protocol &key failure)
+    (declare(ignore application protocol failure))))
 
-(defgeneric connected-p(socket)
-  (:documentation "Return true if socket is connected")
-  (:method((socket socket)) (slot-boundp socket 'peer-port)))
+(defgeneric connected-p(protocol)
+  (:documentation "Return true if protocol is connected")
+  (:method((protocol protocol-implementation))
+    (and (slot-boundp protocol 'peer-port)
+         (slot-boundp protocol 'peer-address))))
 
-(defgeneric close-connection(socket)
+(defgeneric close-connection(protocol)
   (:documentation "Close an open connection")
-  (:method((socket socket)) (slot-makunbound socket 'peer-port)))
+  (:method((protocol protocol-implementation))
+    "Disassociate a peer address and port with a protocol implementation"
+    (slot-makunbound protocol 'peer-port)
+    (slot-makunbound protocol 'peer-address)))
 
-(defgeneric closed(application protocol)
+(defgeneric connection-closed(application protocol)
   (:documentation "Called by an associated layer 4 protocol when a connection
 has completely closed")
   (:method(app protocol) (declare (ignore app protocol))))
 
 (defgeneric close-request(application protocol)
   (:documentation "Called by an associated layer 4 protocol when a connection
-close request has been received from a peer.  Applications should
+close request has been received from a peer. Applications should
 respond by calling the corresponding close-connection routine")
-  (:method(app protocol)
+  (:method(app (protocol protocol-implementation))
     (declare (ignore app))
     (close-connection protocol)))
-
-(defmethod send(application data (socket socket)
-                &key (peer-address (peer-address socket))
-                (peer-port (peer-port socket)) &allow-other-keys)
-  (send socket
-        (make-instance 'packet :data data :fid (fid socket))
-        (protocol socket) :peer-address peer-address :peer-port peer-port))
-
-(defmethod receive((socket socket) packet (protocol protocol)
-                   &key &allow-other-keys)
-  (receive (layer5:application socket) (pop-pdu packet) socket))
 
 (defgeneric sent(application no-octets-sent protocol)
   (:documentation "Called by an associated layer 4 protocol when all some part
@@ -308,7 +287,7 @@ this occurs when the acknowledgement is received from the peer.")
     (declare (ignore application no-octets-sent protocol))))
 
 (defgeneric connection-from-peer(application protocol &key peer-address peer-port)
-  (:documentation "Called when a listening socket receives a
+  (:documentation "Called when a listening protocol receives a
   connection request. Return true if connection accepted.")
   (:method(application protocol &key &allow-other-keys)
     "Default - acceot and do nothing"

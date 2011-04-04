@@ -20,7 +20,8 @@
 
 (defclass application()
   ((name :type string :initarg :name :reader name
-         :documentation "Name of this application"))
+         :documentation "Name of this application")
+   (node :initarg :node :reader node))
   (:documentation "Class Application is the base class for all applications.
 It defines the interface between the application class and
 the associated layer 4 protocols.  Applications can have one
@@ -32,6 +33,6 @@ a web browser model with multiple simultaneous connections."))
     (setf (slot-value app 'name)
           (string-downcase (class-name (class-of app))))))
 
-(defmethod receive((application application) pdu socket &key &allow-other-keys)
+(defmethod receive((application application) data layer4 &key &allow-other-keys)
   "Called by layer 4 protocol object when data is received. Default - do nothing"
-    (declare (ignore application pdu socket)))
+    (declare (ignore application data layer4)))
