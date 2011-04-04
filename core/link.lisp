@@ -129,12 +129,12 @@
         (packets-sent link) 0
         (bytes-sent link) 0))
 
-(defvar *default-link* '(point-to-point)
-  "List of default arguments for make-instance to make a default link")
-
 (defun utilisation(link)
   (let ((now (simulation-time)))
     (if (= now (utilisation-start link))
         0
         (/ (* 8 (bytes-sent link))
            (* (bandwidth link) (- now (utilisation-start link)))))))
+
+(defvar *default-link* '(point-to-point)
+  "List of default arguments for make-instance to make a default link")

@@ -61,11 +61,11 @@ See http://www.iana.org/assignments/protocol-numbers")
 
 (defclass protocol(protocol:protocol)
   ((layer :initform 2 :reader layer :allocation :class)
-   (interface :initarg :iface :initarg :interface :accessor interface
+   (interface :initarg :iface :initarg :interface :accessor layer1:interface
               :documentation "Interface for this protocol"))
   (:documentation "Layer 2 protocol base class"))
 
-(defmethod node((protocol protocol)) (node (interface protocol)))
+(defmethod node((protocol protocol)) (node (layer1:interface protocol)))
 
 (defclass pdu(packet:pdu)
   ((layer :initform 2 :reader protocol:layer :allocation :class))

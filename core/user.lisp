@@ -50,43 +50,13 @@ the arguments to pass to make-instance for each variable name."
 		    (if (listp (car def)) (car def) (list (car def))))
 		defs))))
 
-#+nil(defun duplex-link
-    (local-node remote-node &key (link-type *default-link*)
-     (local-link-type link-type)
-     (remote-link-type link-type)
-     local-ipaddr remote-ipaddr local-ipmask remote-ipmask)
-  "Connect local-node to remote-node using with a duplex link. Returns
-the peer interfaces"
-  (flet((get-interface(node link-type ipaddr ipmask)
-          (let* ((link (apply #'make-instance
-                             (if (listp link-type)
-                                 link-type
-                                 (list link-type))))
-                (interface
-                 (or
-                  (when ipaddr (node:find-interface ipaddr node))
-                  (make-new-interface link :ipaddr ipaddr :ipmask ipmask))))
-            (setf (link interface) link
-                  (local-interface link) interface)
-            (add-interface interface node)
-            interface)))
-    (let ((local-interface
-           (get-interface
-            local-node local-link-type local-ipaddr local-ipmask))
-          (remote-interface
-           (get-interface
-            remote-node remote-link-type remote-ipaddr remote-ipmask)))
-      (setf (link::peer-interface (link local-interface)) remote-interface
-            (link::peer-interface (link remote-interface)) local-interface)
-      (values local-interface remote-interface))))
-
-#+nil(defun connect(graph &optional (link-type *default-link*))
+(defun connect(graph &rest args)
   (dolist(row graph)
     (let ((src (first row)))
       (unless (typep src 'node) (setf src (node src)))
       (dolist(dst (rest row))
         (unless (typep dst 'node) (setf dst (node dst)))
-        (duplex-link src dst :link-type link-type)))))
+        (apply #'point-to-point src dst args)))))
 
 (defun start-simulation(&key (granularity 10000) step)
   "Start or restart the simulation scheduler. If the optional `foreground`

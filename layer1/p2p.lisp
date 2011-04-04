@@ -24,9 +24,9 @@
    (bit-error-rate  :initarg :bit-error-rate
                     :initform *default-ber*
                     :documentation "Bit Error Rate for this link")
-   (simplex-p :type boolean :initarg :simplex :initform nil :reader simplex-p
+   (simplex-p :type boolean :initarg :simplex-p :initform nil :reader simplex-p
               :documentation "If true this is a simplex link")
-   (unidirectional-p :type boolean :initarg :unidirectional :initform nil
+   (unidirectional-p :type boolean :initarg :unidirectional-p :initform nil
                      :reader unidirectional-p
                      :documentation "If true this link is unidirectional")
    (local-interface
@@ -69,20 +69,28 @@
                       (delay *default-delay*)
                       (bandwidth *default-bandwidth*)
                       (bit-error-rate *default-ber*)
-                      simplex
-                      unidirectional)
+                      simplex-p
+                      unidirectional-p
+                      (local-address (network-address a))
+                      (peer-address (network-address b))
+                      local-mask
+                      peer-mask)
   (make-instance
    'point-to-point
    :delay delay
    :bandwidth bandwidth
    :bit-error-rate  bit-error-rate
-   :simplex simplex
-   :unidirectional unidirectional
+   :simplex simplex-p
+   :unidirectional unidirectional-p
    :local-interface (make-instance
                      'interface
                      :node a
-                     :protocol (make-instance 'layer2:llcsnap :node a))
+                     :protocol 'layer2:llcsnap
+                     :network-address local-address
+                     :network-mask local-mask)
    :peer-interface (make-instance
                     'interface
                     :node b
-                    :protocol (make-instance 'layer2:llcsnap :node b))))
+                    :protocol 'layer2:llcsnap
+                    :network-address peer-address
+                    :network-mask peer-mask)))

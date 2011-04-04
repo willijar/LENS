@@ -92,7 +92,7 @@
 
 (defgeneric macaddr(arg)
   (:documentation "Create a mac address entity. May be aliased")
-  (:method((mac integer)) (make-instance 'macaddr :bytes mac)))
+  (:method(mac) (make-instance 'macaddr :mac mac)))
 
 (defmethod make-load-form((macaddr macaddr) &optional env)
   (declare (ignore env))
@@ -114,8 +114,8 @@
 (defmethod print-object((addr macaddr) stream)
   (if *print-escape*
       (print-unreadable-object (addr stream :type t :identity nil)
-        (write (slot-value addr 'datum) :stream stream :base 16))
-      (write (slot-value addr 'datum) :stream stream :base 16)))
+        (write (slot-value addr 'address-bytes) :stream stream :base 16))
+      (write (slot-value addr 'address-bytes) :stream stream :base 16)))
 
 (defclass ipaddr(network-address)
   ()

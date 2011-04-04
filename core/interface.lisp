@@ -54,7 +54,7 @@ two things")
 
 (defclass interface(notifier)
   ((node
-    :type node :reader node
+    :type node :reader node :initarg :node
     :documentation "Associated node")
    (network-address
     :type network-address :initarg :network-address
@@ -93,10 +93,10 @@ two things")
   (print-unreadable-object (interface stream :type t :identity t)
     (princ (type-of (layer2:protocol interface)) stream)
     (when (slot-boundp interface 'node)
-      (format stream " N~D~@[ ~A~]~:[~;/~A~]"
+      (format stream " N~D~@[ ~A~]~@[/~A~]"
               (uid (node interface))
               (hardware-address interface)
-              (network-mask interface) (logcount (network-mask interface))))))
+              (network-mask interface)))))
 
 (defmethod buffer-available-p(size (interface interface))
   (buffer-available-p size (packet-queue interface)))
@@ -120,17 +120,18 @@ two things")
         (call-next-method))))
 
 (defmethod initialize-instance :after ((interface interface)
-                                       &key
+                                       &key (protocol 'layer2:ieee802.3)
+                                       node
                                        &allow-other-keys)
+  (setf (slot-value interface 'layer2:protocol)
+        (make-instance protocol :interface interface))
   (when *default-arp*
     (setf (slot-value interface 'layer2:arp)
           (make-instance *default-arp* :interface interface)))
-  (setf (interface (layer2:protocol interface)) interface)
-  (setf (interface (packet-queue interface)) interface)
-  (node:add-interface interface (node interface))
+  (node:add-interface interface node)
   (unless (slot-boundp interface 'network-address)
     (setf  (slot-value interface 'network-address)
-           (network-address (node interface)))))
+           (network-address node))))
 
 (defmethod send((interface interface) packet (protocol layer3:protocol) &key address &allow-other-keys)
   "Called by upper layers to send packets - may return null if

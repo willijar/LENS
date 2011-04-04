@@ -30,18 +30,6 @@
         result
         (cons (list (network-address node)) result))))
 
-(defmethod add-interface((interface interface) (node node))
-  (setf (node interface) node)
-  (unless (find interface (interfaces node))
-    (vector-push-extend interface (interfaces node)))
-  ;; if only 1 interface node has same ipaddr
-  (when (= 1 (length (interfaces node)))
-    (cond ((not (ipaddr node))
-           (setf (slot-value node 'ipaddr) (ipaddr interface)))
-          ((not (ipaddr interface))
-           (setf (slot-value interface 'ipaddr) (ipaddr node)))))
-  interface)
-
 (defmethod find-interface((link link) (node node))
   "Return interface on node connected to link"
   (find link (interfaces node) :key #'link))
