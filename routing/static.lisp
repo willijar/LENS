@@ -33,7 +33,7 @@
                     &allow-other-keys)
   (or (call-next-method) ;; lookup fib
       (default-route routing) ;; or default route or use Dijkstra
-      (let* ((vertices (map 'array #'routing-neighbours (nodes)))
+      (let* ((vertices (map 'vector #'routing-neighbours (nodes)))
              (source (node routing))
              (destination
               (or (node address)
@@ -66,7 +66,7 @@
               ;; add in all first hops for this node
               (dotimes(i (length (nodes)))
                 (let ((hop (aref first-hops i)))
-                  (unless (= hop maxhop)
+                  (unless (or (= hop maxhop) (< hop 0))
                     (setf (getroute (network-address (node i)) routing)
                           (vertex (uid source) hop))))))
             ;; add in routes to destination to other nodes

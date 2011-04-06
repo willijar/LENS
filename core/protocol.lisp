@@ -75,6 +75,14 @@ See http://www.iana.org/assignments/protocol-numbers")
 
 (in-package :protocol.layer3)
 
+(defclass pdu(packet:pdu)
+  ((layer :initform 3 :reader protocol:layer :allocation :class))
+  (:documentation "The base class for all layer three protocol data units"))
+
+(defclass protocol(protocol:protocol)
+  ((layer :initform 3 :reader layer :allocation :class))
+  (:documentation "Layer 3 protocol"))
+
 ;; standard layer 3 protocols may be registered so they can be
 ;; instantiated on nodes on demand.
 
@@ -94,6 +102,7 @@ See http://www.iana.org/assignments/protocol-numbers")
   (:method((protocol-type symbol) (protocol-number integer))
     (setf (get protocol-type 'protocol::layer) 3
           (get protocol-type 'protocol::protocol-number) protocol-number)
+    ;; only first one registered as a standard protocol
     (unless (find-protocol protocol-number *standard-protocols*)
       (push protocol-type  *standard-protocols*))))
 
@@ -104,14 +113,6 @@ See http://www.iana.org/assignments/protocol-numbers")
   (:method(protocol entity)
     (let ((protocol (find-protocol protocol entity)))
       (when protocol (delete-protocol protocol entity)))))
-
-(defclass pdu(packet:pdu)
-  ((layer :initform 3 :reader protocol:layer :allocation :class))
-  (:documentation "The base class for all layer three protocol data units"))
-
-(defclass protocol(protocol:protocol)
-  ((layer :initform 3 :reader layer :allocation :class))
-  (:documentation "Layer 3 protocol"))
 
 
 (defmethod protocol-number((addr ipaddr)) #x0800)
@@ -145,6 +146,7 @@ See http://www.iana.org/assignments/protocol-numbers")
   (:method((protocol-type symbol) (protocol-number integer))
     (setf (get protocol-type 'protocol::layer) 4
           (get protocol-type 'protocol::protocol-number) protocol-number)
+    ;; only first one registered as a standard protocol
     (unless (find-protocol protocol-number *standard-protocols*)
       (push protocol-type  *standard-protocols*))))
 
@@ -232,7 +234,7 @@ See http://www.iana.org/assignments/protocol-numbers")
      &allow-other-keys)
   (when (find local-port (bindings dmux) :key #'local-port)
     (error "~A Port ~D already bound" protocol local-port))
-  (setf (slot-value protocol 'local-adress) local-address
+  (setf (slot-value protocol 'local-address) local-address
         (slot-value protocol 'local-port) local-port)
   (push protocol (bindings dmux))
   (when (and peer-address peer-port)
@@ -269,7 +271,11 @@ See http://www.iana.org/assignments/protocol-numbers")
 (defgeneric connection-closed(application protocol)
   (:documentation "Called by an associated layer 4 protocol when a connection
 has completely closed")
-  (:method(app protocol) (declare (ignore app protocol))))
+  (:method(app protocol) (declare (ignore app protocol)))
+  (:method :after (app protocol)
+     (declare (ignore app))
+     (let ((dmux (protocol-dmux protocol)))
+       (setf (bindings dmux) (delete protocol (bindings dmux))))))
 
 (defgeneric close-request(application protocol)
   (:documentation "Called by an associated layer 4 protocol when a connection
@@ -345,21 +351,24 @@ this occurs when the acknowledgement is received from the peer.")
 
 (in-package :protocol.layer5)
 
-(defclass data()
+(defclass data(packet:pdu)
   ((layer :initform 5 :allocation :class :reader layer)
    (length-bytes :type integer :initarg :length-bytes
          :documentation "Number of data bytes if no contents")
    (contents :type (or null (vector octet *)) :initform nil :reader contents
              :initarg :contents
              :documentation "Vector of data if we are sending")
-   (msg-size :type integer :initarg :msg-size :initform 0 :reader msg-size
-             :documentation "Total size of message")
-   (response-size :type integer :initarg :response-size :initform 0
+   #+nil(response-size :type integer :initarg :response-size :initform 0
                   :reader response-size
                   :documentation "Size of response requested")
-   (checksum :type word :initform 0 :initarg :checksum
-             :documentation "Checksum value"))
+   #+nil(checksum :type word :initarg :checksum
+                  :documentation "Checksum value"))
   (:documentation "Data PDU"))
+
+(defmethod send((layer4 layer4:protocol) (length-bytes integer) application &rest args)
+  (apply #'send layer4
+         (make-instance 'data :length-bytes length-bytes)
+         application args))
 
 (defmethod print-object((data data) stream)
   (print-unreadable-object (data stream :type t :identity t)
@@ -369,7 +378,7 @@ this occurs when the acknowledgement is received from the peer.")
   (if (contents pdu) (length (contents pdu)) (slot-value pdu 'length-bytes)))
 
 (defmethod copy((data data))
-  (let ((copy (copy-with-slots data '(msg-size response-size checksum))))
+  (let ((copy (copy-with-slots data '(-size response-size checksum))))
     (if (contents data)
         (setf (slot-value copy 'contents) (copy-seq (contents data)))
         (setf (slot-value copy 'length-bytes) (slot-value data 'length-bytes)
@@ -380,7 +389,7 @@ this occurs when the acknowledgement is received from the peer.")
   (:documentation "Perform 16 bit xor checksum across entity data")
   (:method((data vector))
     "Perform 16 bit xor checksum across a vector of (unsigned-byte 8)"
-    (check-type data (vector (unsigned-byte 8) *))
+    (check-type data (vector octet *))
     (multiple-value-bind(s2 rem) (floor (length data) 2)
       (let ((sum 0))
         (declare (type word sum))
@@ -421,9 +430,9 @@ this occurs when the acknowledgement is received from the peer.")
        'data
        :contents (when (contents data)
                    (subseq (contents data) offset (+ offset size)))
-       :msg-size (msg-size data)
-       :length-bytes (unless (contents data) size)
-       :response-size (response-size data)))))
+       :length-bytes (unless (contents data) size)))))
+
+       ;;:response-size (response-size data)
 
 (defun copy-from-seq(size f o data)
   (copy-from-offset size (offset-from-seq f o) data))

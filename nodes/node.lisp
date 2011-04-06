@@ -44,16 +44,16 @@
 (defmethod find-interface((address network-address) (node node))
   "Return interface for given  network address"
   (or
-   (find local-ipaddr (interfaces node)
+   (find address (interfaces node)
          :test #'address=
          :key #'network-address)
-   (let ((r (layer3::getroute peer-address node)))
+   (let ((r (layer3::getroute address node)))
      (when r (interface r)))))
 
 (defun local-ipaddr-p(ipaddr node)
   (or
    (address= ipaddr (network-address node))
-   (find local-ipaddr (interfaces node)
+   (find ipaddr (interfaces node)
          :test #'address=
          :key #'network-address)))
 

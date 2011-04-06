@@ -54,7 +54,7 @@
 
 (defmethod print-object((p udp-pending) stream)
   (print-unreadable-object(p stream :type t :identity t)
-    (format stream "~:/print-eng/bytes/~:/print-eng/bytes sent"
+    (format stream "~:/print-eng//~:/print-eng/bytes sent"
             (bytes-sent p) (length-bytes (data p)))))
 
 (defclass udp-dmux(protocol-dmux)
@@ -64,7 +64,7 @@
 (register-protocol 'udp-dmux 17)
 
 (defclass udp(protocol-implementation)
-  ((protocol-number :type 'fixnum :initform 17 :allocation :class
+  ((protocol-number :type fixnum :initform 17 :allocation :class
                     :reader protocol-number)
    (packet-size :initform *default-udp-packet-size*
                 :initarg :packet-size :accessor packet-size
@@ -91,11 +91,12 @@
              :src-port (src-port udphdr)
              :fid (fid packet)
              :packet-created (packet:created packet)
-             :sequence-number (sequence-number uphdr))))
+             :sequence-number (sequence-number udphdr))))
 
-(defmethod send(application data (udp udp)
+(defmethod send((udp udp) (data layer5:data) application
                 &key (dst-address (peer-address udp))
                 (dst-port (peer-port udp)) &allow-other-keys)
+  (declare (ignore application))
   (assert (and dst-address dst-port)
           (dst-address dst-port)
           "send of data to ~A:~A invalid for UDP" dst-address dst-port)
@@ -111,7 +112,8 @@
   (udp-send-pending udp))
 
 (defmethod close-connection((udp udp))
-  (call-next-method))
+  (call-next-method)
+  (connection-closed (application udp) udp))
 
 (defmethod reset((udp udp))
   (dolist(interface (interfaces (node udp)))
@@ -141,9 +143,9 @@
                                :msg-size (length-bytes data)
                                :sequence-number (incf (sequence-number udp)))
                 packet)
-               (send (find-protocol 'layer3:ipv4 (node udp)) packet udp
+               (send (layer3:find-protocol 'layer3:ipv4 (node udp)) packet udp
                      :dst-address (dst-address pd)
-                     :src-address (src-address udp)
+                     :src-address (local-address udp)
                      :ttl (ttl udp)
                      :tos (tos udp))
                (sent (application udp) (length-bytes data) udp)))

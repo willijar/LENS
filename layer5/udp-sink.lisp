@@ -61,7 +61,7 @@ overall bytes/sec data rx.")
   (:documentation "Listen and record statistics of incomming packets
 on a specific port"))
 
-(defmethod initialize-instance
+(defmethod initialize-instance :after
     ((app udp-sink)
      &key local-port
      (protocol-type 'layer4:udp)

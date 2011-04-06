@@ -93,10 +93,9 @@ two things")
   (print-unreadable-object (interface stream :type t :identity t)
     (princ (type-of (layer2:protocol interface)) stream)
     (when (slot-boundp interface 'node)
-      (format stream " N~D~@[ ~A~]~@[/~A~]"
+      (format stream " N~D ~A"
               (uid (node interface))
-              (hardware-address interface)
-              (network-mask interface)))))
+              (hardware-address interface)))))
 
 (defmethod buffer-available-p(size (interface interface))
   (buffer-available-p size (packet-queue interface)))

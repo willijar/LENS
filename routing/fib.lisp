@@ -14,7 +14,7 @@
   (:documentation "Abstract class for routing using a Forwarding
 Information Base"))
 
-(defmethod initialize-instance((fib fib) &key &allow-other-keys)
+(defmethod initialize-instance :after ((fib fib) &key &allow-other-keys)
   (reinitialise-routes fib nil))
 
 (defmethod reinitialise-routes((fib fib) (changed-entity null))

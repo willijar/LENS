@@ -103,7 +103,6 @@ bucket interval."))
     (loop :for i :from 0 :below (length bins) :do (setf (aref bins i) 0)))
   (setf (out-of-range stats) 0))
 
-
 (defmethod record((v number) (stats histogram) &key time)
   (declare (ignore time))
   (with-slots(min-value max-value out-of-range) stats

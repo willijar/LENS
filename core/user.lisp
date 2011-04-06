@@ -72,7 +72,7 @@ will run on a backgound thread."
   (clear-nodes)
   (reset :all)
   (load (merge-pathnames (make-pathname :name name :type "lisp")
-                         #p"/home/willijar/dev/lisp/src/lens/tests/")
+                         #.(asdf:system-relative-pathname :lens "tests/"))
         :verbose nil :print nil)
   (format t "~%-- Test ~S loaded~%" name))
 

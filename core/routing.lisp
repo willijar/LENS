@@ -21,7 +21,7 @@
 
 (defclass routing()
   ((node :initarg :node :reader node
-         :documentation "Node to which routing object is attached")
+         :documentation "Node on which this routing object belongs")
    (default-route :type vertex :initform nil :accessor default-route
                   :documentation "The default (gateway) route"))
   (:documentation "Base class for all the routing protocols that may
@@ -56,7 +56,9 @@ changed-entity is the object in the topology who's state has changed. If no chan
 (defgeneric topology-changed(changed-entity)
   (:documentation "Inform routing that topology has changed")
   (:method(entity)
-    (reinitialise-routes (routing (node entity)) entity)))
+    (reinitialise-routes (routing (node entity)) entity))
+  (:method((seq sequence))
+    (map 'nil #'topology-changed seq)))
 
 (defvar *default-routing* nil "make-instance args for default routing")
 

@@ -95,6 +95,9 @@ Returns:
 (defgeneric busy-p(entity)
   (:documentation "Return true if an entity is busy"))
 
+(defgeneric length-bytes(pdu)
+  (:documentation "Return length of simulation entity in bytes"))
+
 (defvar *reset-hooks* nil
   "List of hooks to call during a reset")
 

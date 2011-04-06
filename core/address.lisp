@@ -114,8 +114,8 @@
 (defmethod print-object((addr macaddr) stream)
   (if *print-escape*
       (print-unreadable-object (addr stream :type t :identity nil)
-        (write (slot-value addr 'address-bytes) :stream stream :base 16))
-      (write (slot-value addr 'address-bytes) :stream stream :base 16)))
+        (format stream "~12,'0X" (slot-value addr 'address-bytes)))
+      (format stream "~12,'0X" (slot-value addr 'address-bytes))))
 
 (defclass ipaddr(network-address)
   ()

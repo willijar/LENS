@@ -19,12 +19,12 @@
 (setf (trace-status (node 5) *lens-trace-output*) :enabled)
 
 ;; notify routing of new topology
-(topology-changed)
+(topology-changed (nodes))
 
 ;; put in sources and sinks and appropriate monitoring
 (defparameter src
   (make-instance
-   'cbr-source
+   'abr-source
    :node (node 0)
    :peer-address (ipaddr (node 5))
    :peer-port 20000))

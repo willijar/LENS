@@ -29,10 +29,13 @@ called after all entities created before running simulation")
          :documentation "Rank in priority queue")
    (event-time :initarg :time :type time-type :accessor event-time
 	 :initform -1.0d0
-	 :documentation "simulation time at which event handler is to be accled")
-   (handler :reader handler :initarg :handler
-            :documentation "The handler function for this event"))
+	 :documentation "simulation time at which event is to be handled"))
   (:documentation "Class representing a scheduled event"))
+
+(defclass simple-event(event)
+  ((handler :reader handler :initarg :handler
+            :documentation "The handler function for this event"))
+  (:documentation "Class for simple events where handler is invoked"))
 
 (defun event-rank(a &optional b)
   (if b (setf (slot-value a 'rank) b) (slot-value a 'rank)))
@@ -47,7 +50,7 @@ called after all entities created before running simulation")
   (:documentation "Method called by scheduler on a scheduled entity")
   (:method((f function)) (funcall f))
   (:method((form list)) (apply (first form) (rest form)))
-  (:method((event event))
+  (:method((event simple-event))
     #+debug(format *debug-io* "handle: ~,3f: ~S~%"
                    (simulation-time) (handler event))
     (handle (handler event))))
@@ -88,7 +91,7 @@ called after all entities created before running simulation")
       (enqueue event (slot-value scheduler 'event-queue)))
     event)
   (:method ((delay number) handler)
-    (schedule delay (make-instance 'event :handler handler))))
+    (schedule delay (make-instance 'simple-event :handler handler))))
 
 (defmethod stop((event event) &key &allow-other-keys)
   (alg:delete event  (slot-value (scheduler) 'event-queue)))
@@ -186,7 +189,7 @@ are dispatched in current thread"
   "Execute body scheduled by delay seconds, or immediately if delay is
 0 The body is used to form a closure - care should be taken that the
 variables captured by that closure cannot be changed between the
-lexecal and execution context"
+lexical and execution context"
   (let ((f (gensym "delayed-body"))
         (d (gensym)))
     `(flet((,f() ,@body))

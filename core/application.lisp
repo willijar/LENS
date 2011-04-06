@@ -19,7 +19,7 @@
 (in-package :layer5)
 
 (defclass application()
-  ((name :type string :initarg :name :reader name
+  ((name :type string :initarg :name
          :documentation "Name of this application")
    (node :initarg :node :reader node))
   (:documentation "Class Application is the base class for all applications.
@@ -28,10 +28,15 @@ the associated layer 4 protocols.  Applications can have one
 or more layer 4 protocols assigned, to allow (for example)
 a web browser model with multiple simultaneous connections."))
 
-(defmethod initialize-instance :after ((app application) &key &allow-other-keys)
-  (unless (slot-boundp app 'name)
-    (setf (slot-value app 'name)
-          (string-downcase (class-name (class-of app))))))
+(defgeneric name(app)
+  (:documentation "Return the given name for an application")
+  (:method(app)
+    (if (slot-boundp app 'name)
+        (slot-value app 'name)
+        (class-name (class-of app)))))
+
+(defmethod initialize-instance :after ((app application) &key node &allow-other-keys)
+  (push app (node:applications node)))
 
 (defmethod receive((application application) data layer4 &key &allow-other-keys)
   "Called by layer 4 protocol object when data is received. Default - do nothing"

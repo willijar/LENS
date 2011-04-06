@@ -11,8 +11,6 @@
   ()
   (:documentation "base class for all PDU entities"))
 
-(defgeneric length-bytes(pdu)
-  (:documentation "Return length of pdu or packet in bytes"))
 
 (defgeneric layer(pdu)
   (:documentation "Return the layer associated with a PDU"))
@@ -40,13 +38,7 @@
 protocol data units (PDUs)."))
 
 (defmethod initialize-instance :after((packet packet) &key data &allow-other-keys)
-  (typecase data
-    (pdu
-     (push-pdu data packet))
-    (integer
-     (push-pdu (make-instance 'layer5:data :length-bytes data) packet))
-    ((vector octet *)
-     (push-pdu (make-instance 'layer5:data :contents data) packet))))
+  (push-pdu data packet))
 
 (defmethod print-object((packet packet) stream)
   (print-unreadable-object(packet stream :type t :identity t)

@@ -23,7 +23,7 @@
   (:export #:start #:stop #:reset #:busy-p #:*reset-hooks*
            #:while #:until #:filter #:defenumeration
            #:when-bind #:when-bind*
-           #:uid #:counter #:name #:node
+           #:uid #:counter #:name #:node #:length-bytes
            #:octet #:word #:counter #:seq #:fid
            #:interface #:link #:node #:application
            #:copy #:copy-with-slots
@@ -58,7 +58,7 @@
   (:documentation "Packet implementation")
   (:use :cl :common)
   (:import-from :scheduler #:simulation-time #:time-type)
-  (:export #:pdu #:pdus #:length-bytes #:layer #:packet #:created
+  (:export #:pdu #:pdus #:layer #:packet #:created
            #:push-pdu #:skip-pdu #:peek-pdu #:pop-pdu #:priority))
 
 (defpackage :trace
@@ -73,8 +73,8 @@
 (defpackage :protocol
   (:documentation "Protocol stack layer implementations")
   (:use :cl #:common #:trace)
-  (:import-from :packet #:pdu #:layer #:length-bytes #:peek-pdu)
-  (:export #:protocol-number #:protocol #:layer #:pdu #:length-bytes
+  (:import-from :packet #:pdu #:layer #:peek-pdu)
+  (:export #:protocol-number #:protocol #:layer #:pdu
            #:send #:receive #:drop
            #:pdu-trace #:write-pdu-slots #:default-trace-detail))
 
@@ -82,7 +82,7 @@
   (:documentation "network and hardware addressing")
   (:use :cl)
   (:import-from :split-sequence #:split-sequence)
-  (:import-from :protocol #:length-bytes #:protocol-number)
+  (:import-from :protocol #:protocol-number)
   (:export  #:hardware-address #:network-address #:network-mask
             #:address= #:subnet #:address-bytes #:make-address-mask
             #:broadcast-p #:macaddr #:ipaddr #:ipport
@@ -93,7 +93,7 @@
 (defpackage :node
   (:documentation "Node implementations")
   (:use :cl :common :address)
-  (:export #:node #:nodes #:clear-nodes
+  (:export #:node #:nodes #:clear-nodes #:interfaces #:applications
            #:interfaces #:ipaddrs #:local-ipaddr-p
            #:add-interface #:find-interface  #:neighbours
            #:receive-packet
@@ -107,7 +107,7 @@
   (:import-from :node #:node #:interfaces)
   (:import-from :alg  #:make-queue
                 #:enqueue #:dequeue #:list-queue #:traverse #:empty-p)
-  (:import-from :packet #:packet #:length-bytes #:priority #:peek-pdu)
+  (:import-from :packet #:packet #:priority #:peek-pdu)
   (:import-from :scheduler #:time-type #:simulation-time #:schedule)
   (:import-from :protocol #:send #:receive #:drop)
   (:export #:interface #:interfaces :link #:packet-queue
@@ -116,7 +116,7 @@
            #:delete-packets-if #:drop-packet-p #:buffer-available-p
            #:average-queue-length #:reset-average-queue-length
            #:enqueue-count #:drop-count #:egress-filter
-           #:length-packets #:length-bytes #:limit-packets #:limit-bytes
+           #:length-packets #:limit-packets #:limit-bytes
            #:interface #:peer-interfaces #:default-peer-interface
            #:receive-own-broadcast-p #:utilisation #:network-to-hardware-address
            #:*default-bandwidth* #:*default-delay* #:*default-ber*
@@ -174,7 +174,7 @@
            #:send #:receive #:sent
            #:fid
            ;; specific default layer 4 protocols
-           #:udp #:tcp #:icmp #:demux #:tcp-tahoe #:tcp-reno #:tcp-newreno))
+           #:udp #:tcp #:icmp #:tcp-tahoe #:tcp-reno #:tcp-newreno))
 
 (defpackage :protocol.layer5
   (:documentation "Application Layer protocol interface")
@@ -196,7 +196,7 @@
    (:import-from :trace
                  #:*lens-trace-output* #:trace-status #:trace-detail
                  #:time-format #:trace-stream)
-   (:import-from :packet #:length-bytes #:created #:fid #:pdus)
+   (:import-from :packet #:created #:fid #:pdus)
    (:import-from #:protocol #:protocol-number #:layer)
    (:import-from :node
                  #:node #:nodes #:clear-nodes
@@ -211,7 +211,7 @@
                  #:packet-queue #:drop-tail #:average-queue-length
                  #:enqueue-count #:drop-count #:limit-bytes #:limit-packets
                  #:length-packets #:priority-queue)
-   (:import-from :protocol.layer2 #:IEEE802.3 #:arp #:IEEE802.11)
+   (:import-from :protocol.layer2 #:llcsnap #:IEEE802.3 #:arp #:IEEE802.11)
    (:import-from :protocol.layer3 #:ipv4
                  #:*default-routing* #:default-route #:initialise-routes
                   #:routing-static #:getroute #:remroute

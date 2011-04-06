@@ -72,3 +72,5 @@
 
 (defmethod receive ((protocol llcsnap) packet interface &key &allow-other-keys)
   (receive (find-recipient (packet:pop-pdu packet) protocol) packet protocol))
+
+(defmethod reset((protocol llcsnap)) )

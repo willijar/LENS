@@ -42,28 +42,29 @@ fast as possible if rate is 0"))
 (defmethod scheduler:handle((app abr-source))
   "Send a packet and reschedule"
   (with-slots(rate protocol pkt-size) app
-    (send protocol pkt-size app)
+    (send protocol (make-instance 'data :length-bytes pkt-size) app)
     (scheduler:schedule (/ (* pkt-size 8) (math:random-value rate)) app)))
 
 (defmethod start((app abr-source))
   (unless (slot-boundp app 'protocol)
-    (setf (slot-value app 'protocol)
-          (make-instance (protocol-type app)
+    (make-instance (protocol-type app)
                          :peer-address (peer-address app)
                          :peer-port (peer-port app)
                          :node (node app)
-                         :application app))))
+                         :application app)))
 
-(defmethod connection-complete((app abr-source) socket &key failure)
+(defmethod connection-complete((app abr-source) layer4 &key failure)
   (unless failure
     (with-slots(protocol rate pkt-size) app
+      (setf protocol layer4)
       (if (equal rate 0)
-          (send protocol pkt-size app)
-          (handle app)))))
+          (send protocol (make-instance 'data :length-bytes pkt-size) app)
+          (scheduler:handle app)))))
 
 (defmethod stop((app abr-source) &key &allow-other-keys)
-  (close-connection (protocol app))
-  (slot-makunbound app 'protocol))
+  (when (slot-boundp app 'protocol)
+    (close-connection (protocol app))
+    (slot-makunbound app 'protocol)))
 
 
 
