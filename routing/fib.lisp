@@ -24,7 +24,8 @@ Information Base"))
       (setf (aref fib-map i)
             (cons (make-address-mask (* (- (length fib-map) i) 8)
                                      address-length)
-                  (make-hash-table))))))
+                  (make-hash-table)))))
+  (call-next-method))
 
 (declaim (inline get-fib-hash))
 (defun get-fib-hash(mask fib)
@@ -33,7 +34,7 @@ Information Base"))
 
 (defmethod getroute((address network-address) (fib fib)
                       &key &allow-other-keys)
-  (let ((bytes (address-bytes address)))
+    (let ((bytes (address-bytes address)))
     (with-slots(fib-map) fib
       (dotimes(i (length fib-map))
         (let* ((v (aref fib-map i))
@@ -41,6 +42,7 @@ Information Base"))
                (hash (cdr v)))
           (let ((match (gethash (logand mask bytes) hash)))
             (when match (return-from getroute match))))))))
+
 
 (defmethod (setf getroute)(vertex (address network-address) (fib fib) &key mask &allow-other-keys)
   (unless (vertex= vertex (default-route fib))
@@ -56,7 +58,7 @@ Information Base"))
                 (return-from getroute
                   (setf (gethash k hash) vertex))
                 (remhash k hash))))
-        (setf (gethash bytes (aref fib-map 0)) vertex))))))
+        (setf (gethash bytes (cdr (aref fib-map 0))) vertex))))))
 
 (defmethod remroute((dest network-address) (fib fib)
                      &key mask &allow-other-keys)

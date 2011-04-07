@@ -66,6 +66,9 @@ fast as possible if rate is 0"))
     (close-connection (protocol app))
     (slot-makunbound app 'protocol)))
 
+(defmethod reset((app abr-source))
+  (stop app))
+
 
 
 

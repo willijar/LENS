@@ -10,9 +10,6 @@
   (:documentation "Manual routing. The routing protocol doesn't manage
 routing - the user must add the entries explicitly."))
 
-(defmethod reinitialise-routes((routing routing-manual) changed)
-  (declare (ignore changed)))
-
 (defmethod getroute((address network-address) (routing routing-manual)
                       &key &allow-other-keys)
   (or (call-next-method)

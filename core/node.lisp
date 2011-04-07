@@ -56,8 +56,8 @@ form the packets are derived from this class."))
   (setf *nodes*
         (make-array 1024 :initial-element nil :adjustable t :fill-pointer 0)))
 
-(eval-when(:load-toplevel :execute)
-  (pushnew *nodes* *reset-hooks*))
+;(eval-when(:load-toplevel :execute)
+;  (pushnew *nodes* *reset-hooks*))
 
 (defmethod initialize-instance :after ((node node) &key &allow-other-keys)
   (setf (slot-value node 'uid) (vector-push-extend node (nodes)))

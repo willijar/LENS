@@ -187,6 +187,9 @@ See http://www.iana.org/assignments/protocol-numbers")
         (apply #'receive listener packet layer3protocol args)
         (drop dmux packet :text "L4-NP"))))
 
+(defmethod reset((dmux protocol-dmux))
+  (map 'nil #'reset (bindings dmux)))
+
 ;; even connectionless protocols don't have a peer address or port
 ;; it is convenient to use the protocol-implementation to manage this for
 ;; the application in the simulation using open-connection and close-connection,

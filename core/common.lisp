@@ -107,9 +107,9 @@ Returns:
   (:method ((entities sequence))
     (map nil #'reset entities))
   (:method ((entity (eql :all)))
+    (reset (node:nodes))
     (dolist(h *reset-hooks*)
       (typecase h
-        (list (apply (first h) (rest h)))
         (function (funcall h))
         (t (reset h))))))
 

@@ -194,7 +194,7 @@ addresses is defined.")
     (multiple-value-bind(q r) (floor mask-len 8)
       (unless (zerop r) (error "Mask length not a multiple of 8 bits"))
       (dotimes(x q)
-        (setf v (dpb  #xFF (byte 8 (- address-length (* 8 x))) v))))
+        (setf v (dpb  #xFF (byte 8 (- address-length (* 8 (1+ x)))) v))))
     v))
 
 (defmethod network-mask(entity)

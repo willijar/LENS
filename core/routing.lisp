@@ -51,7 +51,9 @@ interface and next hop IP address"))
 
 (defgeneric reinitialise-routes(routing changed-entity)
   (:documentation "Reinitialise routing table due to topology change -
-changed-entity is the object in the topology who's state has changed. If no changed entity specified initialise entire state"))
+changed-entity is the object in the topology who's state has changed. If no changed entity specified initialise entire state")
+  (:method((routing routing) (changed-entity null))
+    (setf (default-route routing) nil)))
 
 (defgeneric topology-changed(changed-entity)
   (:documentation "Inform routing that topology has changed")

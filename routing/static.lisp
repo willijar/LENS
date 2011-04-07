@@ -49,7 +49,7 @@
                     (uid source) (length (nodes))
                     :edges-fn #'edges :cost-fn #'cost))
                   (first-hops (alg:extract-first-hops previous))
-                  (route (alg:extract-route (uid destination) previous)))
+                  #+nil(route (alg:extract-route (uid destination) previous)))
             (when (< (aref previous (uid destination)) 0)
               (error "Unable to route - ~A not connected to ~A"
                      source destination))
@@ -70,10 +70,11 @@
                     (setf (getroute (network-address (node i)) routing)
                           (vertex (uid source) hop))))))
             ;; add in routes to destination to other nodes
-            (dolist(dst (cdr route))
-              (setf (getroute address (routing (node dst)))
-                    (vertex dst (uid destination))))))
-        (call-next-method))))
+            #+nil(dolist(dst (cdr route))
+                   (setf (getroute address (routing (node dst)))
+                         (vertex dst (uid destination))))))
+        (or (call-next-method)
+            (default-route routing)))))
 
 (defmethod reinitialise-routes((routing routing-static) entity)
   (setf (default-route routing) nil)

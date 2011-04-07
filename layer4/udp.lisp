@@ -116,9 +116,9 @@
   (connection-closed (application udp) udp))
 
 (defmethod reset((udp udp))
-  (dolist(interface (interfaces (node udp)))
-    (delete-notifications udp interface))
-  (while (dequeue (pending-data udp))))
+  (map 'nil #'(lambda(interface) (delete-notifications udp interface))
+       (interfaces (node udp)))
+  (setf  (pending-data udp) nil))
 
 (defun udp-send-pending(udp)
   (dolist(pd (pending-data udp))
