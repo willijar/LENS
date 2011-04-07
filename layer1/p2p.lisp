@@ -85,12 +85,10 @@
    :local-interface (make-instance
                      'interface
                      :node a
-                     :protocol 'layer2:llcsnap
                      :network-address local-address
                      :network-mask local-mask)
    :peer-interface (make-instance
                     'interface
                     :node b
-                    :protocol 'layer2:llcsnap
                     :network-address peer-address
                     :network-mask peer-mask)))

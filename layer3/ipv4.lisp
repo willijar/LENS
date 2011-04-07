@@ -66,11 +66,11 @@
     copy))
 
 (defmethod pdu-trace((pdu ipv4-header) detail stream &key packet text)
-  (format stream " ~@[~A~] L3" text)
+  (format stream " ~@[~A~] L3-IPV4" text)
   (write-pdu-slots
    pdu
    '((version "-~A") header-length service-type total-length
-     identification flags fragment-offset ttl protocol header-checksum
+     identification flags fragment-offset ttl protocol-number header-checksum
      src-address dst-address)
    detail
    stream)
@@ -90,8 +90,14 @@ node to communicate with each other.")
 
 (register-protocol 'ipv4 #x0800)
 
-(defmethod default-trace-detail((entity ipv4-header))
+(defmethod default-trace-detail((entity ipv4))
   '(ttl protocol-number src-address dst-address))
+
+;; no state so do nothing - note it is intentional that there is no
+;; default method here as every protocol should be considered on its
+;; own merit.
+
+(defmethod reset((ipv4 ipv4)))
 
 (defmethod send((ipv4 ipv4) packet sender
                 &key

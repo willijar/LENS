@@ -155,11 +155,18 @@ interface is busy. Requires address"
     (when tx-packet (error "Interface cannot send two packets simultaneously"))
     (setf tx-packet packet)))
 
+(defmethod send((interface interface) packet (protocol layer2:protocol) &key &allow-other-keys)
+  (if (busy-p protocol)
+      (enqueue packet (packet-queue interface))
+      (send (link interface) packet protocol)))
+
 (defmethod send-complete((interface interface) packet (link link)
                          &key fail &allow-other-keys)
   (assert (eql packet (slot-value interface 'tx-packet)))
   (setf (slot-value interface 'tx-packet) nil)
   (when fail (drop interface packet :text fail))
+  (unless (empty-p (packet-queue interface))
+    (send (link interface) packet interface))
   (do-notifications interface))
 
 (defmethod receive-start((interface interface) packet link)

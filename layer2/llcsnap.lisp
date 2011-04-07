@@ -21,10 +21,10 @@
 (in-package :layer2)
 
 (defclass llcsnap-header(pdu)
-  ((dsap :type (unsigned-byte 8) :initform #xAA)
-   (ssap  :type (unsigned-byte 8) :initform #xAA)
-   (ctrl  :type (unsigned-byte 8) :initform #x3)
-   (oui  :type (unsigned-byte 24) :initform 0)
+  (#+nil(dsap :type (unsigned-byte 8) :initform #xAA)
+   #+nil(ssap  :type (unsigned-byte 8) :initform #xAA)
+   #+nil(ctrl  :type (unsigned-byte 8) :initform #x3)
+   #+nil(oui  :type (unsigned-byte 24) :initform 0)
    (ethtype :type (unsigned-byte 16) :accessor ethtype
             :initform #x0800 :initarg :type
             :documentation "Protocol Number for upper level")))
@@ -54,7 +54,9 @@
   ()
   (:documentation "Base class for protocols which use llcsnap sublayer"))
 
-(defmethod send ((protocol llcsnap) packet layer3 &key &allow-other-keys)
+(defmethod busy-p((layer2 llcsnap)) (busy-p (interface layer2)))
+
+(defmethod send :before ((layer2 llcsnap) packet layer3 &key &allow-other-keys)
   (push-pdu
    (make-instance 'llcsnap-header :type (protocol-number layer3))
    packet))
@@ -72,5 +74,3 @@
 
 (defmethod receive ((protocol llcsnap) packet interface &key &allow-other-keys)
   (receive (find-recipient (packet:pop-pdu packet) protocol) packet protocol))
-
-(defmethod reset((protocol llcsnap)) )

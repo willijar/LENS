@@ -25,6 +25,7 @@
 (defparameter src
   (make-instance
    'abr-source
+   :name "source"
    :node (node 0)
    :peer-address (ipaddr (node 5))
    :peer-port 20000))
@@ -32,6 +33,7 @@
 (defparameter sink
   (make-instance
    'udp-sink
+   :name "sink"
    :node (node 5)
    :delay-statistics (make-instance 'average-min-max)
    :bandwidth-statistics (make-instance 'average-min-max)

@@ -1,6 +1,5 @@
-;; $Id$
 ;; Interfaces
-;; Copyright (C) 2007 Dr. John A.R. Williams
+;; Copyright (C) 2010 Dr. John A.R. Williams
 
 ;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
 ;; Keywords:
@@ -71,13 +70,6 @@
 
 (defmethod send((interface physical-interface) packet dummy &optional dummy)
   (send (channel interface) packet dummy))
-
-
-
-
-
-
-
 
 (defclass interface(timers-manager)
   ((node :initarg :node :type node :accessor node

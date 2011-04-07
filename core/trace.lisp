@@ -62,7 +62,7 @@
   (:documentation "A packet trace stream"))
 
 (defmethod reset((ts trace-stream))
-  (terpri (os ts))
+  (force-output (os ts))
   (setf (col-index ts) 0)
   (setf (last-log-time ts) (simulation-time)))
 
@@ -105,7 +105,7 @@
 (defmethod stream-write-sequence((ts trace-stream)
                                  sequence start end
                                  &key &allow-other-keys)
-  (declare (type (integer 0 *) start end))
+  (unless end (setf end (length sequence)))
   (check-sim-time ts)
   (let ((os (os ts)))
     (loop :for index :from start :below end
@@ -116,7 +116,7 @@
           :do (write-char c os)))
   sequence)
 
-(defmethod stream-write-string((ts trace-stream) string &optional start end)
+(defmethod stream-write-string((ts trace-stream) string &optional (start 0) (end (length string)))
   (stream-write-sequence ts string start end))
 
 (defmethod stream-line-length((ts trace-stream))

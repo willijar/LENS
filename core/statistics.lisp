@@ -45,7 +45,7 @@
    (total :type number :initform 0 :accessor total)
    (no-samples :initform 0 :type integer :accessor no-samples))
   (:documentation "Class to dynamically track the average, minimum,
-and maximum values for the measured stsatistics."))
+and maximum values for the measured statistics."))
 
 (defmethod record((value number) (stats average-min-max)
                   &key time)
@@ -80,7 +80,7 @@ and maximum values for the measured stsatistics."))
 (defmethod print-object((stats average-min-max) stream)
   (print-unreadable-object(stats stream :type t :identity t)
     (unless (zerop (no-samples stats))
-      (format stream "~A ~A ~A"
+      (format stream "~A/~A/~A"
               (min-sample stats) (average stats) (max-sample stats)))))
 
 (defclass histogram()

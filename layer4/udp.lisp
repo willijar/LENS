@@ -107,8 +107,7 @@
           (make-instance 'udp-pending
                          :data data
                          :dst-port dst-port
-                         :dst-address dst-address)
-          (pending-data udp))))
+                         :dst-address dst-address))))
   (udp-send-pending udp))
 
 (defmethod close-connection((udp udp))

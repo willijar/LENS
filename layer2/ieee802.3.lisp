@@ -29,7 +29,6 @@
 (defmethod copy((h ieee802.3-header))
   (copy-with-slots h '(src-address dst-address length)))
 
-
 (defmethod pdu-trace((pdu ieee802.3-header) detail stream &key packet text)
   (format stream " ~@[~A~] L2~@[-802.3~]" text (member 'type detail))
   (when (and packet (member 'length detail))
@@ -43,22 +42,21 @@
   (:documentation "Defines the Medium Access Control portion of 802.3
 layer 2 protocol."))
 
+(defmethod reset((layer2 ieee802.3))) ;; do nothing
+
 (defmethod default-trace-detail((entity ieee802.3))
   '(type src-address dst-address))
 
-(defmethod send ((protocol ieee802.3) packet layer3
+(defmethod send ((layer2 ieee802.3) packet layer3
                  &key address &allow-other-keys)
-  (call-next-method)
-  (let ((interface (interface protocol)))
+  (let ((interface (interface layer2)))
     (push-pdu
      (make-instance 'ieee802.3-header
                     :dst-address address
                     :src-address (hardware-address interface)
                     :length (length-bytes packet))
      packet)
-    (if (busy-p protocol)
-        (enqueue packet (packet-queue interface))
-        (send (interface protocol) packet protocol))))
+    (send interface packet layer2)))
 
 (defmethod receive((protocol ieee802.3) packet interface &key &allow-other-keys)
   (let ((pdu (pop-pdu packet)))
