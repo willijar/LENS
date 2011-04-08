@@ -59,7 +59,8 @@
   (:use :cl :common)
   (:import-from :scheduler #:simulation-time #:time-type)
   (:export #:pdu #:pdus #:layer #:packet #:created
-           #:push-pdu #:skip-pdu #:peek-pdu #:pop-pdu #:priority))
+           #:push-pdu #:skip-pdu #:peek-pdu #:pop-pdu #:priority
+           #:trace-format #:pdu-trace))
 
 (defpackage :trace
    (:documentation "Packet Trace handling")
@@ -67,16 +68,15 @@
 ;   (:import-from :address #:print-ip-format)
    (:import-from :scheduler #:simulation-time #:time-type)
    (:export #:trace-status #:trace-detail #:trace-stream #:time-format
-            #:*lens-trace-output* #:trace #:write-pdu-slots #:pdu-trace
-            #:write-trace #:default-trace-detail))
+            #:*lens-trace-output* #:trace #:default-trace-detail
+            #:trace-enabled-p))
 
 (defpackage :protocol
   (:documentation "Protocol stack layer implementations")
   (:use :cl #:common #:trace)
-  (:import-from :packet #:pdu #:layer #:peek-pdu)
+  (:import-from :packet #:pdu #:layer #:peek-pdu #:pdu-trace)
   (:export #:protocol-number #:protocol #:layer #:pdu
-           #:send #:receive #:drop
-           #:pdu-trace #:write-pdu-slots #:default-trace-detail))
+           #:send #:receive #:drop #:default-trace-detail))
 
 (defpackage :address
   (:documentation "network and hardware addressing")
@@ -107,7 +107,8 @@
   (:import-from :node #:node #:interfaces)
   (:import-from :alg  #:make-queue
                 #:enqueue #:dequeue #:list-queue #:traverse #:empty-p)
-  (:import-from :packet #:packet #:priority #:peek-pdu)
+  (:import-from :packet #:packet #:priority #:peek-pdu
+                #:trace-format)
   (:import-from :scheduler #:time-type #:simulation-time #:schedule)
   (:import-from :protocol #:send #:receive #:drop)
   (:export #:interface #:interfaces :link #:packet-queue
@@ -129,9 +130,9 @@
    (:nicknames :layer2 :layer.link)
    (:use :cl :address :common :protocol)
    (:shadow #:protocol #:pdu)
-   (:import-from :packet #:packet #:pop-pdu #:push-pdu)
+   (:import-from :packet #:packet #:pop-pdu #:push-pdu
+                 #:trace-format)
    (:import-from :scheduler #:schedule #:simulation-time #:time-type)
-   (:import-from :trace #:write-trace)
    (:import-from :node #:node)
    (:import-from :layer1 #:packet-queue #:enqueue #:dequeue #:empty-p
                  #:send-complete)
@@ -143,12 +144,14 @@
    (:nicknames :layer3 :layer.network)
    (:use :cl :common :address :protocol)
    (:shadow #:protocol #:pdu)
-   (:import-from :packet #:push-pdu #:pop-pdu #:peek-pdu)
+   (:import-from :packet #:push-pdu #:pop-pdu #:peek-pdu
+                 #:trace-format)
    (:import-from :alg #:+infinity+ #:dijkstra #:extract-route
                  #:extract-first-hops)
    (:import-from :node #:node #:nodes #:ipaddrs #:neighbours #:interfaces
                  #:find-interface)
    (:import-from :layer1 #:interface)
+   (:import-from :scheduler  #:simulation-time #:time-type)
    (:export #:protocol #:pdu
             #:register-protocol #:protocols #:find-protocol #:delete-protocol
             #:routing #:getroute #:remroute
@@ -163,7 +166,8 @@
   (:nicknames :layer4 :layer.transport)
   (:use :cl :common :address :protocol)
   (:shadow #:protocol #:pdu)
-  (:import-from :packet #:packet #:pop-pdu #:push-pdu #:peek-pdu)
+  (:import-from :packet #:packet #:pop-pdu #:push-pdu #:peek-pdu
+                #:trace-format)
   (:import-from :alg #:enqueue #:dequeue #:make-queue #:empty-p)
   (:import-from :node #:node #:interfaces #:find-interface)
   (:export #:protocol #:pdu

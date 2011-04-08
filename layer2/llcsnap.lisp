@@ -27,41 +27,23 @@
    #+nil(oui  :type (unsigned-byte 24) :initform 0)
    (ethtype :type (unsigned-byte 16) :accessor ethtype
             :initform #x0800 :initarg :type
-            :documentation "Protocol Number for upper level")))
-
-(defmethod default-trace-detail((pdu llcsnap-header))
-  '(ethtype))
-
-(defmethod pdu-trace((pdu llcsnap-header) detail stream &key packet text)
-    (format stream " ~@[~A ~]LLC" text)
-    (when (and packet (member 'length detail))
-      (format stream " ~A" (length-bytes packet)))
-    (write-pdu-slots pdu '((dsap " ~X")
-                           (ssap " ~X")
-                           (ctrl " ~X")
-                           (oui " ~X")
-                           (ethtype " ~X"))
-                     detail stream)
-    (when (member 'uid detail)
-      (format stream " ~D" (if packet (uid packet) 0))))
+            :documentation "Protocol Number for upper level"))
+  (:documentation "Base class for protocol headers using llcsnap"))
 
 (defmethod length-bytes((h llcsnap-header)) 8)
 
 (defmethod copy((h llcsnap-header))
-  (copy-with-slots h '(dsap sap ctrl oui ethtype)))
+  (copy-with-slots h '(ethtype))
+  #+nil(copy-with-slots h '(dsap sap ctrl oui ethtype)))
 
 (defclass llcsnap(protocol)
   ()
   (:documentation "Base class for protocols which use llcsnap sublayer"))
 
+
 (defmethod busy-p((layer2 llcsnap)) (busy-p (interface layer2)))
 
-(defmethod send :before ((layer2 llcsnap) packet layer3 &key &allow-other-keys)
-  (push-pdu
-   (make-instance 'llcsnap-header :type (protocol-number layer3))
-   packet))
-
-(defun find-recipient(h protocol)
+(defun llcsnap-find-recipient(h protocol)
   (let* ((interface (interface protocol))
          (arp (arp (interface protocol)))
          (type (ethtype h)))
@@ -72,5 +54,3 @@
       (t
        (error "Unable to find protocol ~X in protocol graph" type)))))
 
-(defmethod receive ((protocol llcsnap) packet interface &key &allow-other-keys)
-  (receive (find-recipient (packet:pop-pdu packet) protocol) packet protocol))

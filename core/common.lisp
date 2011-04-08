@@ -80,7 +80,9 @@ Returns:
   (:documentation "Return the node associated with an entity"))
 
 (defgeneric name(entity)
-  (:documentation "Return a descriptive name of an entity"))
+  (:documentation "Return a descriptive name of an entity - used in tracing")
+  (:method((obj standard-object))
+    (class-name (class-of obj))))
 
 (defgeneric (setf name)(value entity)
   (:documentation "Set the descriptive name of an entity"))

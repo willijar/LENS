@@ -43,19 +43,29 @@
      reassembly-exceeded))
 
 (defclass icmp-header(pdu)
-  ((icmp-type :accessor icmp-type :type ICMP-msg-type :initarg :type)
+  ((name :initform "ICMP" :reader name :allocation :class)
+   (trace-format :initform '(icmp-type code
+                             identifier seq
+                             originated received transmitted)
+                 :reader trace-format
+                 :allocation :class)
+   (icmp-type :accessor icmp-type :type ICMP-msg-type :initarg :type)
    (code :reader code :initarg :code :initform nil
          :type (or null destination-unreachable-code time-exceeded-code))
-   (identifier :initform 0 :type seq
+   (identifier :type seq
                :reader identifier :initarg :identifier)
-   (seq :initform 0 :type seq :reader seq
+   (seq :type seq :reader seq
         :initarg :seq)
-   (originated :type time-type :initform (simulation-time)
-               :reader originated)
+   (originated :type time-type :reader originated)
    (received :type time-type :reader received)
    (transmitted :type time-type  :reader transmitted)))
 
 (register-protocol 'icmp 1)
+
+(defmethod initialize-instance :after((pdu icmp-header) &key &allow-other-keys)
+  (case (icmp-type pdu)
+    ((timestamp timestamp-reply)
+     (setf (slot-value pdu 'originated)  (simulation-time)))))
 
 (defmethod length-bytes((h icmp-header))
   (ecase (icmp-type h)
@@ -70,16 +80,6 @@
   (copy-with-slots
    h
    '(icmp-type code identifier seq  originated received transmitted)))
-
-(defmethod pdu-trace((pdu icmp-header) detail os &key packet text)
-  (declare (ignore packet))
-  (format os " ~@[~A~] L4-ICMP" text)
-  (write-pdu-slots pdu '(icmp-type code) detail os)
-  (case (icmp-type pdu)
-    ((echo echo-reply)
-     (write-pdu-slots pdu '(identifier seq) detail os))
-    ((timestamp timestamp-reply)
-     (write-pdu-slots pdu '(originated received transmitted) detail os))))
 
 (defun icmp-receive(ipv4 packet ipv4hdr)
   (when (icmp-enabled-p ipv4)
@@ -103,7 +103,7 @@
       (push-pdu (copy ipv4-header) packet)
       (when layer4-header (push-pdu (copy layer4-header) packet))
       (push-pdu icmp-header packet)
-      (send ipv4 packet (icmp ipv4)
+      (send ipv4 packet 'icmp
             :src-address (network-address (node ipv4))
             :dst-address (src-address ipv4-header)))))
 
@@ -114,7 +114,7 @@
                                :type 'destination-unreachable
                                :code code)
                 packet)
-      (send ipv4 packet (icmp ipv4)
+      (send ipv4 packet 'icmp
             :src-address nil
             :dst-address (src-address ipv4-header)))))
 
@@ -124,7 +124,7 @@
           (icmp-header (copy icmp-header)))
       (setf (icmp-type icmp-header) 'echo-reply)
       (push-pdu icmp-header packet)
-      (send ipv4 packet (icmp ipv4)
+      (send ipv4 packet 'icmp
                  :src-address nil
                  :dst-address (src-address ipv4-header)))))
 
@@ -137,28 +137,26 @@
             :dst-address dst))))
 
 (defun timestamp(ipv4 dst &key identifier seq)
-  (when-bind(icmp (icmp ipv4))
-    (let ((packet (make-instance 'packet))
-          (icmp-header (make-instance 'icmp-header
-                                      :type 'timestamp
-                                      :originated (simulation-time)
-                                      :seq seq
-                                      :identifier identifier)))
+  (let ((packet (make-instance 'packet))
+        (icmp-header (make-instance 'icmp-header
+                                    :type 'timestamp
+                                    :originated (simulation-time)
+                                    :seq seq
+                                    :identifier identifier)))
       (push-pdu icmp-header packet)
-          (send ipv4 packet icmp
+      (send ipv4 packet 'icmp
                 :src-address (network-address (node ipv4))
-                :dst-address dst))))
+                :dst-address dst)))
 
 (defun timestamp-reply(ipv4 ipv4-header icmp-header)
-  (when-bind(icmp (icmp ipv4))
-    (let ((packet (make-instance 'packet))
-          (icmp-header (copy icmp-header)))
-      (push-pdu icmp packet)
-      (setf (icmp-type icmp-header) 'timestamp-reply)
-      (setf (slot-value 'icmp-header 'received) (simulation-time))
-      (setf (slot-value 'icmp-header 'transmitted) (simulation-time))
-      (send ipv4 packet icmp
-            :src-address (network-address (node (ipv4)))
-            :dst-address (src-address ipv4-header)))))
+  (let ((packet (make-instance 'packet))
+        (icmp-header (copy icmp-header)))
+    (push-pdu icmp-header packet)
+    (setf (icmp-type icmp-header) 'timestamp-reply)
+    (setf (slot-value 'icmp-header 'received) (simulation-time))
+    (setf (slot-value 'icmp-header 'transmitted) (simulation-time))
+    (send ipv4 packet 'icmp
+          :src-address (network-address (node ipv4))
+          :dst-address (src-address ipv4-header))))
 
 ;; kill-pending-connection in tcp.lisp

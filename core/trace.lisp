@@ -36,7 +36,8 @@
   (:method(entity) (declare (ignore entity)) nil))
 
 (defgeneric trace-detail(entity stream)
-  (:documentation "Return the trace detail for given entity on stream. t means all")
+  (:documentation "Return the trace detail for given entity (e.g. protocol)
+on stream. t means all")
   (:method(entity stream)
     (declare (ignore stream))
     (default-trace-detail entity)))
@@ -116,12 +117,12 @@
           :do (write-char c os)))
   sequence)
 
-(defmethod stream-write-string((ts trace-stream) string &optional (start 0) (end (length string)))
+(defmethod stream-write-string((ts trace-stream) string
+                               &optional (start 0) (end (length string)))
   (stream-write-sequence ts string start end))
 
 (defmethod stream-line-length((ts trace-stream))
   (stream-line-length (os ts)))
-
 
 ;; trace status and trace detail are set by node, protocol
 ;; or protocol layer number
@@ -188,38 +189,3 @@ heirarchically - node, entity (protocol) and layer"
               (setf (col-index stream) 0)))
   (:method((streams list)) (dolist(stream streams) (eol stream))))
 
-(defun write-pdu-slots(pdu slots mask stream)
-  "Helper to write the slots of a PDU to stream. mask is the detail mask
-specifying which slots to write. slots is a list of either slot names
-or a list of slot name and format string"
-  (dolist(slot slots)
-    (multiple-value-bind(slot format)
-        (if (listp slot)
-            (values (first slot) (second slot))
-            (values slot " ~A"))
-      (when (member slot mask)
-        (format stream format
-                (if (functionp slot)
-                    (funcall slot pdu)
-                    (slot-value pdu slot)))))))
-
-(defgeneric pdu-trace(pdu detail stream &key packet text)
-  (:documentation "All PDUs should define this method to trace their
-output according to detail onto stream")
-  (:method((pdu (eql :drop)) detail stream &key packet text)
-    "Trace a packet drop"
-    (declare (ignore detail))
-    (format stream " D-~A ~D" text (uid packet))
-    (eol stream))
-  (:method((pdu null) detail stream &key packet text)
-    (format stream " ~A ~D" text (uid packet))))
-
-(defun write-trace(protocol pdu &key (node (node protocol)) packet text (stream *lens-trace-output*))
-  (dolist(stream (if (listp stream) stream (list stream)))
-    (when (trace-enabled-p protocol stream)
-      (setf (slot-value stream 'node) node)
-      (pdu-trace pdu
-                 (if protocol (trace-detail protocol stream) nil)
-                 stream
-                 :packet packet
-                 :text text))))

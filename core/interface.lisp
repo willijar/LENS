@@ -158,7 +158,7 @@ interface is busy. Requires address"
 (defmethod send((interface interface) packet (protocol layer2:protocol) &key &allow-other-keys)
   (if (busy-p protocol)
       (enqueue packet (packet-queue interface))
-      (send (link interface) packet protocol)))
+      (send (link interface) packet interface)))
 
 (defmethod send-complete((interface interface) packet (link link)
                          &key fail &allow-other-keys)

@@ -11,7 +11,6 @@
   ()
   (:documentation "base class for all PDU entities"))
 
-
 (defgeneric layer(pdu)
   (:documentation "Return the layer associated with a PDU"))
 
@@ -19,7 +18,42 @@
   (:documentation "Priority of a pdu for priority queueing")
   (:method(pdu) 0))
 
+(defgeneric trace-format(pdu)
+  (:documentation "Return the trace formatting for a pdu as a list -
+  either slot names or a list of slot name and associated format string"))
+
 (defmethod copy((pdu pdu)) (make-instance (class-of pdu)))
+
+(defun write-pdu-slots(pdu mask stream)
+  "Helper to write the slots of a PDU to stream. mask is the detail
+mask specifying which slots to write."
+  (dolist(slot (trace-format pdu))
+    (multiple-value-bind(slot format)
+        (if (listp slot)
+            (values (first slot) (second slot))
+            (values slot " ~A"))
+      (when (member slot mask)
+        (cond
+          ((functionp slot)
+           (format stream format (funcall slot pdu)))
+          ((slot-boundp pdu slot)
+           (format stream format (slot-value pdu slot))))))))
+
+(defgeneric pdu-trace(pdu detail stream &key packet text)
+  (:documentation "All PDUs should define this method to trace their
+output according to detail onto stream")
+  (:method((pdu (eql :drop)) detail stream &key packet text)
+    "Trace a packet drop"
+    (declare (ignore detail))
+    (format stream " D-~A ~D~%" text (uid packet)))
+  (:method((pdu null) detail stream &key packet text)
+    (format stream " ~A ~D" text (if packet (uid packet) 0)))
+  (:method((pdu pdu) detail stream &key packet text)
+    (format stream " ~@[~A~] L~D~:[~*~;-~A~]"
+            text (layer pdu)  (member 'type detail) (name pdu))
+    (write-pdu-slots pdu detail stream)
+    (when (member 'uid detail)
+      (format stream " ~D" (if packet (uid packet) 0)))))
 
 (defclass packet()
   ((uid :type counter

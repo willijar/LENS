@@ -28,12 +28,10 @@ the associated layer 4 protocols.  Applications can have one
 or more layer 4 protocols assigned, to allow (for example)
 a web browser model with multiple simultaneous connections."))
 
-(defgeneric name(app)
-  (:documentation "Return the given name for an application")
-  (:method(app)
-    (if (slot-boundp app 'name)
-        (slot-value app 'name)
-        (class-name (class-of app)))))
+(defmethod name((app application))
+  (if (slot-boundp app 'name)
+      (slot-value app 'name)
+      (call-next-method)))
 
 (defmethod initialize-instance :after ((app application) &key node &allow-other-keys)
   (push app (node:applications node)))

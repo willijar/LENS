@@ -44,7 +44,8 @@
                (:file "interface"
                       :depends-on ("defpackage" "packet-queue" "link"))
                (:file "trace" :depends-on
-                      ("defpackage" "common" "scheduler" "compatibility"))
+                      ("defpackage" "common" "scheduler" "compatibility"
+                        "protocol"))
                (:file "routing" :depends-on ("common" "address"))
                (:file "node"
                        :depends-on ("common" "address" "protocol" "routing"))

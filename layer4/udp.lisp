@@ -18,7 +18,10 @@
 (in-package :protocol.layer4)
 
 (defclass udp-header(pdu)
-  ((protocol-number :initform 17 :accessor protocol-number :allocation :class)
+  ((name :initform "UDP" :reader name :allocation :class)
+   (trace-format :initform '(src-port dst-port msg-size (checksum "~4,'0X") seq)
+                 :reader trace-format :allocation :class)
+   (protocol-number :initform 17 :accessor protocol-number :allocation :class)
    (src-port :type ipport :initform 0 :accessor src-port :initarg :src-port)
    (dst-port :type ipport :initform 0 :accessor dst-port :initarg :dst-port)
    (msg-size :type word :initform 0 :accessor msg-size :initarg :msg-size)
@@ -26,22 +29,14 @@
    (sequence-number
     :type seq :initform 0 :reader sequence-number
     :initarg :sequence-number
-    :documentation "Sequence id's are not part of UDP, but are useful for performing statistics in the simulation"))
+    :documentation "Sequence id's are not part of UDP, but are useful
+    for performing statistics in the simulation"))
   (:documentation "UDP PDU class"))
 
 (defmethod length-bytes((h udp-header)) 8)
 
 (defmethod copy((h udp-header))
   (copy-with-slots h '(src-port dst-port msg-size checksum seq)))
-
-(defmethod pdu-trace((pdu udp-header) detail os &key packet text)
-  (declare (ignore packet))
-  (format os " ~@[~A~] L4-UDP" text)
-  (write-pdu-slots
-   pdu
-   '(src-port dst-port msg-size (checksum "~4,'0X") seq)
-   detail
-   os))
 
 (defvar *default-udp-packet-size* 512 "Default UDP datagram size in octets")
 

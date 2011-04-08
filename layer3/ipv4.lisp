@@ -31,7 +31,14 @@
   (copy-with-slots pdu '(option-number)))
 
 (defclass ipv4-header(pdu)
-  ((version :initarg :version :initform 4 :type octet :reader version
+  ((name :initform "IP" :reader name :allocation :class)
+   (trace-format
+    :initform '((version "-~A") header-length service-type total-length
+                identification flags fragment-offset ttl protocol-number
+                (header-checksum "~4,'0X") src-address dst-address)
+    :reader trace-format
+    :allocation :class)
+   (version :initarg :version :initform 4 :type octet :reader version
             :allocation :class)
    (service-type :initform 0 :type octet :reader servive-type
                  :reader packet:priority
@@ -64,18 +71,6 @@
             src-address dst-address))))
     (setf (slot-value copy 'options) (mapcar #'copy (options h)))
     copy))
-
-(defmethod pdu-trace((pdu ipv4-header) detail stream &key packet text)
-  (format stream " ~@[~A~] L3-IPV4" text)
-  (write-pdu-slots
-   pdu
-   '((version "-~A") header-length service-type total-length
-     identification flags fragment-offset ttl protocol-number header-checksum
-     src-address dst-address)
-   detail
-   stream)
-  (when (member 'uid detail)
-    (format stream " ~D" (if packet (uid packet) 0))))
 
 (defclass ipv4(protocol)
   ((protocol-number :initform #x0800 :reader protocol-number

@@ -33,20 +33,33 @@ See http://www.iana.org/assignments/protocol-numbers")
 (defmethod layer((protocol protocol)) (get (type-of protocol) 'layer))
 (defmethod layer((protocol symbol)) (get protocol 'layer))
 
+(defun write-trace(protocol pdu &key (node (node protocol)) packet text
+                   (stream trace:*lens-trace-output*))
+  (dolist(stream (if (listp stream) stream (list stream)))
+    (when (trace-enabled-p protocol stream)
+      (setf (slot-value stream 'node) node)
+      (pdu-trace pdu
+                 (if protocol (trace-detail protocol stream) nil)
+                 stream
+                 :packet packet
+                 :text text))))
+
 ;; split-phase transmission (going down protocol layers)
 (defgeneric send(receiver packet sender &key &allow-other-keys)
   (:documentation "Called by sender to start sending packet - Returns
   true if packet accepted for transmission, false otherwise.")
-  (:method :before(receiver packet (sender protocol) &key &allow-other-keys)
-           (write-trace sender (peek-pdu packet) :packet packet :text "-"))
+  (:method :before(receiver packet (sender protocol) &key no-trace &allow-other-keys)
+     (unless no-trace
+       (write-trace sender (peek-pdu packet) :packet packet :text "-")))
   (:method :around (receiver packet (sender protocol) &key &allow-other-keys)
            (when (node:call-callbacks :tx sender packet) (call-next-method))))
 
 (defgeneric receive(receiver packet sender &key &allow-other-keys)
   (:documentation "Called by packet when to pass received packet up to
   receiver (once reception is complete)")
-  (:method :before((receiver protocol) packet sender &key &allow-other-keys)
-           (write-trace receiver (peek-pdu packet) :packet packet :text "+"))
+  (:method :before((receiver protocol) packet sender &key no-trace &allow-other-keys)
+    (unless no-trace
+      (write-trace receiver (peek-pdu packet) :packet packet :text "+")))
   (:method :around((receiver protocol) packet sender &key &allow-other-keys)
            (when (node:call-callbacks :rx receiver packet) (call-next-method))))
 
