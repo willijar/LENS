@@ -54,16 +54,13 @@ called after all entities created before running simulation")
 
 (defmethod print-object((event event) stream)
   (print-unreadable-object (event stream :type t :identity t)
-    (format stream "~D T=~,2f" (uid event) (event-time event) )))
+    (format stream "~D T=~,5f" (uid event) (event-time event) )))
 
 (defgeneric handle(entity)
   (:documentation "Method called by scheduler on a scheduled entity")
   (:method((f function)) (funcall f))
   (:method((form list)) (apply (first form) (rest form)))
-  (:method((event simple-event))
-    #+debug(format *debug-io* "handle: ~,3f: ~S~%"
-                   (simulation-time) (handler event))
-    (handle (handler event))))
+  (:method((event simple-event)) (handle (handler event))))
 
 (defclass scheduler ()
   ((clock :type time-type :initform 0.0d0

@@ -83,11 +83,11 @@ will run on a backgound thread."
         :collect (make-instance 'node
                                 :ipaddr (when ipaddrs (funcall ipaddrs)))))
 
-#+nil(defun dumbell-topology(n-left n-right &key
-                        (ipaddrs (make-instance 'ipaddr-allocator))
+(defun dumbell-topology(n-left n-right &key
+                        (ipaddrs  ipaddr-allocator)
                         (left-ipaddrs ipaddrs)
                         (right-ipaddrs left-ipaddrs)
-                        (link-type *default-link*)
+                        (bandwidth *default-bandwidth*)
                         (bottleneck-multiplier 1.0))
   "Create nodes in a dumbell topology where some number of nodes on
 the left and right side of the topology communicate through a single
@@ -104,8 +104,8 @@ Arguments:
 - `ipaddrs`: an ipaddr-allocator (default default ipaddr-allocator)
 - `left-ipaddrs`: an ipaddr-allocator (default ipaddrs)
 - `right-ipaddrs`: an ipaddr-allocator (default left-ipaddrs)
-- `link-type`: a list of arguments for make-instance
-- `bottleneck-multiplier`: a real number
+- `bandwidth`: bandwidth of leaf node links
+- `bottleneck-multiplier`: multiplier for bottleneck bandwidth
 
 Results:
 
@@ -113,49 +113,44 @@ Results:
 - `left-router`: a node
 - `right-router`: a node
 - `right-nodes`: a list of nodes"
-  (let* ((left-router (make-instance 'node :ipaddr (next-ipaddr left-ipaddrs)))
+  (let* ((left-router
+          (make-instance 'node  :network-address (funcall left-ipaddrs)))
          (left-nodes (make-nodes n-left left-ipaddrs))
-         (right-router (make-instance 'node
-                                      :ipaddr (next-ipaddr right-ipaddrs)))
+         (right-router
+          (make-instance 'node :network-address (funcall right-ipaddrs)))
          (right-nodes (make-nodes n-right right-ipaddrs)))
     (dolist(n left-nodes)
-      (duplex-link n left-router :link-type link-type))
+      (point-to-point n left-router :bandwidth bandwidth))
     (dolist(n right-nodes)
-      (duplex-link n right-router :link-type link-type))
-    (let* ((bottleneck (copy-list link-type))
-           (bandwidth (getf (rest bottleneck) :bandwidth *default-bandwidth*)))
-      (setf (getf (rest bottleneck) :bandwidth)
-            (* bandwidth bottleneck-multiplier))
-      (duplex-link left-router right-router :link-type bottleneck))
+      (point-to-point right-router n :bandwidth bandwidth))
+    (point-to-point left-router right-router
+                    :bandwidth (* bandwidth bottleneck-multiplier))
   (values left-nodes left-router right-router right-nodes)))
 
-#+nil(defun star-topology(n-leaf &key (link-type *default-link*) node
-                     (ipaddrs (make-instance
-                               'ipaddr-allocator
-                               :ipaddr (if node
-                                           (ipaddr node)
-                                           (next-ipaddr (last-ipaddr))))))
+(defun star-topology(n-leaf &key (bandwidth *default-bandwidth*) node
+                     (ipaddrs ipaddr-allocator))
   "Create nodes in a star topology. `n-leaf` is the number of leaf
 nodes, `node` is an existing node to be used as the core - if nil
 a new node will be created as core. The leaf nodes are connected to
-the core node using the specified `link-type`. ipaddresses are
+the core node using links with the specified bandwidth. ipaddresses are
 allocated using `ipaddrs`.
 
 Arguments:
 
 - `n-leaf`: an integer
 - `ipaddrs`: an ipaddr-allocator
-- `link-type`: a list of arguments for make-instance
+- `bandwidth`:  bandwidth of leaf node links
 - `node`: a node
 
 Results:
 
 - `leaf-nodes`: a list of nodes
 - `core-node`: a node"
-  (let ((core (or node (make-instance 'node :ipaddr (next-ipaddr ipaddrs))))
+  (let ((core (or node (make-instance 'node
+                                      :network-address (funcall ipaddrs))))
         (leaves (make-nodes n-leaf ipaddrs)))
     (dolist(n leaves)
-      (duplex-link n core :link-type link-type))
+      (point-to-point n core :bandwidth bandwidth))
     (values leaves core)))
 
 ;; data analysis
