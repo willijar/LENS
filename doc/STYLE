@@ -1,5 +1,6 @@
 Directories:
 
+
 - `core`: Core definitions and interfaces
 - `doc`: All documentation files
 - `layer1`: Physical layer entities
@@ -7,12 +8,7 @@ Directories:
 - `layer3`: Network layer protocols
 - `layer4`: Transport layer protocols
 - `layer5`: Application implementation
-- `nodes`: Specialised node implementations
-- `routing`: Routing implementations
-- `tests`: Files to run simulation tests
-- `graphics`: extensions for producing graphical output 
 
 Files:
 
 - `defpackage.lisp`:  package definitions 
-
