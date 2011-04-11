@@ -149,7 +149,7 @@
    (:import-from :alg #:+infinity+ #:dijkstra #:extract-route
                  #:extract-first-hops)
    (:import-from :node #:node #:nodes #:ipaddrs #:neighbours #:interfaces
-                 #:find-interface)
+                 #:find-interface #:local-ipaddr-p)
    (:import-from :layer1 #:interface)
    (:import-from :scheduler  #:simulation-time #:time-type)
    (:export #:protocol #:pdu

@@ -195,7 +195,7 @@ See http://www.iana.org/assignments/protocol-numbers")
                    &key &allow-other-keys)
   (let ((listener
          (find (dst-port (peek-pdu packet)) (bindings dmux)
-               :test #'local-port)))
+               :key #'local-port)))
     (if listener
         (apply #'receive listener packet layer3protocol args)
         (drop dmux packet :text "L4-NP"))))

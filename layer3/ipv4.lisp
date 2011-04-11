@@ -155,8 +155,7 @@ node to communicate with each other.")
       (dolist(option (options iphdr))
         (process-ip-option option interface packet))
       (cond
-        ((or (eql dst-address (network-address node))
-             (find-interface dst-address node)
+        ((or (local-ipaddr-p dst-address node)
              (broadcast-p dst-address))
          ;; destined for this node
          (let ((proto (protocol-number iphdr)))
@@ -186,6 +185,7 @@ node to communicate with each other.")
              ((eql (interface route) interface) ;; routing loop - drop packet
               (drop ipv4 packet :text "L3-RL"))
              (t ;; forward to next hop
+              (push-pdu iphdr packet)
               (send (interface route) packet ipv4
                     :address (dst-address route)))))))))
 
