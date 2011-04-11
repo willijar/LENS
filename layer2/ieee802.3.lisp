@@ -59,13 +59,13 @@ layer 2 protocol."))
                     :src-address (hardware-address interface)
                     :length (length-bytes packet))
      packet)
-    (send interface packet layer2 :no-trace t)))
+    (send interface packet layer2)))
 
 (defmethod receive((layer2 ieee802.3) packet interface &key &allow-other-keys)
   (let ((pdu (pop-pdu packet)))
     (when (or (eql (dst-address pdu) (hardware-address interface))
               (broadcast-p (dst-address pdu)))
-      (receive (llcsnap-find-recipient pdu) packet layer2))))
+      (receive (llcsnap-find-recipient pdu layer2) packet layer2))))
 
 
 

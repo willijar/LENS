@@ -119,8 +119,8 @@ are dispatched in current thread"
           (loop
            :with c = 1
            :with q =  (slot-value scheduler 'event-queue)
+           :while (not (or (empty-p q) (halted scheduler)))
            :for event = (dequeue q)
-           :while (and event (not (halted scheduler)))
            :do (progn
                  (setf (clock scheduler) (event-time event))
                  (when step (funcall step (handler event)))

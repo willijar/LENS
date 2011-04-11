@@ -155,6 +155,10 @@ interface is busy. Requires address"
     (when tx-packet (error "Interface cannot send two packets simultaneously"))
     (setf tx-packet packet)))
 
+(defmethod send :before((interface interface) packet (sender layer2:protocol)
+                        &key &allow-other-keys)
+  (protocol::write-trace sender (peek-pdu packet) :packet packet :text "-"))
+
 (defmethod send((interface interface) packet (protocol layer2:protocol) &key &allow-other-keys)
   (if (busy-p protocol)
       (enqueue packet (packet-queue interface))
@@ -172,10 +176,12 @@ interface is busy. Requires address"
 (defmethod receive-start((interface interface) packet link)
   (when (up-p interface)
     (with-slots(rx-packet) interface
-      (when rx-packet
-        (drop interface rx-packet :text "L2-ID")
-        (setf rx-packet packet)
-        (receive-start (layer2:protocol interface) packet interface)))))
+      (when rx-packet (drop interface rx-packet :text "L2-ID"))
+      (setf rx-packet packet)
+      (receive-start (layer2:protocol interface) packet interface))))
+
+(defmethod receive :before((receiver layer2:protocol) packet (interface interface)  &key &allow-other-keys)
+  (protocol::write-trace receiver (peek-pdu packet) :packet packet :text "+"))
 
 (defmethod receive((interface interface) packet link
                    &key errors &allow-other-keys)

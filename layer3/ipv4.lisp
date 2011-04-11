@@ -86,7 +86,7 @@ node to communicate with each other.")
 (register-protocol 'ipv4 #x0800)
 
 (defmethod default-trace-detail((entity ipv4))
-  '(ttl protocol-number src-address dst-address))
+  '(type ttl protocol-number src-address dst-address))
 
 ;; no state so do nothing - note it is intentional that there is no
 ;; default method here as every protocol should be considered on its

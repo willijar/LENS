@@ -71,7 +71,7 @@
   (:documentation "A model of the User Datagram Protocol."))
 
 (defmethod default-trace-detail((protocol udp))
-  `(src-port dst-port msg-size))
+  `(type src-port dst-port msg-size))
 
 (defmethod open-connection(peer-address peer-port (udp udp))
   (call-next-method)

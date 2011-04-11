@@ -79,6 +79,10 @@ on stream. t means all")
 (defmethod stream-line-column ((stream trace-stream))
   (col-index stream))
 
+(defmethod stream-terpri((stream trace-stream))
+  (terpri (os stream))
+  (setf (col-index stream) 0))
+
 (defun check-sim-time(trace-stream)
   (let ((tm (simulation-time))
         (os (os trace-stream)))

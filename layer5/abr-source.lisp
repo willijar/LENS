@@ -68,8 +68,3 @@ fast as possible if rate is 0"))
 
 (defmethod reset((app abr-source))
   (stop app))
-
-
-
-
-

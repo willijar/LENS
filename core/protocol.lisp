@@ -48,20 +48,20 @@ See http://www.iana.org/assignments/protocol-numbers")
 (defgeneric send(receiver packet sender &key &allow-other-keys)
   (:documentation "Called by sender to start sending packet - Returns
   true if packet accepted for transmission, false otherwise.")
-  (:method :before(receiver packet (sender protocol) &key no-trace &allow-other-keys)
-     (unless no-trace
-       (write-trace sender (peek-pdu packet) :packet packet :text "-")))
+  (:method :before((receiver protocol) packet (sender protocol)
+                   &key &allow-other-keys)
+    (write-trace sender (peek-pdu packet) :packet packet :text "-"))
   (:method :around (receiver packet (sender protocol) &key &allow-other-keys)
-           (when (node:call-callbacks :tx sender packet) (call-next-method))))
+    (when (node:call-callbacks :tx sender packet) (call-next-method))))
 
 (defgeneric receive(receiver packet sender &key &allow-other-keys)
   (:documentation "Called by packet when to pass received packet up to
   receiver (once reception is complete)")
-  (:method :before((receiver protocol) packet sender &key no-trace &allow-other-keys)
-    (unless no-trace
-      (write-trace receiver (peek-pdu packet) :packet packet :text "+")))
+  (:method :before((receiver protocol) packet (sender protocol)
+                   &key &allow-other-keys)
+     (write-trace receiver (peek-pdu packet) :packet packet :text "+"))
   (:method :around((receiver protocol) packet sender &key &allow-other-keys)
-           (when (node:call-callbacks :rx receiver packet) (call-next-method))))
+    (when (node:call-callbacks :rx receiver packet) (call-next-method))))
 
 (defgeneric drop(entity packet &key text &allow-other-keys)
   (:documentation "Drop a packet")
