@@ -1,3 +1,6 @@
+;;; A simple constant bit rate simulation testing udp implementation and
+;;; routing through a simple chaing of nodes.
+
 (in-package :lens-user)
 
 ;; always start tests by clearing nodes and reseting all

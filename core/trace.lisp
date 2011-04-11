@@ -87,7 +87,7 @@ on stream. t means all")
   (let ((tm (simulation-time))
         (os (os trace-stream)))
     (unless (= tm (last-log-time trace-stream))
-      (eol trace-stream))
+      (terpri trace-stream))
     (setf (last-log-time trace-stream) tm)
     (when (zerop (col-index trace-stream))
       (let ((msg (format nil "~? N~D"
@@ -100,9 +100,7 @@ on stream. t means all")
 
 (defmethod stream-write-char ((stream trace-stream) char)
   (cond
-    ((eql char #\newline)
-     (terpri (os stream))
-     (setf (col-index stream) 0))
+    ((eql char #\newline) (stream-terpri stream))
     (t (check-sim-time stream)
        (incf (col-index stream))
        (write-char char (os stream)))))
@@ -183,13 +181,3 @@ heirarchically - node, entity (protocol) and layer"
   (:method(value entity (streams (eql 'nil)))
     (when *lens-trace-output*
       (setf (trace-detail entity *lens-trace-output*) value))))
-
-(defgeneric eol(stream)
-  (:documentation "Write end of line eol to a stream type entity")
-  (:method ((stream stream)) (write-char #\newline stream))
-  (:method ((stream trace-stream))
-            (unless (zerop (col-index stream))
-              (write-char #\newline stream)
-              (setf (col-index stream) 0)))
-  (:method((streams list)) (dolist(stream streams) (eol stream))))
-

@@ -67,17 +67,6 @@
   (copy-with-slots h '(srchwaddr srcprotoaddr dsthwaddr dstprotoaddr)
                    (call-next-method)))
 
-(defmethod pdu-trace((pdu arp-header) detail stream &key packet text)
-  (format stream " ~@[~A~] L3-ARP" text)
-  (write-pdu-slots pdu
-                   '(hwmacaddrtype protoaddrtype hwmacaddrsize protoaddrsize)
-                   detail stream)
-  (write-string (ecase (op pdu) (:request " REQ") (:reply " RPL")) stream)
-  (write-pdu-slots
-   pdu '(srcmacaddr srcipaddr dstmacaddr dstipaddr) detail stream)
-  (when (member 'uid detail)
-    (format stream " ~D" (if packet (uid packet) 0))))
-
 (defclass arp(protocol)
   ((protocol-number :type word :initform #x803 :allocation :class
                     :reader protocol-number)
@@ -92,7 +81,7 @@
   (:documentation "Address Resolution Protocol (ARP)  implementation"))
 
 (defmethod default-trace-detail((entity arp))
-  '(op srchwaddr srcprotoaddr dsthwaddr dstprotoaddr))
+  '(type op srchwaddr srcprotoaddr dsthwaddr dstprotoaddr))
 
 (defmethod send((arp arp) packet layer3 &key address &allow-other-keys)
   (let ((entry (or (gethash address (cache arp))

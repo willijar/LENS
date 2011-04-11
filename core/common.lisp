@@ -22,7 +22,7 @@
 (deftype octet() "8-bit byte type" '(unsigned-byte 8))
 (deftype word() "16-bit word type" '(unsigned-byte 16))
 (deftype seq() "a sequence number type" 'fixnum)
-(defconstant +c+ 299792458 "Speed of Light in m/sec")
+(defconstant +c+ 299792458d0 "Speed of Light in m/sec")
 
 (defmacro while (test &body body)
   "A while loop - repeat body while test is true"

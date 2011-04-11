@@ -398,7 +398,7 @@
     copy))
 
 (defmethod default-trace-detail((protocol tcp))
-  `(src-port dst-port sequence-number ack-number flags fid))
+  `(type src-port dst-port sequence-number ack-number flags fid))
 
 (defstruct time-seq (time 0.0 :type time-type) (seq 0 :type seq))
 
@@ -1251,3 +1251,16 @@
 
 (defmethod make-instance((tcp (eql 'tcp)) &rest rest)
   (apply #'make-instance (cons *default-tcp-variant* rest)))
+
+
+(defun protocol.layer3:kill-pending-connection(icmp ipv4-header layer4-header)
+  (when (typep layer4-header 'tcp:tcp-header) ;; if tcp
+    (let ((tcp (lookup-by-port
+                node (protocol-number layer4-header)
+                :local-port (src-port layer4-header)
+                :local-address (src-address ipv4-header)
+                :peer-port (dst-port layer4-header)
+                :peer-address (dst-address ipv4-header))))
+      (when tcp (tcp:abort tcp)))))
+
+

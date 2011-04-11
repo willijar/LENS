@@ -19,7 +19,7 @@
 
 (defclass point-to-point(link)
   ((delay
-    :type real :initarg :delay :initform *default-delay*
+    :type time-type :initarg :delay :initform *default-delay*
     :documentation "Link Propagation Delay in sec")
    (bit-error-rate  :initarg :bit-error-rate
                     :initform *default-ber*

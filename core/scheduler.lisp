@@ -17,7 +17,7 @@
 (defvar *scheduler* nil "The global scheduler instance")
 (defvar *reset-hooks* nil "List of hooks to call to reset simulation -
 called after all entities created before running simulation")
-(defvar *time-format* "~6,2f"  "Time output format control")
+(defvar *time-format* "~6,3f"  "Time output format control")
 
 (declaim (inline scheduler))
 (defun scheduler() *scheduler*)
@@ -29,7 +29,10 @@ called after all entities created before running simulation")
          :documentation "Rank in priority queue")
    (event-time :initarg :time :type time-type :accessor event-time
 	 :initform -1.0d0
-	 :documentation "simulation time at which event is to be handled"))
+	 :documentation "simulation time at which event is to be handled")
+   (event-id :type integer :documentation "Used to ensure events with
+   same time are scheduled in order of scheduling" :reader uid)
+   (last-event-id :type integer :initform 0 :allocation :class))
   (:documentation "Class representing a scheduled event"))
 
 (defclass simple-event(event)
@@ -40,11 +43,18 @@ called after all entities created before running simulation")
 (defun event-rank(a &optional b)
   (if b (setf (slot-value a 'rank) b) (slot-value a 'rank)))
 
+(defun event<(a b)
+  (let ((ta (event-time a))
+        (tb (event-time b)))
+    (cond
+      ((< ta tb))
+      ((= ta tb) (< (slot-value a 'event-id) (slot-value b 'event-id))))))
+
 (defmethod busy-p((event event)) (>= (slot-value event 'rank) 0))
 
 (defmethod print-object((event event) stream)
   (print-unreadable-object (event stream :type t :identity t)
-    (format stream "T=~,2f" (event-time event) )))
+    (format stream "~D T=~,2f" (uid event) (event-time event) )))
 
 (defgeneric handle(entity)
   (:documentation "Method called by scheduler on a scheduled entity")
@@ -68,8 +78,7 @@ called after all entities created before running simulation")
      :initial-size 1024
      :extend-size 1.4
      :element-type 'event
-     :key-fn #'event-time
-     :comp-fn #'<
+     :comp-fn #'event<
      :index #'event-rank))))
 
 (defmethod print-object((scheduler scheduler) stream)
@@ -87,7 +96,8 @@ called after all entities created before running simulation")
       (error  "Attempt to schedule ~S ~D seconds in the past"
               event delay))
     (let ((scheduler (scheduler)))
-      (setf (slot-value event 'event-time) (+ delay (simulation-time)))
+      (setf (slot-value event 'event-time) (+ delay (simulation-time))
+            (slot-value event 'event-id) (incf (slot-value event 'last-event-id)))
       (enqueue event (slot-value scheduler 'event-queue)))
     event)
   (:method ((delay number) handler)
@@ -123,7 +133,7 @@ are dispatched in current thread"
            :for event = (dequeue q)
            :do (progn
                  (setf (clock scheduler) (event-time event))
-                 (when step (funcall step (handler event)))
+                 (when step (funcall step event))
                  (handle event))
            :when (and granularity
                       (= (setf c (mod (1+ c) granularity)) 0))

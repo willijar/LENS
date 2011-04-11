@@ -49,16 +49,16 @@
 
 (defmethod print-object((p udp-pending) stream)
   (print-unreadable-object(p stream :type t :identity t)
-    (format stream "~:/print-eng//~:/print-eng/bytes sent"
+    (format stream "~D/~D bytes sent"
             (bytes-sent p) (length-bytes (data p)))))
 
 (defclass udp-dmux(protocol-dmux)
   ()
   (:documentation "Protocol demultiplexer for received UDP packets"))
 
-(register-protocol 'udp-dmux 17)
+(layer4:register-protocol 'udp-dmux 17)
 
-(defclass udp(protocol-implementation)
+(defclass udp(protocol)
   ((protocol-number :type fixnum :initform 17 :allocation :class
                     :reader protocol-number)
    (packet-size :initform *default-udp-packet-size*

@@ -35,7 +35,7 @@
   (:method(receiver packet sender)
     (declare (ignore receiver packet sender))))
 
-(defvar *default-bandwidth* 1e6 "Default link bandwidth")
+(defvar *default-bandwidth* 1d6 "Default link bandwidth")
 
 ;; Generic interface for link
 (defgeneric propagation-speed(link)
@@ -62,7 +62,7 @@
 ;; this is equivalent to link-real in GTNetS
 (defclass link()
   ((bandwidth
-    :type real :initarg :bandwidth :reader bandwidth
+    :type double-float :initarg :bandwidth :reader bandwidth
     :initform *default-bandwidth*
     :documentation "Link bandwidth in bits/sec")
    (weight :type number :initarg :weight :accessor weight :initform 1
@@ -84,9 +84,8 @@
 (defmethod send((link link) packet local-interface
                 &key (peer-address (dst-address (peek-pdu packet))))
   (let* ((no-bits (* 8 (length-bytes packet)))
-         (txtime (/ no-bits (bandwidth link))))
-    ;; schedule packet transmit complete event
-    (schedule txtime (list #'send-complete local-interface packet link))
+         (txtime (/ no-bits (coerce (bandwidth link) 'double-float))))
+    (declare (time-type txtime))
     ;; schedule packet arrival at interface(s)
     (flet ((schedule-receive(peer-interface packet)
              (let ((delay (delay local-interface peer-interface))
@@ -95,6 +94,7 @@
                      (expt
                       (1- (bit-error-rate local-interface peer-interface))
                       no-bits))))
+               (declare (time-type delay))
                (schedule delay
                          (list #'receive-start peer-interface packet link))
                (schedule (+ delay txtime)
@@ -108,7 +108,10 @@
                (find peer-address (peer-interfaces link local-interface)
                      :key #'hardware-address :test #'address=)
                (default-peer-interface link))
-           packet)))))
+           packet)))
+    ;; schedule packet transmit complete event - 1 bit after txtime
+    (schedule txtime
+              (list #'send-complete local-interface packet link))))
 
 (defmethod send-complete :before (interface packet (link link)
                                   &key fail &allow-other-keys)

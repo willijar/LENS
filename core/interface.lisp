@@ -37,7 +37,7 @@
    protocol (or not). All interfaces on the same link must support ARP
    for it to work")
 
-(defvar *default-delay* 1e-3 "Default link delay")
+(defvar *default-delay* 1d-3 "Default link delay")
 (defvar *default-ber* 0 "Default bit error rate on a link")
 
 (defgeneric delay(start end)
@@ -170,7 +170,7 @@ interface is busy. Requires address"
   (setf (slot-value interface 'tx-packet) nil)
   (when fail (drop interface packet :text fail))
   (unless (empty-p (packet-queue interface))
-    (send (link interface) packet interface))
+    (send (link interface) (dequeue (packet-queue interface)) interface))
   (do-notifications interface))
 
 (defmethod receive-start((interface interface) packet link)

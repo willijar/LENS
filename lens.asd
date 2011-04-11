@@ -41,11 +41,12 @@
                       :depends-on ("defpackage" "common" "scheduler" "packet"
                                                 "protocol"))
                (:file "protocol"
-                      :depends-on ("address" "common" "packet" "trace"))
+                      :depends-on ("address" "common" "packet"))
                (:file "interface"
                       :depends-on ("defpackage" "packet-queue" "link"))
                (:file "trace" :depends-on
-                      ("defpackage" "common" "scheduler" "compatibility"))
+                      ("defpackage" "common" "scheduler" "compatibility"
+                                    "protocol"))
                (:file "routing" :depends-on ("common" "address"))
                (:file "node"
                        :depends-on ("common" "address" "protocol" "routing"))
