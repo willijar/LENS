@@ -21,7 +21,8 @@
   ((name :initform "UDP" :reader name :allocation :class)
    (trace-format :initform '(src-port dst-port msg-size (checksum "~4,'0X") seq)
                  :reader trace-format :allocation :class)
-   (protocol-number :initform 17 :accessor protocol-number :allocation :class)
+   (protocol-number :initform 17 :reader protocol-number :allocation :class)
+   (length-bytes :initform 8 :reader length-bytes :allocation :class)
    (src-port :type ipport :initform 0 :accessor src-port :initarg :src-port)
    (dst-port :type ipport :initform 0 :accessor dst-port :initarg :dst-port)
    (msg-size :type word :initform 0 :accessor msg-size :initarg :msg-size)
@@ -32,8 +33,6 @@
     :documentation "Sequence id's are not part of UDP, but are useful
     for performing statistics in the simulation"))
   (:documentation "UDP PDU class"))
-
-(defmethod length-bytes((h udp-header)) 8)
 
 (defmethod copy((h udp-header))
   (copy-with-slots h '(src-port dst-port msg-size checksum seq)))
