@@ -32,12 +32,19 @@ mask specifying which slots to write."
         (if (listp slot)
             (values (first slot) (second slot))
             (values slot " ~A"))
-      (when (member slot mask)
-        (cond
-          ((functionp slot)
-           (format stream format (funcall slot pdu)))
-          ((slot-boundp pdu slot)
-           (format stream format (slot-value pdu slot))))))))
+      (when (or (member slot mask) (eql mask :all))
+        (let ((value
+               (cond
+                 ((functionp slot) (funcall slot pdu))
+                 ((slot-boundp pdu slot)
+                  (slot-value pdu slot)))))
+          (etypecase format
+            (string (format stream format value))
+            (function (funcall function stream arg))))))))
+
+(defmethod print-object((pdu pdu) stream)
+  (print-unreadable-object (pdu stream :type t :identity nil)
+    (write-pdu-slots pdu :all stream)))
 
 (defgeneric pdu-trace(pdu detail stream &key packet text)
   (:documentation "All PDUs should define this method to trace their
