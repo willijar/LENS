@@ -26,7 +26,7 @@
            #:uid #:counter #:name #:node #:length-bytes
            #:octet #:word #:counter #:seq #:fid
            #:interface #:link #:node #:application
-           #:copy #:copy-with-slots
+           #:copy #:copy-with-slots #:trace-accessor #:untrace-accessor
            #:notifier #:add-notification #:delete-notifications
            #:do-notifications
            #:up-p #:mkup #:mkdown
@@ -170,7 +170,7 @@
                 #:trace-format)
   (:import-from :alg #:enqueue #:dequeue #:make-queue #:empty-p)
   (:import-from :node #:node #:interfaces #:find-interface)
-  (:export #:protocol #:pdu
+  (:export #:protocol #:pdu #:protocol-dmux
            #:register-protocol #:protocols #:find-protocol #:delete-protocol
            #:peer-address #:peer-port #:local-port #:local-address
            #:open-connection #:connection-complete
@@ -178,6 +178,7 @@
            #:send #:receive #:sent
            #:fid
            ;; specific default layer 4 protocols
+           #:udp-dmux #:tcp-dmux #:udp-header #:tcp-header
            #:udp #:tcp #:icmp #:tcp-tahoe #:tcp-reno #:tcp-newreno))
 
 (defpackage :protocol.layer5

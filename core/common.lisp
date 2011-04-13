@@ -73,6 +73,20 @@ Returns:
           `(deftype ,(first typename)() ',@(rest typename))
           `(deftype ,typename () '(member ,@(mapcar #'second items)))))))
 
+(defmacro defenumeration (typename (&rest items))
+  (let ((items (loop :for item :in items
+                     :for count :from 0
+                     :collect (if (consp item) item (list item count)))))
+    `(eval-when (:compile-toplevel :load-toplevel :execute)
+      ,@(loop :for item :in items
+              :collect
+              `(defconstant ,(first item) ,@(rest item)))
+      ,@(if (listp typename)
+            `((deftype ,(first typename)() ',@(rest typename))
+              (defvar ,(first typename) ',(mapcar #'first items)))
+            `((deftype ,typename () '(member ,@(mapcar #'second items)))
+              (defvar ,typename ',(mapcar #'first items)))))))
+
 (defgeneric uid(entity)
   (:documentation "Return the unique id of an entity"))
 
@@ -135,7 +149,8 @@ Returns:
           copy)
         (setf (aref copy i) (copy (aref v i)))))))
 
-(defun copy-with-slots(original slots &optional (copy (allocate-instance (class-of original))))
+(defun copy-with-slots(original slots
+                       &optional (copy (allocate-instance (class-of original))))
   "Given an original instance allocate and return a new instance of
 the same class and set specified slots of copy to the same values as
 the slots of the original."
@@ -144,6 +159,24 @@ the slots of the original."
           (setf (slot-value copy slot) (copy (slot-value original slot)))
           (slot-makunbound copy slot)))
     copy)
+
+(defmacro trace-accessor((slotname (objvar type)
+                          &optional (slotvar (gensym))) &rest body)
+  "Define method to add tracing code to standard slot writer function.
+It is assumed that slot and accessor have the same name."
+  `(defmethod (setf ,slotname)(,slotvar (,objvar ,type))
+     ,@(or body
+           `((format *standard-trace* "~A ~A ~A->~A~%"
+                     ,objvar ',slotname (slot-value  ,objvar ',slotname)
+                     ,slotvar)))
+     (setf (slot-value ,objvar ',slotname) ,slotvar)))
+
+(defmacro untrace-accessor((slotname (objvar type)))
+   "Define method to remove tracig code and replace with a setf slot
+It is assumed that slot and accessor have the same name."
+  (let ((gv (gensym)))
+  `(defmethod (setf ,slotname)(,gv (,objvar ,type))
+     (setf (slot-value ,objvar ',slotname) ,gv))))
 
 (defun cl-user::print-eng(os arg &optional colon-p at-p
                  (d 2) (padchar #\space) (exponentchar #\e))
