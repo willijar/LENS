@@ -26,7 +26,7 @@
    (src-port :type ipport :initform 0 :accessor src-port :initarg :src-port)
    (dst-port :type ipport :initform 0 :accessor dst-port :initarg :dst-port)
    (msg-size :type word :initform 0 :accessor msg-size :initarg :msg-size)
-   (checksum :type word :accessor checksum :initarg :checksum)
+   (checksum :type word :initform 0 :accessor checksum :initarg :checksum)
    (sequence-number
     :type seq :initform 0 :reader sequence-number
     :initarg :sequence-number
@@ -36,8 +36,6 @@
 
 (defmethod copy((h udp-header))
   (copy-with-slots h '(src-port dst-port msg-size checksum seq)))
-
-(defvar *default-udp-packet-size* 512 "Default UDP datagram size in octets")
 
 (defclass udp-pending()
   ((data :initarg :data :reader data)
@@ -60,11 +58,10 @@
 (defclass udp(protocol)
   ((protocol-number :type fixnum :initform 17 :allocation :class
                     :reader protocol-number)
-   (packet-size :initform *default-udp-packet-size*
-                :initarg :packet-size :accessor packet-size
-                :documentation "Size of packets")
+   (mtu :initform 556 :initarg :mtu :accessor mtu ;; 576-20 for udp&ip headers
+        :documentation "Maximum transmission unit")
    (sequence-number :type seq :initform 0 :accessor sequence-number
-        :documentation "Sequence number of next packet")
+                    :documentation "Sequence number of next packet")
    (pending-data :type list :initform nil :accessor pending-data
                  :documentation "Queue of pending data"))
   (:documentation "A model of the User Datagram Protocol."))
@@ -75,7 +72,12 @@
 (defmethod open-connection(peer-address peer-port (udp udp))
   (call-next-method)
   (when-bind(application (layer5:application udp))
-    (connection-complete application udp :failure nil)))
+            (connection-complete application udp)))
+
+(defmethod close-connection((udp udp))
+  (call-next-method)
+  (when-bind(application (layer5:application udp))
+            (connection-complete application udp)))
 
 (defmethod receive((udp udp) (packet packet) (layer3 layer3:ipv4)
                    &key src-address &allow-other-keys)
@@ -104,10 +106,6 @@
                          :dst-address dst-address))))
   (udp-send-pending udp))
 
-(defmethod close-connection((udp udp))
-  (call-next-method)
-  (connection-closed (application udp) udp))
-
 (defmethod reset((udp udp))
   (map 'nil #'(lambda(interface) (delete-notifications udp interface))
        (interfaces (node udp)))
@@ -119,10 +117,10 @@
       (loop
            (let ((data (if (and (= (bytes-sent pd) 0)
                                 (< (length-bytes (data pd))
-                                   (packet-size udp)))
+                                   (mtu udp)))
                            (data pd)
                            (layer5:copy-from-offset
-                            (packet-size udp) (bytes-sent pd) (data pd) ))))
+                            (mtu udp) (bytes-sent pd) (data pd) ))))
              (unless (layer1:buffer-available-p
                       (+ 28 (length-bytes data)) interface)
                (add-notification udp #'udp-send-pending interface)
@@ -131,14 +129,15 @@
                (incf (bytes-sent pd) (length-bytes data))
                (push-pdu
                 (make-instance 'udp-header
-                               :src-port (local-port udp)
+                               :src-port (or (local-port udp) 0)
                                :dst-port (dst-port pd)
                                :msg-size (length-bytes data)
                                :sequence-number (incf (sequence-number udp)))
                 packet)
                (send (layer3:find-protocol 'layer3:ipv4 (node udp)) packet udp
                      :dst-address (dst-address pd)
-                     :src-address (local-address udp)
+                     :src-address (or (local-address udp)
+                                      (network-address (node udp)))
                      :ttl (ttl udp)
                      :tos (tos udp))
                (sent (application udp) (length-bytes data) udp)))

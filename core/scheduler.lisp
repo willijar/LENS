@@ -103,6 +103,9 @@ called after all entities created before running simulation")
 (defmethod stop((event event) &key &allow-other-keys)
   (alg:delete event  (slot-value (scheduler) 'event-queue)))
 
+(defmethod reset((event event))
+  (stop event))
+
 (defmethod stop ((scheduler scheduler) &key abort)
   (setf (slot-value scheduler 'halted) t)
   (when abort
@@ -188,7 +191,7 @@ are dispatched in current thread"
         (setf (slot-value m name)
               (make-instance 'timer :name name :handler m))))))
 
-(defmethod reset :after ((object with-timers))
+(defmethod reset ((object with-timers))
   (dolist(def (class-direct-slots (class-of object)))
     (when (eql (slot-definition-type def) 'timer)
         (stop (slot-value object (slot-definition-name def))))))

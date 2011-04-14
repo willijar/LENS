@@ -53,8 +53,12 @@
       (logand mask (slot-value addr 'address-bytes))
       (slot-value addr 'address-bytes)))
 
+(defmethod address=(a b &optional mask)
+  (declare (ignore mask))
+  (eql a b))
+
 (defmethod address=((a address) (b address) &optional mask)
-  (or (eql a b)
+  (or (call-next-method)
       (if mask
           (= (subnet a mask) (subnet b mask))
           (= (slot-value a 'address-bytes) (slot-value b 'address-bytes)))))

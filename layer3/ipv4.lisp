@@ -18,8 +18,9 @@
 
 (in-package :protocol.layer3)
 
-(defparameter *default-ipv4-ttl* 64)
 (defparameter *icmp-enabled-default* nil)
+
+;; base for all internet protocol conditions
 
 (defclass ipv4-header-option(pdu)
   ((option-number :type octet :initarg :option-number :reader option-number))
@@ -47,8 +48,8 @@
    (identification :initform 0 :type word)
    (flags :initform 0 :type octet)
    (fragment-offset :initform 0 :initarg :fragment-offset :type word)
-   (ttl :initform *default-ipv4-ttl* :type octet :initarg :ttl :accessor ttl
-        :documentation "Default ttl")
+   (ttl :initform 64 :type octet :initarg :ttl :accessor ttl
+        :documentation "Default ttl for this ipv4 instance")
    (protocol-number
     :initform 17 :type octet :initarg :protocol-number
     :reader protocol-number
@@ -98,7 +99,7 @@ node to communicate with each other.")
                 &key
                 (src-address (network-address (node ipv4)))
                 (dst-address :broadcast)
-                (ttl *default-ipv4-ttl*)
+                (ttl 64)
                 (tos 0)
                 (fragment-offset 0)
                 &allow-other-keys)

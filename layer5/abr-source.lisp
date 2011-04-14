@@ -18,9 +18,7 @@
 (in-package :protocol.layer5)
 
 (defclass abr-source(application scheduler:event)
-  ((protocol-type :type symbol :reader protocol-type :initform 'layer4:udp
-                  :documentation "Name of protocol to use")
-   (peer-address :type network-address
+  ((peer-address :type network-address
                  :initarg :peer-address :reader peer-address
                  :documentation "Destination address for data")
    (peer-port :type ipport :initarg :peer-port :reader peer-port
@@ -35,6 +33,11 @@ random variable or an integer or zero for as fast as possible")
 either at rate (which may be a random variable or a constant) or as
 fast as possible if rate is 0"))
 
+(defmethod initialize-instance :after
+    ((app abr-source) &key (protocol-type 'layer4:udp) &allow-other-keys)
+  (setf (slot-value app 'protocol)
+        (make-instance protocol-type :node (node app) :application app)))
+
 (defmethod sent((app abr-source) n socket)
   "Send a packet on every notification if rate is 0"
   (when (equal (rate app) 0) (send socket (pkt-size app) app)))
@@ -46,12 +49,7 @@ fast as possible if rate is 0"))
     (scheduler:schedule (/ (* pkt-size 8) (math:random-value rate)) app)))
 
 (defmethod start((app abr-source))
-  (unless (slot-boundp app 'protocol)
-    (make-instance (protocol-type app)
-                         :peer-address (peer-address app)
-                         :peer-port (peer-port app)
-                         :node (node app)
-                         :application app)))
+  (open-connection (peer-address app)  (peer-port app) (protocol app)))
 
 (defmethod connection-complete((app abr-source) layer4 &key failure)
   (unless failure
@@ -62,9 +60,5 @@ fast as possible if rate is 0"))
           (scheduler:handle app)))))
 
 (defmethod stop((app abr-source) &key &allow-other-keys)
-  (when (slot-boundp app 'protocol)
-    (close-connection (protocol app))
-    (slot-makunbound app 'protocol)))
-
-(defmethod reset((app abr-source))
-  (stop app))
+  (call-next-method)
+  (close-connection (protocol app)))

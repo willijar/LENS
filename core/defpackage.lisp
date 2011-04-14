@@ -22,7 +22,7 @@
   (:use :cl)
   (:export #:start #:stop #:reset #:busy-p #:*reset-hooks*
            #:while #:until #:filter #:defenumeration
-           #:when-bind #:when-bind*
+           #:when-bind #:when-bind* #:simulation-condition
            #:uid #:counter #:name #:node #:length-bytes
            #:octet #:word #:counter #:seq #:fid
            #:interface #:link #:node #:application
@@ -75,7 +75,7 @@
   (:documentation "Protocol stack layer implementations")
   (:use :cl #:common #:trace)
   (:import-from :packet #:pdu #:layer #:peek-pdu #:pdu-trace)
-  (:export #:protocol-number #:protocol #:layer #:pdu
+  (:export #:protocol-number #:protocol #:protocol-condition #:layer #:pdu
            #:send #:receive #:drop #:default-trace-detail))
 
 (defpackage :address
@@ -172,11 +172,14 @@
   (:import-from :node #:node #:interfaces #:find-interface)
   (:export #:protocol #:pdu #:protocol-dmux
            #:register-protocol #:protocols #:find-protocol #:delete-protocol
+           #:bind #:unbind #:binding #:bound-p
            #:peer-address #:peer-port #:local-port #:local-address
+           #:src-port #:dst-port
            #:open-connection #:connection-complete
-           #:close-connection #:connected-p
-           #:send #:receive #:sent
-           #:fid
+           #:close-connection #:connection-closed #:close-request
+           #:connection-from-peer #:connected-p #:connection-error
+           #:send #:receive #:sent #:fid
+           ;; conditions
            ;; specific default layer 4 protocols
            #:udp-dmux #:tcp-dmux #:udp-header #:tcp-header
            #:udp #:tcp #:icmp #:tcp-tahoe #:tcp-reno #:tcp-newreno))

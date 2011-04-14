@@ -24,6 +24,12 @@
   ((node :initarg :node :reader node))
   (:documentation "Base class for all protocol entities"))
 
+;; base class for protocol conditions
+(define-condition protocol-condition(simulation-condition)
+  ((protocol :type protocol :initarg :protocol :reader protocol))
+  (:report (lambda(c s)
+               (format s "~A: ~A" (class-name (class-of c)) (protocol c)))))
+
 (defgeneric protocol-number(entity)
   (:documentation "Return the IANA protocol number.
 See http://www.iana.org/assignments/protocol-numbers")
@@ -139,6 +145,12 @@ See http://www.iana.org/assignments/protocol-numbers")
   ((layer :initform 4 :reader layer :allocation :class))
   (:documentation "The base class for all layer 4 protocol data units"))
 
+(defgeneric src-port(pdu)
+  (:documentation "Return the source port address"))
+
+(defgeneric dst-port(pdu)
+  (:documentation "Return the destination port address"))
+
 ;; even connectionless protocols don't have a peer address or port
 ;; it is convenient to use the protocol implementation to manage this for
 ;; the application in the simulation using open-connection and close-connection,
@@ -146,17 +158,20 @@ See http://www.iana.org/assignments/protocol-numbers")
 
 (defclass protocol(protocol:protocol)
   ((layer :initform 4 :reader layer :allocation :class)
-   (local-address :type network-address :reader local-address
-                  :documentation "local address used by this socket")
-   (local-port :type ipport :accessor local-port
-               :documentation "Local bound service access port")
    (layer5:application :initarg :application :initform nil
                        :reader layer5:application
                        :documentation "Application entity for this flow")
-   (peer-address :initform nil :type network-address
+   (local-address :initform nil :initarg :local-address
+                  :type (or network-address null) :reader local-address
+                  :documentation "local address used by this socket")
+   (local-port :initform nil :initarg :local-port
+               :type (or ipport null) :accessor local-port
+               :documentation "Local bound service access port")
+   (peer-address :initarg :peer-address :initform nil
+                 :type (or network-address null)
                  :accessor peer-address
                  :documentation "network address of peer")
-   (peer-port  :type ipport :accessor peer-port
+   (peer-port  :initarg :peer-port :type (or ipport null) :accessor peer-port
                :documentation "Service access port of peer")
    (fid :type counter :reader fid :documentation "Flow id for packets")
    (last-fid :type counter :initform 0 :documentation "last allocated flow id"
@@ -215,47 +230,99 @@ See http://www.iana.org/assignments/protocol-numbers")
    (layer :initform 4 :reader layer :allocation :class)
    (bindings :type list :initform nil :accessor bindings
              :documentation "Sequence of bound connections")
-   (min-ephemeral-port :type fixnum :initform 49152))
+   (min-ephemeral-port :type word :initform 49152
+                       :initarg :min-ephemeral-port))
   (:documentation "Layer 4 protocol demultiplexer to bound protocol entities"))
-
-;; dmux - around methods etc not
-(defmethod receive ((dmux protocol-dmux) packet
-                   (layer3protocol layer3:protocol) &rest args
-                   &key &allow-other-keys)
-  (let ((listener
-         (find (dst-port (peek-pdu packet)) (bindings dmux)
-               :key #'local-port)))
-    (if listener
-        (apply #'receive listener packet layer3protocol args)
-        (drop dmux packet :text "L4-NP"))))
-
-(defmethod reset((dmux protocol-dmux))
-  (map 'nil #'reset (bindings dmux)))
-
-(defun next-available-port(protocol-dmux)
-  "Return next available ephemeral port for a protocol demultiplexer"
-  (1+
-   (reduce #'max (bindings protocol-dmux) :key #'local-port
-           :initial-value  (slot-value protocol-dmux 'min-ephemeral-port))))
 
 (defun protocol-dmux(protocol)
   "Return the protocol demultiplexer associated with a protocol implementation"
   (find-protocol (protocol-number protocol) (node protocol)))
 
-(defmethod initialize-instance :after
-    ((protocol protocol) &key
-     (local-address (network-address (node protocol)))
-     (dmux (protocol-dmux protocol))
-     (local-port (next-available-port dmux))
-     peer-address peer-port
-     &allow-other-keys)
-  (when (find local-port (bindings dmux) :key #'local-port)
-    (error "~A Port ~D already bound" protocol local-port))
-  (setf (slot-value protocol 'local-address) local-address
-        (slot-value protocol 'local-port) local-port)
-  (push protocol (bindings dmux))
-  (when (and peer-address peer-port)
-    (open-connection peer-address peer-port protocol)))
+(defun next-available-port(protocol-dmux)
+  "Return next available ephemeral port for a protocol demultiplexer"
+  (the word
+   (1+
+    (reduce #'max (bindings protocol-dmux) :key #'local-port
+            :initial-value  (slot-value protocol-dmux 'min-ephemeral-port)))))
+
+(defgeneric binding(entity local-port &key &allow-other-keys)
+  (:documentation "Fnd best matching binding for given address details")
+  (:method(node local-port
+           &key local-address peer-port peer-address protocol-number)
+    (binding (find-protocol protocol-number node)
+             local-port
+             :local-address local-address
+             :peer-port peer-port
+             :peer-address peer-address))
+  (:method((dmux protocol-dmux) local-port
+           &key local-address peer-port peer-address &allow-other-keys)
+     (let ((binding nil)) ;; most specific found so far
+      (map 'nil
+           #'(lambda(p)
+               (when (eql local-port (local-port p))
+                 (if (local-address p)
+                     (when (address= (local-address p) local-address)
+                       (if (peer-address p)
+                           (when (and
+                                  (eql peer-port (peer-port p))
+                                  (address= peer-address (peer-address p)))
+                             (return-from binding p))
+                           (setf binding p)))
+                     (unless binding (setf binding p)))))
+           (bindings dmux))
+      binding)))
+
+(defgeneric bind(protocol &key local-port peer-port
+                          peer-address local-address node)
+  (:documentation "Bind a protocol - returning it if successful or nil if not")
+  (:method((protocol protocol) &key
+           (local-port (local-port protocol))
+           (local-address (local-address protocol))
+           (peer-port (peer-port protocol))
+           (peer-address (peer-address protocol))
+           (node (node protocol)))
+    (let ((dmux (find-protocol (protocol-number protocol) node)))
+      (unless local-port (setf local-port (next-available-port dmux)))
+      (assert (or (not (or peer-port peer-address))
+                  (and peer-port peer-address)))
+       (unless (binding dmux local-port :local-address local-address
+                        :peer-port peer-port :peer-address peer-address)
+         (setf (slot-value protocol 'local-port) local-port
+               (slot-value protocol 'peer-port) peer-port
+               (slot-value protocol 'local-address) local-address
+               (slot-value protocol 'peer-address) peer-address
+               (slot-value protocol 'node) node)
+         (push protocol (bindings dmux))))))
+
+(defgeneric unbind(protocol)
+  (:documentation "Remove protocol from dmux bindings")
+  (:method((protocol protocol))
+    (let ((dmux (find-protocol (protocol-number protocol) (node protocol))))
+      (setf (bindings dmux) (delete protocol (bindings dmux))))))
+
+(defgeneric bound-p(protocol)
+  (:documentation "Return true if protocol is currently bound")
+  (:method((protocol protocol))
+    (and (node protocol)
+         (find protocol
+               (bindings
+                (find-protocol (protocol-number protocol) (node protocol)))))))
+
+;; dmux - around methods etc not
+(defmethod receive ((dmux protocol-dmux) packet
+                    (layer3protocol layer3:protocol) &rest args
+                    &key src-address dst-address &allow-other-keys)
+  (let* ((h (peek-pdu packet))
+         (agent (binding dmux (dst-port h)
+                         :local-address dst-address
+                         :peer-address src-address
+                         :peer-port (src-port h))))
+    (if agent
+        (apply #'receive agent packet layer3protocol args)
+        (drop dmux packet :text "L4-NP"))))
+
+(defmethod reset((dmux protocol-dmux))
+  (map 'nil #'reset (bindings dmux)))
 
 (defgeneric open-connection(peer-address peer-port protocol)
   (:documentation "Connect a protocol to a remote (peer) address")
@@ -275,8 +342,7 @@ See http://www.iana.org/assignments/protocol-numbers")
 (defgeneric connected-p(protocol)
   (:documentation "Return true if protocol is connected")
   (:method((protocol protocol))
-    (and (slot-boundp protocol 'peer-port)
-         (slot-boundp protocol 'peer-address))))
+    (slot-boundp protocol 'peer-port)))
 
 (defgeneric close-connection(protocol)
   (:documentation "Close an open connection")
@@ -288,11 +354,7 @@ See http://www.iana.org/assignments/protocol-numbers")
 (defgeneric connection-closed(application protocol)
   (:documentation "Called by an associated layer 4 protocol when a connection
 has completely closed")
-  (:method(app protocol) (declare (ignore app protocol)))
-  (:method :after (app protocol)
-     (declare (ignore app))
-     (let ((dmux (protocol-dmux protocol)))
-       (setf (bindings dmux) (delete protocol (bindings dmux))))))
+  (:method(app protocol) (declare (ignore app protocol))))
 
 (defgeneric close-request(application protocol)
   (:documentation "Called by an associated layer 4 protocol when a connection
@@ -316,6 +378,12 @@ this occurs when the acknowledgement is received from the peer.")
     "Default - acceot and do nothing"
     (declare (ignore application protocol))
     t))
+
+(defgeneric connection-error(application protocol error)
+  (:documentation "Called by protocol to signal an error to the application")
+  (:method(application protocol error)
+    (declare (ignore application))
+    (format *trace-output* "~A connection Error: ~A" protocol error)))
 
 (in-package :protocol.layer5)
 

@@ -65,11 +65,18 @@ on a specific port"))
     ((app udp-sink)
      &key local-port
      (protocol-type 'layer4:udp)
+     local-address
+     peer-port
+     peer-address
      &allow-other-keys)
   (setf (slot-value app 'protocol)
         (make-instance protocol-type
+                       :node (node app)
                        :local-port local-port
-                       :node (node app) :application app)))
+                       :local-address local-address
+                       :peer-port peer-port
+                       :peer-address peer-address
+                       :application app)))
 
 (defmethod reset((app udp-sink))
   (dolist(s '(loss-statistics bandwidth-statistics
@@ -110,9 +117,14 @@ on a specific port"))
         (setf next-sequence-rx (1+ sequence-number))))))
 
 (defmethod start((app udp-sink))
+  (bind (protocol app))
   (when (or (loss-statistics app) (bandwidth-statistics app))
     ;; need to set up logging event
     (scheduler:schedule (stats-update-interval app) app)))
+
+(defmethod stop((app udp-sink) &key &allow-other-keys)
+  (call-next-method)
+  (unbind (protocol app)))
 
 (defmethod scheduler:handle((app udp-sink))
   (with-slots(bytes-rx packets-rx packets-lost loss-statistics

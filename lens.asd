@@ -58,11 +58,6 @@
                (:file "user"
                        :depends-on ("common" "address" "scheduler" "link"
                                              "node"))))
-     (:module "routing" :depends-on ("core")
-              :components
-              ((:file "fib")
-               (:file "manual" :depends-on ("fib"))
-               (:file "static" :depends-on ("fib"))))
      (:module "nodes" :depends-on ("core")
               :components ((:file "node")))
      (:module "layer1" :depends-on ("core")
@@ -76,7 +71,10 @@
      (:module "layer3" :depends-on ("core")
               :components
               ((:file "icmp")
-               (:file "ipv4" :depends-on ("icmp"))))
+               (:file "ipv4" :depends-on ("icmp"))
+               (:file "fib")
+               (:file "manual" :depends-on ("fib"))
+               (:file "static" :depends-on ("fib"))))
      (:module "layer4" :depends-on ("layer3" "core")
               :components
               ((:file "udp"))

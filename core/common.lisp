@@ -24,6 +24,10 @@
 (deftype seq() "a sequence number type" 'fixnum)
 (defconstant +c+ 299792458d0 "Speed of Light in m/sec")
 
+;; base class for in simulation errors (not program errors)
+(define-condition simulation-condition(condition)())
+
+;; Some basic macros
 (defmacro while (test &body body)
   "A while loop - repeat body while test is true"
   `(do ()
