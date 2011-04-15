@@ -20,13 +20,16 @@
 (defpackage :common
   (:documentation "Some common declarations and interfaces for LENS")
   (:use :cl)
+  (:import-from :closer-mop #:class-slots #:slot-definition-name
+                #:slot-definition-allocation #:class-direct-slots)
   (:export #:start #:stop #:reset #:busy-p #:*reset-hooks*
            #:while #:until #:filter #:defenumeration
            #:when-bind #:when-bind* #:simulation-condition
            #:uid #:counter #:name #:node #:length-bytes
-           #:octet #:word #:counter #:seq #:fid
+           #:octet #:word  #:word+ #:counter #:fid
            #:interface #:link #:node #:application
-           #:copy #:copy-with-slots #:trace-accessor #:untrace-accessor
+           #:copy #:copy-with-slots
+           #:trace-accessor #:untrace-accessor
            #:notifier #:add-notification #:delete-notifications
            #:do-notifications
            #:up-p #:mkup #:mkdown
@@ -36,12 +39,12 @@
 (defpackage :scheduler
   (:documentation "LENS Discrete Event Scheduler")
   (:use :cl :common)
-  (:import-from :alg #:enqueue #:dequeue #:make-binary-heap
-                #:empty-p #:size)
-  (:import-from :closer-mop #:slot-definition-name #:slot-definition-type
-                #:class-direct-slots)
+  (:import-from :alg
+                #:enqueue #:dequeue #:make-binary-heap #:empty-p #:size)
+  (:import-from :closer-mop
+                #:slot-definition-name #:slot-definition-type #:class-slots)
   (:export #:scheduler #:schedule #:simulation-time #:time-type
-           #:status #:with-timers #:timer #:timeout #:with-delay
+           #:status #:with-timers #:timer #:timers #:timeout #:with-delay
            #:event #:handle))
 
 (defpackage :math

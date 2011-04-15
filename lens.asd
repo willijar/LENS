@@ -77,8 +77,8 @@
                (:file "static" :depends-on ("fib"))))
      (:module "layer4" :depends-on ("layer3" "core")
               :components
-              ((:file "udp"))
-               #+nil(:file "tcp"))
+              ((:file "udp")
+               (:file "tcp")))
      (:module "layer5" :depends-on ("core")
               :components
               ((:file "abr-source")

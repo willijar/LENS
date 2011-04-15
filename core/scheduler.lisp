@@ -170,8 +170,15 @@ are dispatched in current thread"
 
 (defclass timer(event)
   ((name :initarg :name :reader name
-         :documentation "Slot name for instance in handler object"))
+         :documentation "Slot name for instance in handler object")
+   (timer-delay :initarg :delay :reader timer-delay
+                :documentation "Default delay for this timer")
+   (scheduled :initform nil :reader scheduled :type time-type))
   (:documentation "A timer event"))
+
+(defmethod schedule((delay number) (timer timer))
+  (setf (slot-value timer 'scheduled) (simulation-time))
+  (call-next-method))
 
 (defmethod handle((timer timer))
   (timeout (name timer) (handler timer)))
@@ -180,21 +187,42 @@ are dispatched in current thread"
   ()
   (:documentation "Class which maintaines a set of timers"))
 
+(defmethod schedule((timer symbol) (entity with-timers))
+  (let ((timer (slot-value entity timer)))
+    (schedule (timer-delay timer) timer)))
+
+(defgeneric timers(entity)
+  (:documentation "Return timers associated with entity")
+  (:method((obj with-timers))
+    (mapcan #'(lambda(slot)
+                (when (subtypep (slot-definition-type slot) 'timer)
+                  (list (slot-definition-name slot))))
+            (class-slots (class-of obj)))))
+
 (defgeneric timeout(timer handler)
   (:documentation "Called when a timer has finished. timer is the name
   of the timer (slot) in the handler object"))
 
-(defmethod initialize-instance :after ((m with-timers) &key &allow-other-keys)
-  (dolist(def (class-direct-slots (class-of m)))
-    (when (eql (slot-definition-type def) 'timer)
-      (let((name (slot-definition-name def)))
-        (setf (slot-value m name)
-              (make-instance 'timer :name name :handler m))))))
+(defmethod initialize-instance :after ((obj with-timers) &key &allow-other-keys)
+  (dolist(timer (timers obj))
+    (if (slot-boundp obj timer)
+        (setf (slot-value (slot-value obj timer) 'handler) obj)
+        (setf (slot-value obj timer)
+              (make-instance 'timer :name timer :handler obj)))))
+
+(defmethod copy :around ((object with-timers))
+  (let ((copy (call-next-method)))
+    (dolist(timer (timers copy))
+      (setf (slot-value (slot-value object timer) 'handler) copy))))
+
+(defmethod copy ((timer timer))
+  (make-instance 'timer
+                 :name (name timer) :timer-delay (timer-delay timer)
+                 :handler (handler timer)))
 
 (defmethod reset ((object with-timers))
-  (dolist(def (class-direct-slots (class-of object)))
-    (when (eql (slot-definition-type def) 'timer)
-        (stop (slot-value object (slot-definition-name def))))))
+  (dolist(timer (timers object))
+    (stop (slot-value object timer))))
 
 (defmacro with-delay((delay) &body body)
   "Execute body scheduled by delay seconds, or immediately if delay is

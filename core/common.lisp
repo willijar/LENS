@@ -1,6 +1,5 @@
-;; $Id$
 ;; Some commonly used definitions and protocols
-;; Copyright (C) 2007 Dr. John A.R. Williams
+;; Copyright (C) 2011 Dr. John A.R. Williams
 
 ;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
 ;; Keywords:
@@ -19,10 +18,15 @@
 
 ;; Basic types
 (deftype counter() "Type for counting objects" 'fixnum)
-(deftype octet() "8-bit byte type" '(unsigned-byte 8))
+(deftype octet(&optional (length 1)) "8-bit byte type"
+         `(unsigned-byte ,(* 8 length)))
 (deftype word() "16-bit word type" '(unsigned-byte 16))
-(deftype seq() "a sequence number type" 'fixnum)
 (defconstant +c+ 299792458d0 "Speed of Light in m/sec")
+
+(declaim (inline word+))
+(defun word+(a b)
+  (declare (word a b) (optimize speed (safety 0)))
+  (the word (mod (+ a b) #x10000)))
 
 ;; base class for in simulation errors (not program errors)
 (define-condition simulation-condition(condition)())
@@ -134,8 +138,7 @@ Returns:
         (t (reset h))))))
 
 (defgeneric copy(entity)
-  (:documentation "Create an return a (deep - no shared structure)
- copy of an entity")
+  (:documentation "Create an return a (deep) copy of an entity")
   (:method((entity (eql nil))) nil)
   (:method((entity number)) entity)
   (:method((entity symbol)) entity)
@@ -151,7 +154,18 @@ Returns:
       (do((i 0 (1+ i)))
          ((= i (array-total-size v))
           copy)
-        (setf (aref copy i) (copy (aref v i)))))))
+        (setf (aref copy i) (copy (aref v i))))))
+  (:method((obj standard-object))
+    (let* ((class (class-of obj))
+           (copy (allocate-instance class)))
+      (dolist(slot-definition (class-slots class))
+        (when (eql (slot-definition-allocation slot-definition) :instance)
+          (let ((slot-name (slot-definition-name slot-definition)))
+            (if (slot-boundp obj slot-name)
+                (setf (slot-value copy slot-name)
+                      (copy (slot-value obj slot-name)))
+                (slot-makunbound copy slot-name)))))
+      copy)))
 
 (defun copy-with-slots(original slots
                        &optional (copy (allocate-instance (class-of original))))

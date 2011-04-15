@@ -1,5 +1,5 @@
 ;; Implementation of 802.2 llc/snap frame
-;; Copyright (C) 2007 Dr. John A.R. Williams
+;; Copyright (C) 2010 Dr. John A.R. Williams
 
 ;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
 ;; Keywords:
@@ -21,10 +21,10 @@
 (in-package :layer2)
 
 (defclass llcsnap-header(pdu)
-  (#+nil(dsap :type (unsigned-byte 8) :initform #xAA)
-   #+nil(ssap  :type (unsigned-byte 8) :initform #xAA)
-   #+nil(ctrl  :type (unsigned-byte 8) :initform #x3)
-   #+nil(oui  :type (unsigned-byte 24) :initform 0)
+  ((dsap :type (unsigned-byte 8) :initform #xAA)
+   (ssap  :type (unsigned-byte 8) :initform #xAA)
+   (ctrl  :type (unsigned-byte 8) :initform #x3)
+   (oui  :type (unsigned-byte 24) :initform 0)
    (ethtype :type (unsigned-byte 16) :accessor ethtype
             :initform #x0800 :initarg :type
             :documentation "Protocol Number for upper level"))
@@ -32,14 +32,16 @@
 
 (defmethod length-bytes((h llcsnap-header)) 8)
 
-(defmethod copy((h llcsnap-header))
-  (copy-with-slots h '(ethtype))
-  #+nil(copy-with-slots h '(dsap sap ctrl oui ethtype)))
+(defmethod trace-format ((pdu llcsnap-header))
+  '((dsap " ~X")
+    (ssap " ~X")
+    (ctrl " ~X")
+    (oui " ~X")
+    (ethtype " ~X")))
 
 (defclass llcsnap(protocol)
   ()
   (:documentation "Base class for protocols which use llcsnap sublayer"))
-
 
 (defmethod busy-p((layer2 llcsnap)) (busy-p (interface layer2)))
 

@@ -18,24 +18,27 @@
 (in-package :protocol.layer4)
 
 (defclass udp-header(pdu)
-  ((name :initform "UDP" :reader name :allocation :class)
-   (trace-format :initform '(src-port dst-port msg-size (checksum "~4,'0X") seq)
-                 :reader trace-format :allocation :class)
-   (protocol-number :initform 17 :reader protocol-number :allocation :class)
-   (length-bytes :initform 8 :reader length-bytes :allocation :class)
-   (src-port :type ipport :initform 0 :accessor src-port :initarg :src-port)
-   (dst-port :type ipport :initform 0 :accessor dst-port :initarg :dst-port)
-   (msg-size :type word :initform 0 :accessor msg-size :initarg :msg-size)
-   (checksum :type word :initform 0 :accessor checksum :initarg :checksum)
+  ((src-port :type (unsigned-byte 16)
+             :initform 0 :accessor src-port :initarg :src-port)
+   (dst-port :type  (unsigned-byte 16)
+             :initform 0 :accessor dst-port :initarg :dst-port)
+   (msg-size :type  (unsigned-byte 16)
+             :initform 0 :accessor msg-size :initarg :msg-size)
+   (checksum :type  (unsigned-byte 16)
+             :initform 0 :accessor checksum :initarg :checksum)
    (sequence-number
-    :type seq :initform 0 :reader sequence-number
+    :type integer :initform 0 :reader sequence-number
     :initarg :sequence-number
     :documentation "Sequence id's are not part of UDP, but are useful
     for performing statistics in the simulation"))
   (:documentation "UDP PDU class"))
 
-(defmethod copy((h udp-header))
-  (copy-with-slots h '(src-port dst-port msg-size checksum seq)))
+(defmethod name((h udp-header)) "UDP")
+
+(defmethod length-bytes((h udp-header)) 8)
+
+(defmethod trace-format ((h udp-header))
+  '(src-port dst-port msg-size (checksum "~4,'0X") sequence-number))
 
 (defclass udp-pending()
   ((data :initarg :data :reader data)
@@ -60,24 +63,25 @@
                     :reader protocol-number)
    (mtu :initform 556 :initarg :mtu :accessor mtu ;; 576-20 for udp&ip headers
         :documentation "Maximum transmission unit")
-   (sequence-number :type seq :initform 0 :accessor sequence-number
+   (sequence-number :type integer :initform 0 :accessor sequence-number
                     :documentation "Sequence number of next packet")
    (pending-data :type list :initform nil :accessor pending-data
                  :documentation "Queue of pending data"))
   (:documentation "A model of the User Datagram Protocol."))
+
+(defmethod copy((udp udp))
+  (copy-with-slots udp '(mut sequence-number) (call-next-method)))
 
 (defmethod default-trace-detail((protocol udp))
   `(type src-port dst-port msg-size))
 
 (defmethod open-connection(peer-address peer-port (udp udp))
   (call-next-method)
-  (when-bind(application (layer5:application udp))
-            (connection-complete application udp)))
+  (connection-complete (application udp) udp))
 
 (defmethod close-connection((udp udp))
   (call-next-method)
-  (when-bind(application (layer5:application udp))
-            (connection-complete application udp)))
+  (connection-closed (layer5:application udp) udp))
 
 (defmethod receive((udp udp) (packet packet) (layer3 layer3:ipv4)
                    &key src-address &allow-other-keys)

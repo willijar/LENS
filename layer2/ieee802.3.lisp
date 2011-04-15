@@ -18,26 +18,19 @@
 (in-package :layer2)
 
 (defclass ieee802.3-header(llcsnap-header)
-  ((name :initform "802.3" :reader name :allocation :class)
-   (trace-format :initform '((dsap " ~X")
-                             (ssap " ~X")
-                             (ctrl " ~X")
-                             (oui " ~X")
-                             (ethtype " ~X")
-                             src-address
-                             dst-address)
-                 :reader trace-format
-                 :allocation :class)
-   (src-address :type macaddr :reader src-address :initarg :src-address)
+  ((src-address :type macaddr :reader src-address :initarg :src-address)
    (dst-address :type macaddr :reader dst-address :initarg :dst-address)
-   (msg-length :initform 0 :type word :reader msg-length :initarg :length))
+   (msg-length  :type (unsigned-byte 16)
+                :initform 0 :reader msg-length :initarg :length))
   (:documentation "The 802.3 PDU"))
 
 ;; Note NS2 doesn't model layer 2 size so direct comparisons are difficult
 (defmethod length-bytes((pdu ieee802.3-header)) 12)
 
-(defmethod copy((h ieee802.3-header))
-  (copy-with-slots h '(src-address dst-address msg-length) (call-next-method)))
+(defmethod name((pdu ieee802.3-header)) "802.3")
+
+(defmethod trace-format ((pdu ieee802.3-header))
+  (append (call-next-method) '(src-address dst-address msg-length)))
 
 (defclass ieee802.3 (llcsnap)
   ()

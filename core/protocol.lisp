@@ -24,6 +24,9 @@
   ((node :initarg :node :reader node))
   (:documentation "Base class for all protocol entities"))
 
+(defmethod copy((protocol protocol))
+  (copy-with-slots protocol '(name) (call-next-method)))
+
 ;; base class for protocol conditions
 (define-condition protocol-condition(simulation-condition)
   ((protocol :type protocol :initarg :protocol :reader protocol))
@@ -181,6 +184,12 @@ See http://www.iana.org/assignments/protocol-numbers")
    (tos :accessor tos :initarg :tos :initform 0 :type octet
         :documentation "Layer 3 type of service"))
   (:documentation "Base class for IP layer 4 protocol implementations"))
+
+(defmethod copy((protocol protocol))
+  (copy-with-slots protocol
+                   '(layer5:application local-address local-port
+                     peer-address peer-port fid ttl tos)
+                   (call-next-method)))
 
 ;; as per layer 3 standard layer 4 protocols may be registered so they
 ;; can be instantiated on nodes on demand.
@@ -354,7 +363,10 @@ See http://www.iana.org/assignments/protocol-numbers")
 (defgeneric connection-closed(application protocol)
   (:documentation "Called by an associated layer 4 protocol when a connection
 has completely closed")
-  (:method(app protocol) (declare (ignore app protocol))))
+  (:method(app protocol) (declare (ignore app protocol)))
+  (:method :after (app (protocol protocol))
+      (declare (ignore app))
+      (unbind protocol)))
 
 (defgeneric close-request(application protocol)
   (:documentation "Called by an associated layer 4 protocol when a connection

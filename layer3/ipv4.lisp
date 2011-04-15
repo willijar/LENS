@@ -1,6 +1,5 @@
-;; $Id$
 ;; IPv4 implementation
-;; Copyright (C) 2006 Dr. John A.R. Williams
+;; Copyright (C) 2010 Dr. John A.R. Williams
 
 ;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
 ;; Keywords:
@@ -28,33 +27,23 @@
 
 (defmethod length-bytes((pdu ipv4-header-option)) 0)
 
-(defmethod copy((pdu ipv4-header-option))
-  (copy-with-slots pdu '(option-number)))
-
 (defclass ipv4-header(pdu)
-  ((name :initform "IP" :reader name :allocation :class)
-   (trace-format
-    :initform '((version "-~A") header-length service-type total-length
-                identification flags fragment-offset ttl protocol-number
-                (header-checksum "~4,'0X") src-address dst-address)
-    :reader trace-format
-    :allocation :class)
-   (version :initarg :version :initform 4 :type octet :reader version
-            :allocation :class)
-   (service-type :initform 0 :type octet :reader servive-type
-                 :reader packet:priority
-                 :initarg :service-type)
-   (total-length :initform 0 :type word :accessor total-length)
-   (identification :initform 0 :type word)
-   (flags :initform 0 :type octet)
-   (fragment-offset :initform 0 :initarg :fragment-offset :type word)
-   (ttl :initform 64 :type octet :initarg :ttl :accessor ttl
+  ((version :type (unsigned-byte 4) :reader version :initform 4)
+   (header-length :type (unsigned-byte 4) :initform 5)
+   (service-type :type (unsigned-byte 6) :initform 0 :reader service-type
+                 :reader packet:priority :initarg :service-type)
+   (unused :type (unsigned-byte 2) :initform 0)
+   (total-length  :type (unsigned-byte 32) :initform 0 :accessor total-length)
+   (identification :type (unsigned-byte 32) :initform 0)
+   (flags :type (unsigned-byte 3) :initform 0 )
+   (fragment-offset :type (unsigned-byte 13)
+                    :initform 0 :initarg :fragment-offset)
+   (ttl :type (unsigned-byte 3) :initform 64 :initarg :ttl :accessor ttl
         :documentation "Default ttl for this ipv4 instance")
-   (protocol-number
-    :initform 17 :type octet :initarg :protocol-number
+   (protocol-number :type (unsigned-byte 8) :initform 17  :initarg :protocol-number
     :reader protocol-number
     :documentation "Protocol number for transport layer")
-   (header-checksum :initform 0 :type word) ;; not used in simulation
+   (header-checksum  :type (unsigned-byte 16) :initform 0) ;; not used in simulation
    (src-address :type ipaddr :accessor src-address :initarg :src-address)
    (dst-address :type ipaddr :accessor dst-address :initarg :dst-address)
    (options :type list :accessor options :initform nil))
@@ -63,21 +52,15 @@
 (defmethod length-bytes((pdu ipv4-header))
   (+ 20 (reduce #'+ (slot-value pdu 'options) :key #'length-bytes)))
 
-(defmethod copy((h ipv4-header))
-  (let ((copy
-         (copy-with-slots
-          h
-          '(uid version service-type total-length identification
-            flags fragment-offset ttl protocol header-checksum
-            src-address dst-address))))
-    (setf (slot-value copy 'options) (mapcar #'copy (options h)))
-    copy))
+(defmethod name((pdu ipv4-header)) "IP")
+
+(defmethod trace-format ((pdu ipv4-header))
+  '((version "-~A") header-length service-type total-length
+    identification flags fragment-offset ttl protocol-number
+    (header-checksum "~4,'0X") src-address dst-address))
 
 (defclass ipv4(protocol)
-  ((protocol-number :initform #x0800 :reader protocol-number
-                    :allocation :class)
-   (version :initform 4 :reader version :allocation :class)
-   (route-locally :type boolean :initform nil :accessor route-locally
+  ((route-locally :type boolean :initform nil :accessor route-locally
                   :documentation "Allows transport layer protocols on the same
 node to communicate with each other.")
    (icmp-enabled :initform *icmp-enabled-default* :initarg :icmp-enabled
@@ -189,26 +172,3 @@ node to communicate with each other.")
               (push-pdu iphdr packet)
               (send (interface route) packet ipv4
                     :address (dst-address route)))))))))
-
-
-
-;; (defmethod layer4:receive((demux ipv4-demux)
-;;                                   node packet dst-address
-;;                                   interface)
-;;   (when (node:call-callbacks
-;;            (layer demux) (protocol-number demux)
-;;            :rx packet node interface)
-;;     (let* ((pdu (peek-pdu packet))
-;;            (layer4protocol
-;;             (node:lookup-by-port (protocol-number pdu) node
-;;                                  :local-port (dst-port pdu))))
-;;       (cond
-;;         (layer4protocol
-;;          (layer4:receive
-;;           layer4protocol node packet dst-address interface))
-;;         (t ; no port - log and discard
-;;          (write-trace node (ipv4)
-;;                       :drop nil :packet packet :text "L3-NP")
-;;          (destination-unreachable node packet
-;;                                        (peek-pdu packet -1)
-;;                                        pdu :port-unreachable))))))

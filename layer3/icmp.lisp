@@ -43,24 +43,22 @@
      reassembly-exceeded))
 
 (defclass icmp-header(pdu)
-  ((name :initform "ICMP" :reader name :allocation :class)
-   (trace-format :initform '(icmp-type code
-                             identifier seq
-                             originated received transmitted)
-                 :reader trace-format
-                 :allocation :class)
-   (icmp-type :accessor icmp-type :type ICMP-msg-type :initarg :type)
+  ((icmp-type :accessor icmp-type :type ICMP-msg-type :initarg :type)
    (code :reader code :initarg :code :initform nil
          :type (or null destination-unreachable-code time-exceeded-code))
-   (identifier :type seq
+   (identifier :type (unsigned-byte 32)
                :reader identifier :initarg :identifier)
-   (seq :type seq :reader seq
-        :initarg :seq)
+   (seq :type (unsigned-byte 32) :reader seq :initarg :seq)
    (originated :type time-type :reader originated)
    (received :type time-type :reader received)
    (transmitted :type time-type  :reader transmitted)))
 
 (register-protocol 'icmp 1)
+
+(defmethod name((h icmp-header)) "ICMP")
+
+(defmethod trace-format((h icmp-header))
+  '(icmp-type code identifier seq originated received transmitted))
 
 (defmethod initialize-instance :after((pdu icmp-header) &key &allow-other-keys)
   (case (icmp-type pdu)

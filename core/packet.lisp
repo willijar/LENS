@@ -1,7 +1,18 @@
-;;;; LENS packet header API
-;;;; Copyright (C) 2003-2005 John A.R. Williams <J.A.R.Williams@jarw.org.uk>
-;;;; Released under the GNU General Public License (GPL)
-;;;; See <http://www.gnu.org/copyleft/gpl.html> for license details
+;;;; packet and headers
+;;;; Copyright (C) 2011 John A.R. Williams
+
+;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
+;; Keywords:
+
+;; This file is part of Lisp Educational Network Simulator (LENS)
+
+;; This is free software released under the GNU General Public License (GPL)
+;; See <http://www.gnu.org/copyleft/gpl.html>
+
+;;; Commentary:
+
+
+;;; Code:
 
 (in-package :packet)
 
@@ -18,11 +29,13 @@
   (:documentation "Priority of a pdu for priority queueing")
   (:method(pdu) 0))
 
+;; there are two useful external representations for pdus and packets
+;; one is readable  - e.g. for tracing, the other is binary format for
+;; interaction with real networks.
+
 (defgeneric trace-format(pdu)
   (:documentation "Return the trace formatting for a pdu as a list -
   either slot names or a list of slot name and associated format string"))
-
-(defmethod copy((pdu pdu)) (make-instance (class-of pdu)))
 
 (defun write-pdu-slots(pdu mask stream)
   "Helper to write the slots of a PDU to stream. mask is the detail
@@ -40,7 +53,7 @@ mask specifying which slots to write."
                   (slot-value pdu slot)))))
           (etypecase format
             (string (format stream format value))
-            (function (funcall function stream arg))))))))
+            (function (funcall format stream value))))))))
 
 (defmethod print-object((pdu pdu) stream)
   (print-unreadable-object (pdu stream :type t :identity nil)
@@ -78,7 +91,8 @@ output according to detail onto stream")
   (:documentation  "A generic packet class composed of a vector of
 protocol data units (PDUs)."))
 
-(defmethod initialize-instance :after((packet packet) &key data &allow-other-keys)
+(defmethod initialize-instance :after((packet packet)
+                                      &key data &allow-other-keys)
   (push-pdu data packet))
 
 (defmethod print-object((packet packet) stream)
@@ -87,16 +101,6 @@ protocol data units (PDUs)."))
 
 (defmethod length-bytes((p packet))
   (reduce #'+ (pdus p) :key #'length-bytes))
-
-(defmethod copy((packet packet))
-  ;; note this does not copy the pdu's for efficiency reasons.
-  (let ((copy (copy-with-slots packet '(uid created routing))))
-    (let ((pdus (make-array (length (pdus packet))
-                            :adjustable t :fill-pointer 0)))
-      (setf (slot-value copy 'pdus) pdus)
-      (map nil #'(lambda(pdu) (vector-push-extend pdu pdus))
-           (pdus packet)))
-    copy))
 
 (defun push-pdu(pdu packet)
   "Insert a protocol data unit (PDU) into the packet.

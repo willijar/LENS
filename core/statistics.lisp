@@ -170,13 +170,13 @@ bucket interval."))
 ;;; round trip time estimation
 
 (defstruct rtt-history
-  (seq 0 :type seq)         ; First sequence number in packet sent
-  (count 0 :type counter)   ; Number of bytes sent
+  (seq 0 :type integer)       ; First sequence number in packet sent
+  (count 0 :type counter)     ; Number of bytes sent
   (time 0.0 :type time-type)  ; Time this one was sent
-  (retx nil :type boolean)) ; True if this has been retransmitted
+  (retx nil :type boolean))   ; True if this has been retransmitted
 
 (defclass rtt-estimator()
-  ((seq-next :initform 0 :type seq :accessor seq-next
+  ((seq-next :initform 0 :type integer :accessor seq-next
              :documentation  "Next expected sequence to be sent")
    (history :initform nil :type list :accessor history
             :documentation "List of sent packets")
@@ -199,7 +199,7 @@ bucket interval."))
   (:documentation "A virtual base class which defines the behavior of
 a round trip time estimator used by TCP."))
 
-(defgeneric sent-seq(seq no-bytes rtt-estimator)
+(defgeneric rtt-sent-seq(seq no-bytes rtt-estimator)
   (:documentation "Record in rtt-estimator that no-bytes where sent
 with particular sequence number")
   (:method (seq no-bytes (rtt rtt-estimator))
@@ -233,7 +233,7 @@ with particular sequence number")
   (setf (multiplier rtt)
         (min (* 2 (multiplier rtt) (slot-value rtt 'max-multiplier)))))
 
-(defgeneric ack-seq(seq rtt-estimator)
+(defgeneric rtt-ack-seq(seq rtt-estimator)
   (:documentation "Notify the RTT estimator that a particular sequence number
     has been acknowledged.")
   (:method(a (rtt rtt-estimator))
@@ -247,7 +247,7 @@ with particular sequence number")
         (reset-multiplier rtt)
         (when-bind(stats (statistics rtt)) (record m stats))
         (when-bind(stats (global-statistics rtt)) (record m stats)))
-      ;;  Now delete all ack history with seq <= ack
+      ;;  Now delete all ack history with seq<= ack
       (while(and history (not (> (+ (rtt-history-seq (first history))
                                     (rtt-history-count (first history))) a)))
         (pop history))
@@ -285,7 +285,7 @@ with particular sequence number")
   (call-next-method)
   (setf (variance rtt) 0.0))
 
-(defun retransmit-timeout(rtt)
+(defun rtt-retransmit-timeout(rtt)
   ;;As suggested by Jacobson
   (if (< (variance rtt) (/ (estimate rtt) 4.0))
       (* 2 (estimate rtt) (multiplier rtt))
