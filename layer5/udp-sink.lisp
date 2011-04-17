@@ -41,18 +41,18 @@ overall bytes/sec data rx.")
    (last-packet-rx
     :initform 0 :type  scheduler:time-type
     :documentation "Time last packet is received. Used to calculate jitter.")
-   (bytes-rx  :initform 0 :type counter :reader bytes-rx
+   (bytes-rx  :initform 0 :type integer :reader bytes-rx
               :documentation "total number of bytes received")
-   (packets-rx :initform 0 :type counter :reader packets-rx
+   (packets-rx :initform 0 :type integer :reader packets-rx
                :documentation "total number of packets received")
-   (packets-lost :initform 0 :type counter :reader packets-lost
+   (packets-lost :initform 0 :type integer :reader packets-lost
                  :documentation "total number of packets lost")
    (next-sequence-rx :initform 0 :type seq
                      :documentation "Sequence number of next expected packet")
    (last-log-time :initform 0 :type  scheduler:time-type)
-   (last-packets-rx :initform 0 :type counter)
-   (last-bytes-rx :initform 0 :type counter)
-   (last-packets-lost :initform 0 :type counter)
+   (last-packets-rx :initform 0 :type integer)
+   (last-bytes-rx :initform 0 :type integer)
+   (last-packets-lost :initform 0 :type integer)
    (iat-statistics :initarg :iat-statistics :initform nil
                    :accessor iat-statistics
                    :documentation "Inter-arrival time distribution statistics")

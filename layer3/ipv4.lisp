@@ -22,10 +22,11 @@
 ;; base for all internet protocol conditions
 
 (defclass ipv4-header-option(pdu)
-  ((option-number :type octet :initarg :option-number :reader option-number))
+  ((option-number :type (unsigned-byte 8)
+                  :initarg :option-number :reader option-number))
   (:documentation "The IP options part of the IP Header."))
 
-(defmethod length-bytes((pdu ipv4-header-option)) 0)
+(defmethod length-bytes((pdu ipv4-header-option)) 1)
 
 (defclass ipv4-header(pdu)
   ((version :type (unsigned-byte 4) :reader version :initform 4)

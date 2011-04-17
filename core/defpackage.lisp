@@ -25,8 +25,7 @@
   (:export #:start #:stop #:reset #:busy-p #:*reset-hooks*
            #:while #:until #:filter #:defenumeration
            #:when-bind #:when-bind* #:simulation-condition
-           #:uid #:counter #:name #:node #:length-bytes
-           #:octet #:word  #:word+ #:counter #:fid
+           #:uid #:name #:node #:length-bytes #:modulus+
            #:interface #:link #:node #:application
            #:copy #:copy-with-slots #:immutable
            #:trace-accessor #:untrace-accessor
@@ -83,7 +82,7 @@
 
 (defpackage :address
   (:documentation "network and hardware addressing")
-  (:use :cl)
+  (:use :cl :common)
   (:import-from :split-sequence #:split-sequence)
   (:import-from :protocol #:protocol-number)
   (:export  #:hardware-address #:network-address #:network-mask
@@ -207,7 +206,7 @@
    (:import-from :trace
                  #:*lens-trace-output* #:trace-status #:trace-detail
                  #:time-format #:trace-stream)
-   (:import-from :packet #:created #:fid #:pdus)
+   (:import-from :packet #:created #:pdus)
    (:import-from #:protocol #:protocol-number #:layer)
    (:import-from :node
                  #:node #:nodes #:clear-nodes

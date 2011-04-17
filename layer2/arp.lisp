@@ -28,11 +28,11 @@
   (state :free :type symbol) ;; current state, free, resolved or pending
   (hwaddr 0 :type hardware-address)   ;; mac address of the target
   (lifetime 0 :type time-type) ;; lifetime of this entry
-  (retries 0 :type counter) ;; number of arp attempts made for this entry
+  (retries 0 :type integer) ;; number of arp attempts made for this entry
   (buffer nil :type packet));; One packet buffer
 
 (defclass arp-header(pdu)
-  ((protocol-number :type word :initform #x803 :allocation :class
+  ((protocol-number :type (unsigned-byte 16) :initform #x803 :allocation :class
                     :reader protocol-number)
    (op :initarg :op :type (member :request :reply) :accessor op
        :documentation "Either Request or Reply")
@@ -68,7 +68,8 @@
                    (call-next-method)))
 
 (defclass arp(protocol)
-  ((protocol-number :type word :initform #x803 :allocation :class
+  ((protocol-number :type (unsigned-byte 16)
+                    :initform #x803 :allocation :class
                     :reader protocol-number)
    (timeout :initform *default-arp-entry-timeout*
             :initarg :timeout :type time-type :accessor timeout

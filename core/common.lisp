@@ -17,20 +17,23 @@
 (in-package :common)
 
 ;; Basic types
-(deftype counter() "Type for counting objects" 'fixnum)
-(deftype octet(&optional (length 1)) "8-bit byte type"
-         `(unsigned-byte ,(* 8 length)))
-(deftype word() "16-bit word type" '(unsigned-byte 16))
+
 (defconstant +c+ 299792458d0 "Speed of Light in m/sec")
 
-(declaim (inline word+ seq1+))
-(defun word+(a b)
-  (declare (word a b) (optimize speed (safety 0)))
-  (the word (mod (+ a b) #x10000)))
+(defun modulus+(a b &optional (bit-length 32))
+  "Add two unsigned-byte integers using modulus arithmetic for given
+bit length"
+  (declare (unsigned-byte a b))
+  (the unsigned-byte (mod (+ a b) (dpb 1 (byte 1 bit-length) 0))))
 
-(defun (seq1+)(a)
-  (declare ((unsigned-byte 32)  (optimize speed (safety 0))))
-  (the (unsigned-byte 32) (mod (1+ a) #x100000000)))
+(define-compiler-macro modulus+ (&whole form a b &optional (bit-length 32))
+   "Add two unsigned-byte integers using modulus arithmetic for given
+bit length - optimisation where bit-length is a static number"
+  (cond
+    ((numberp bit-length)
+     `(the (unsigned-byte ,bit-length)
+        (mod (+ ,a ,b) ,(dpb 1 (byte 1 bit-length) 0))))
+    (t form)))
 
 ;; base class for in simulation errors (not program errors)
 (define-condition simulation-condition(condition)())

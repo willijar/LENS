@@ -18,9 +18,9 @@
 (in-package :layer1)
 
 (defclass packet-queue()
-  ((enqueue-count :type counter :accessor enqueue-count :initform 0
+  ((enqueue-count :type integer :accessor enqueue-count :initform 0
               :documentation "Total enqueued packets")
-   (drop-count :type counter :accessor drop-count :initform 0
+   (drop-count :type integer :accessor drop-count :initform 0
                :documentation "Total dropped packets")
    (egress-filter :type (or boolean function list) :writer egress-filter
                 :initform nil

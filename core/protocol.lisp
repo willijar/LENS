@@ -176,12 +176,12 @@ See http://www.iana.org/assignments/protocol-numbers")
                  :documentation "network address of peer")
    (peer-port  :initarg :peer-port :type (or ipport null) :accessor peer-port
                :documentation "Service access port of peer")
-   (fid :type counter :reader fid :documentation "Flow id for packets")
-   (last-fid :type counter :initform 0 :documentation "last allocated flow id"
+   (fid :type integer :reader fid :documentation "Flow id for packets")
+   (last-fid :type integer :initform 0 :documentation "last allocated flow id"
              :allocation :class)
-   (ttl :accessor ttl :initarg :ttl :initform 64 :type word
+   (ttl :accessor ttl :initarg :ttl :initform 64 :type integer
         :documentation "Layer 3 ttl")
-   (tos :accessor tos :initarg :tos :initform 0 :type octet
+        (tos :accessor tos :initarg :tos :initform 0
         :documentation "Layer 3 type of service"))
   (:documentation "Base class for IP layer 4 protocol implementations"))
 
@@ -239,7 +239,7 @@ See http://www.iana.org/assignments/protocol-numbers")
    (layer :initform 4 :reader layer :allocation :class)
    (bindings :type list :initform nil :accessor bindings
              :documentation "Sequence of bound connections")
-   (min-ephemeral-port :type word :initform 49152
+   (min-ephemeral-port :type (unsigned-byte 16) :initform 49152
                        :initarg :min-ephemeral-port))
   (:documentation "Layer 4 protocol demultiplexer to bound protocol entities"))
 
@@ -249,13 +249,12 @@ See http://www.iana.org/assignments/protocol-numbers")
 
 (defun next-available-port(protocol-dmux)
   "Return next available ephemeral port for a protocol demultiplexer"
-  (the word
-   (1+
-    (reduce #'max (bindings protocol-dmux) :key #'local-port
-            :initial-value  (slot-value protocol-dmux 'min-ephemeral-port)))))
+  (do((port (min-ephemeral-port protocol-dmux) (modulus+ 1 port 16)))
+     ((or (zerop port) (not (binding protocol-dmux port))
+          (the (unsigned-byte 16) port)))))
 
 (defgeneric binding(entity local-port &key &allow-other-keys)
-  (:documentation "Fnd best matching binding for given address details")
+  (:documentation "Find best matching binding for given address details")
   (:method(node local-port
            &key local-address peer-port peer-address protocol-number)
     (binding (find-protocol protocol-number node)
@@ -403,13 +402,13 @@ this occurs when the acknowledgement is received from the peer.")
   ((layer :initform 5 :allocation :class :reader layer)
    (length-bytes :type integer :initarg :length-bytes
          :documentation "Number of data bytes if no contents")
-   (contents :type (or null (vector octet *)) :initform nil :reader contents
+   (contents :type (or null (vector (unsigned-byte 8) *)) :initform nil :reader contents
              :initarg :contents
              :documentation "Vector of data if we are sending")
    #+nil(response-size :type integer :initarg :response-size :initform 0
                   :reader response-size
                   :documentation "Size of response requested")
-   #+nil(checksum :type word :initarg :checksum
+   #+nil(checksum :type (unsigned-byte 16) :initarg :checksum
                   :documentation "Checksum value"))
   (:documentation "Data PDU"))
 
@@ -437,10 +436,10 @@ this occurs when the acknowledgement is received from the peer.")
   (:documentation "Perform 16 bit xor checksum across entity data")
   (:method((data vector))
     "Perform 16 bit xor checksum across a vector of (unsigned-byte 8)"
-    (check-type data (vector octet *))
+    (check-type data (vector (unsigned-byte 8) *))
     (multiple-value-bind(s2 rem) (floor (length data) 2)
       (let ((sum 0))
-        (declare (type word sum))
+        (declare (type (unsigned-byte 16) sum))
         ;; do 16 bit checksum across contents
         (loop :for i :from 0 :below s2
               :do (setf sum (logxor sum
@@ -500,14 +499,14 @@ this occurs when the acknowledgement is received from the peer.")
   (multiple-value-bind(s d)
       (etypecase s
         (integer (values s nil))
-        ((vector octet *) (values (length s) s))
+        ((vector (unsigned-byte 8) *) (values (length s) s))
         (data (values (length-bytes s) (contents s))))
     (with-slots(length-bytes contents) data
       (if contents
           (setf contents
                 (concatenate 'vector contents
                              (or d (make-array s
-                                               :element-type 'octet
+                                               :element-type '(unsigned-byte 8)
                                                :initial-element 0))))
           (when d (setf contents (copy-seq d))))
       (setf length-bytes (+ length-bytes s)))))
