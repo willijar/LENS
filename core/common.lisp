@@ -23,10 +23,14 @@
 (deftype word() "16-bit word type" '(unsigned-byte 16))
 (defconstant +c+ 299792458d0 "Speed of Light in m/sec")
 
-(declaim (inline word+))
+(declaim (inline word+ seq1+))
 (defun word+(a b)
   (declare (word a b) (optimize speed (safety 0)))
   (the word (mod (+ a b) #x10000)))
+
+(defun (seq1+)(a)
+  (declare ((unsigned-byte 32)  (optimize speed (safety 0))))
+  (the (unsigned-byte 32) (mod (1+ a) #x100000000)))
 
 ;; base class for in simulation errors (not program errors)
 (define-condition simulation-condition(condition)())
@@ -177,6 +181,12 @@ the slots of the original."
           (setf (slot-value copy slot) (copy (slot-value original slot)))
           (slot-makunbound copy slot)))
     copy)
+
+(defclass immutable()
+  ()
+  (:documentation "Base for classes which are immutable and so don't have to be deep copied."))
+
+(defmethod copy((obj immutable)) obj)
 
 (defmacro trace-accessor((slotname (objvar type)
                           &optional (slotvar (gensym))) &rest body)

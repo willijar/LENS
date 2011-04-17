@@ -28,7 +28,7 @@
            #:uid #:counter #:name #:node #:length-bytes
            #:octet #:word  #:word+ #:counter #:fid
            #:interface #:link #:node #:application
-           #:copy #:copy-with-slots
+           #:copy #:copy-with-slots #:immutable
            #:trace-accessor #:untrace-accessor
            #:notifier #:add-notification #:delete-notifications
            #:do-notifications

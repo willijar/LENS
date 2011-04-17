@@ -42,7 +42,7 @@
 (defgeneric address=(a b &optional mask)
   (:documentation "Return true if addresses are equal"))
 
-(defclass address()
+(defclass address(immutable)
   ((address-bytes :type (unsigned-byte *) :initarg :bytes
                   :reader address-bytes))
   (:documentation "Generic class for addresses"))
@@ -79,7 +79,7 @@
 
 (defclass network-address(address)
   ()
-  (:documentation "Base class for hardware addresses"))
+  (:documentation "Base class for network addresses"))
 
 (deftype ip() '(unsigned-byte 32))
 (deftype mac() '(unsigned-byte 48))
