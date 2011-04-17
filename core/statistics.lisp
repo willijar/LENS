@@ -171,7 +171,7 @@ bucket interval."))
 
 (defstruct rtt-history
   (seq 0 :type integer)       ; First sequence number in packet sent
-  (count 0 :type counter)     ; Number of bytes sent
+  (count 0 :type integer)     ; Number of bytes sent
   (time 0.0 :type time-type)  ; Time this one was sent
   (retx nil :type boolean))   ; True if this has been retransmitted
 

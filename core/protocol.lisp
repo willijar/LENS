@@ -91,16 +91,20 @@ See http://www.iana.org/assignments/protocol-numbers")
 (defmethod node((protocol protocol)) (node (layer1:interface protocol)))
 
 (defclass pdu(packet:pdu)
-  ((layer :initform 2 :reader protocol:layer :allocation :class))
+  ()
   (:documentation "The base class for all layer two  protocol data units"))
+
+(defmethod layer((pdu pdu)) 2)
 
 (defmethod protocol-number((addr macaddr)) 1)
 
 (in-package :protocol.layer3)
 
 (defclass pdu(packet:pdu)
-  ((layer :initform 3 :reader protocol:layer :allocation :class))
+  ()
   (:documentation "The base class for all layer three protocol data units"))
+
+(defmethod layer((pdu pdu)) 3)
 
 (defclass protocol(protocol:protocol)
   ((layer :initform 3 :reader layer :allocation :class))
@@ -141,12 +145,11 @@ See http://www.iana.org/assignments/protocol-numbers")
 
 (in-package :protocol.layer4)
 
-(defgeneric dst-port(pdu)
-  (:documentation "Return the destiantion port for a packet"))
-
 (defclass pdu(packet:pdu)
-  ((layer :initform 4 :reader layer :allocation :class))
+  ()
   (:documentation "The base class for all layer 4 protocol data units"))
+
+(defmethod layer((pdu pdu)) 4)
 
 (defgeneric src-port(pdu)
   (:documentation "Return the source port address"))
@@ -249,7 +252,8 @@ See http://www.iana.org/assignments/protocol-numbers")
 
 (defun next-available-port(protocol-dmux)
   "Return next available ephemeral port for a protocol demultiplexer"
-  (do((port (min-ephemeral-port protocol-dmux) (modulus+ 1 port 16)))
+  (do((port (slot-value protocol-dmux 'min-ephemeral-port)
+            (modulus+ 1 port 16)))
      ((or (zerop port) (not (binding protocol-dmux port))
           (the (unsigned-byte 16) port)))))
 

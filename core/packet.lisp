@@ -80,8 +80,8 @@ output according to detail onto stream")
         :initform (incf *packet-count*)
         :reader uid
         :documentation "Unique id of the packet")
-   (fid :type integer :initarg :fid :documentation "Flow id useful for tracing"
-        :reader fid)
+   (fid :type integer :initarg :fid :reader fid
+        :documentation "Flow id - useful for tracing")
    (pdus :type vector :initform (make-array 5 :adjustable t :fill-pointer 0)
          :reader pdus)
    (created :type time-type :initform (simulation-time) :reader created
@@ -97,7 +97,7 @@ protocol data units (PDUs)."))
 
 (defmethod print-object((packet packet) stream)
   (print-unreadable-object(packet stream :type t :identity t)
-    (format stream "~S ~:/print-eng/bytes" (uid packet) (length-bytes packet))))
+    (format stream "~D ~:/print-eng/bytes" (uid packet) (length-bytes packet))))
 
 (defmethod length-bytes((p packet))
   (reduce #'+ (pdus p) :key #'length-bytes))

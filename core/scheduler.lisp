@@ -101,7 +101,8 @@ called after all entities created before running simulation")
     (schedule delay (make-instance 'simple-event :handler handler))))
 
 (defmethod stop((event event) &key &allow-other-keys)
-  (alg:delete event  (slot-value (scheduler) 'event-queue)))
+  (when (>= (slot-value event 'rank) 0)
+    (alg:delete event  (slot-value (scheduler) 'event-queue))))
 
 (defmethod reset((event event))
   (stop event))

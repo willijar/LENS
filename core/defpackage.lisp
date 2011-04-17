@@ -62,7 +62,7 @@
   (:import-from :scheduler #:simulation-time #:time-type)
   (:export #:pdu #:pdus #:layer #:packet #:created
            #:push-pdu #:skip-pdu #:peek-pdu #:pop-pdu #:priority
-           #:trace-format #:pdu-trace))
+           #:trace-format #:pdu-trace  #:fid))
 
 (defpackage :trace
    (:documentation "Packet Trace handling")
@@ -169,7 +169,7 @@
   (:use :cl :common :address :protocol)
   (:shadow #:protocol #:pdu)
   (:import-from :packet #:packet #:pop-pdu #:push-pdu #:peek-pdu
-                #:trace-format)
+                #:trace-format #:fid)
   (:import-from :alg #:enqueue #:dequeue #:make-queue #:empty-p)
   (:import-from :node #:node #:interfaces #:find-interface)
   (:export #:protocol #:pdu #:protocol-dmux
@@ -180,7 +180,7 @@
            #:open-connection #:connection-complete
            #:close-connection #:connection-closed #:close-request
            #:connection-from-peer #:connected-p #:connection-error
-           #:send #:receive #:sent #:fid
+           #:send #:receive #:sent
            ;; conditions
            ;; specific default layer 4 protocols
            #:udp-dmux #:tcp-dmux #:udp-header #:tcp-header
