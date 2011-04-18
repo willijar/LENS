@@ -78,7 +78,8 @@
      (:module "layer4" :depends-on ("layer3" "core")
               :components
               ((:file "udp")
-               (:file "tcp")))
+               (:file "rtt")
+               (:file "tcp" :depends-on ("rtt"))))
      (:module "layer5" :depends-on ("core")
               :components
               ((:file "abr-source")

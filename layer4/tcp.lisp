@@ -1,5 +1,5 @@
 ;; TCP base implementation
-;; Copyright (C) 2010 Dr. John A.R. Williams
+;; Copyright (C) 2011 Dr. John A.R. Williams
 
 ;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
 ;; Keywords:
@@ -29,9 +29,6 @@
                 #:enqueue #:dequeue #:make-queue #:empty-p)
   (:import-from :node
                 #:node #:interfaces #:find-interface)
-  (:import-from :math
-                #:rtt-mdev #:rtt-sent-seq #:rtt-ack-seq
-                #:rtt-retransmit-timeout #:record)
   (:import-from :scheduler
                 #:time-type #:stop #:scheduled #:timer #:schedule #:timers
                 #:simulation-time)
@@ -415,15 +412,29 @@
         :documentation "Maximum transmission unit")
    (state :initform closed :accessor state :type tcp-states
           :documentation "Current state")
+   (pending-data :initform (make-queue)
+                 :documentation "Data sent by application but not sent")
    (buffered-data :initform (make-hash-table) :type list :accessor buffered-data
                   :documentation "data Received but out of sequence")
    (syn-time :initform 0.0 :accessor syn-time :type time-type
              :documentation "Time SYN sent")
+   (last-ack-time :initform 0.0 :type time-type
+                  :documentation  "Time last Ack received")
    (rtt :initform (make-instance 'rtt-mdev) :initarg :rtt :reader rtt
         :documentation "RTT estimator")
+   ;; timers
+   (connTimeout :type timer
+                :initform (make-instance 'timer :delay 6)
+                :documentation "Pending connection timeout event")
+   (timedWaitTimeout :type timer
+                     :initform (make-instance 'timer :delay 5)
+                     :documentation "Timeout for timed-wait state")
+   (lastAckTimeout :type timer
+                   :initform (make-instance 'timer)
+                   :documentation " Timeout for last-ack state")
    ;; (pending-data :initform (make-hash-table) :type pending-data
    ;;               :accessor pending-data
-   ;;               :documentation "Data sent by application but not sent")
+   ;;               :documentation )
    ;; (first-pending-seq :initform 0 :type (unsigned-byte 32) :accessor first-pending-seq
    ;;                    :documentation "First sequence number in pending data")
    ;; ;; sequence information - sender side
@@ -476,17 +487,10 @@
    ;; (datimeout :initform *default-del-ack-timeout*
    ;;                  :accessor del-ack-timeout :type time-type
    ;;                  :documentation "Timeout period for delayed acks")
-   (connTimeout :type timer
-                :initform (make-instance 'timer :delay 6)
-                :documentation "Pending connection timeout event")
+
    ;; (retxTimeout :type timer :documentation "Retransmit timeout")
    ;; (delAckTimeout :type timer :documentation "Delayed ack timeout")
-   (timedWaitTimeout :type timer
-                     :initform (make-instance 'timer :delay 5)
-                     :documentation "Timeout for timed-wait state")
-   (lastAckTimeout :type timer
-                   :initform (make-instance 'timer)
-                   :documentation " Timeout for last-ack state")
+
    ;; (retry-count :initform 0 :accessor retry-count :type integer
    ;;              :documentation "Limit the re-tx retries")
    ;; (conn-count :initform *default-conn-count*
@@ -550,6 +554,9 @@
 )
   (:documentation "A model of the Transmission Control Protocol."))
 
+(defmethod default-trace-detail((protocol tcp))
+  `(type src-port dst-port sequence-number ack-number flags fid))
+
 (defun process-event(event tcp)
   (let ((old-state (state tcp)))
     (multiple-value-bind(new-state action) (lookup-state old-state event)
@@ -571,20 +578,19 @@
         (old-state (state tcp)))
     ;; Check if ACK bit set, and if so notify rtt estimator
     (when (flag-set-p (flags header) ack)
-      (let ((m (rtt-ack-seq (ack-number header) (rtt tcp))))
-        ;; Also insure that connection timer is canceled,
-        ;; as this may be the final part of 3-way handshake
-        (stop (slot-value tcp 'connTimeout))))
+      (rtt-ack-seq (ack-number header) (rtt tcp))
+      ;; Also insure that connection timer is canceled,
+      ;; as this may be the final part of 3-way handshake
+      (stop (slot-value tcp 'connTimeout)))
 
     ;; Check syn/ack and update rtt if so
     (when (and (= old-state syn-sent) (= (flags header) (logior syn ack)))
-      (record (- (simulation-time) (syn-time tcp)) (rtt tcp)))
+      (math:record (- (simulation-time) (syn-time tcp)) (rtt tcp)))
 
     ;; determine event type and process
-    (let* ((event (flags-event (flags header)))
-           (action (process-event event tcp))
-           (state (state tcp)))
-
+    (let ((event (flags-event (flags header)))
+          (action (process-event event tcp))
+          (state (state tcp)))
       ;; sanity checks
       (assert (not (and (= state close-wait) (= event seq-recv)))
               ()
@@ -607,10 +613,42 @@
          (map 'nil #'stop (timers tcp))
          (schedule 'timedWaitTimeout tcp)))
       (process-action action tcp packet header dst-address)
-    (when (and (= state last-ack) (not (zerop (last-ack-time tcp))))
+      (when (and (= state last-ack)
+                 (not (zerop (slot-value tcp 'last-ack-time))))
       (schedule (rtt-retransmit-timeout (rtt tcp))
                 (slot-value tcp 'lastAckTimeout))))))
 
+
+(defmethod send((tcp tcp) (data data) application
+                &key &allow-other-keys)
+  (unless (member (state tcp) #.(list established syn-sent close-wait))
+    (error "TCP ~A send wrong state ~A" tcp (state tcp)))
+  (enqueue data (pending-data tcp))
+  (process-action (process-event app-send tcp) tcp)
+  (length-bytes data))
+
+(defmethod open-connection(peer-address peer-port (tcp tcp))
+  (call-next-method)
+  (unless (local-port protocol) (bind protocol))
+  (let ((state (state protocol))
+        (action (process-event app-connect protocol)))
+    (unless (= action syn-tx)
+      (error "Bad connect action ~A from ~A state" action state))
+    (process-action action protocol)))
+
+(defmethod close-connection((tcp tcp))
+;;   (unless (= (state protocol) closed)
+;;     (let ((action (process-event app-close protocol)))
+;;       (unless (pending-data protocol)
+;;         (when (= action fin-tx)
+;;           (setf (close-on-empty protocol) t)
+;;           (return-from close-connection t)))
+;;       (prog1
+;;           (process-action action protocol)
+;;         (when (and (= (state protocol) last-ack)
+;;                    (not (last-ack-timeout-event protocol)))
+;;           (schedule-timer (retransmit-timeout (rtt protocol))
+;;                           'last-ack-timeout-event protocol))))))
 
 ;; the following 3 generic functions are implemented for different variations
 ;; of TCP
@@ -711,8 +749,6 @@
 ;;                     :when (aref tss i) :do (enable-time-seq i copy)))
 ;;     copy))
 
-;; (defmethod default-trace-detail((protocol tcp))
-;;   `(type src-port dst-port sequence-number ack-number flags fid))
 
 ;; (defstruct time-seq
 ;;   "Time/sequence logs"
@@ -728,44 +764,8 @@
 
 ;; (defmethod notify((tcp tcp)) (tcp-send-pending tcp))
 
-;; (defmethod send((tcp tcp) (data data)
-;;                 &key dst-address dst-port)
-;;   (declare (ignore dst-address dst-port))
-;;   (unless (member (state tcp) '#.(list established syn-sent close-wait))
-;;     (error "TCP ~A send wrong state ~A" tcp (state tcp)))
-;;   (if (pending-data tcp)
-;;       (data:add-data (or (data:contents data) (size data))  (pending-data tcp))
-;;       (progn
-;;         (setf (first-pending-seq tcp) (next-tx-seq tcp))
-;;         (setf (pending-data tcp) (copy data))))
-;;   (process-action (process-event app-send tcp) tcp)
-;;   (size data))
 
-;; (defmethod connect((protocol tcp) (peer-address ipaddr) (peer-port integer))
-;;   (unless (local-port protocol) (bind protocol))
-;;   (setf (conn-count protocol) *default-conn-count*)
-;;   (let ((state (state protocol))
-;;         (action (process-event app-connect protocol)))
-;;     (setf (peer-address protocol) peer-address
-;;           (peer-port protocol) peer-port
-;;           (open-time protocol) (simulation-time))
-;;     (if (= action syn-tx)
-;;         (process-action action protocol)
-;;         (error "Bad connect action ~A from ~A state" action state))))
 
-;; (defmethod close-connection((protocol tcp))
-;;   (unless (= (state protocol) closed)
-;;     (let ((action (process-event app-close protocol)))
-;;       (unless (pending-data protocol)
-;;         (when (= action fin-tx)
-;;           (setf (close-on-empty protocol) t)
-;;           (return-from close-connection t)))
-;;       (prog1
-;;           (process-action action protocol)
-;;         (when (and (= (state protocol) last-ack)
-;;                    (not (last-ack-timeout-event protocol)))
-;;           (schedule-timer (retransmit-timeout (rtt protocol))
-;;                           'last-ack-timeout-event protocol))))))
 
 ;; ;; timer events
 

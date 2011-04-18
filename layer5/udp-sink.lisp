@@ -47,7 +47,7 @@ overall bytes/sec data rx.")
                :documentation "total number of packets received")
    (packets-lost :initform 0 :type integer :reader packets-lost
                  :documentation "total number of packets lost")
-   (next-sequence-rx :initform 0 :type seq
+   (next-sequence-rx :initform 0 :type (unsigned-byte 32)
                      :documentation "Sequence number of next expected packet")
    (last-log-time :initform 0 :type  scheduler:time-type)
    (last-packets-rx :initform 0 :type integer)

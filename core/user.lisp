@@ -62,11 +62,13 @@ the arguments to pass to make-instance for each variable name."
   "Start or restart the simulation scheduler. If the optional `foreground`
 argument is true the scheduler will run in the current thread, otherwise it
 will run on a backgound thread."
+  ;; should check for stop-simulation on scheduler
   (scheduler::run (scheduler) :granularity granularity :step step))
 
 (defun run(&optional time)
   (when time (schedule time #'stop-simulation))
-  (start-simulation))
+  (start-simulation)
+  (values))
 
 (defun stop-simulation()
   (scheduler::stop (scheduler) :abort t)

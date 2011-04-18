@@ -52,7 +52,6 @@
   (:import-from :scheduler #:simulation-time #:time-type)
   (:export
    #:record #:average-min-max #:histogram #:inter-arrival-histogram
-   #:rtt-estimator #:rtt-mdev
    #:random-variable #:random-value #:constant #:uniform #:normal
    #:exponential #:pareto #:paretoII #:lognormal))
 
@@ -172,6 +171,7 @@
                 #:trace-format #:fid)
   (:import-from :alg #:enqueue #:dequeue #:make-queue #:empty-p)
   (:import-from :node #:node #:interfaces #:find-interface)
+  (:import-from :scheduler #:simulation-time #:time-type #:timer #:schedule)
   (:export #:protocol #:pdu #:protocol-dmux
            #:register-protocol #:protocols #:find-protocol #:delete-protocol
            #:bind #:unbind #:binding #:bound-p
