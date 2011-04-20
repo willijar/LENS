@@ -51,13 +51,12 @@ fast as possible if rate is 0"))
 (defmethod start((app abr-source))
   (open-connection (peer-address app)  (peer-port app) (protocol app)))
 
-(defmethod connection-complete((app abr-source) layer4 &key failure)
-  (unless failure
-    (with-slots(protocol rate pkt-size) app
-      (setf protocol layer4)
-      (if (equal rate 0)
-          (send protocol (make-instance 'data :length-bytes pkt-size) app)
-          (scheduler:handle app)))))
+(defmethod connection-complete((app abr-source) layer4)
+  (with-slots(protocol rate pkt-size) app
+    (setf protocol layer4)
+    (if (equal rate 0)
+        (send protocol (make-instance 'data :length-bytes pkt-size) app)
+        (scheduler:handle app))))
 
 (defmethod stop((app abr-source) &key &allow-other-keys)
   (call-next-method)

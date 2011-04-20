@@ -48,6 +48,7 @@ on stream. t means all")
   ((os :initarg :stream :reader os :initform *standard-output*)
    (col-index :initform 0 :accessor col-index)
    (node :initform nil :reader node :documentation "Current node")
+   (packet :initform nil :reader packet :documentation "Current packet")
    (print-time-format
     :initform "~7,3F" :initarg :time-format
     :accessor print-time-format :type string
@@ -67,6 +68,16 @@ on stream. t means all")
   (setf (col-index ts) 0)
   (setf (last-log-time ts) (simulation-time)))
 
+(defmethod (setf node)(node (stream trace-stream))
+  (unless (eql node (node stream))
+    (setf (slot-value stream 'node) node)
+    (terpri stream)))
+
+(defmethod (setf packet)(packet (stream trace-stream))
+  (unless (eql packet (packet stream))
+    (setf (slot-value stream 'packet) packet)
+    (terpri stream)))
+
 (defmethod stream-element-type ((stream trace-stream))
   (stream-element-type (os stream)))
 
@@ -80,8 +91,9 @@ on stream. t means all")
   (col-index stream))
 
 (defmethod stream-terpri((stream trace-stream))
-  (terpri (os stream))
-  (setf (col-index stream) 0))
+  (unless (zerop (col-index stream))
+    (terpri (os stream))
+    (setf (col-index stream) 0)))
 
 (defun check-sim-time(trace-stream)
   (let ((tm (simulation-time))

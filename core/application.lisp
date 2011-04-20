@@ -37,5 +37,9 @@ a web browser model with multiple simultaneous connections."))
   (push app (node:applications node)))
 
 (defmethod receive((application application) data layer4 &key &allow-other-keys)
-  "Called by layer 4 protocol object when data is received. Default - do nothing"
+  "Called by layer 4 protocol object when data is received. Default -
+do nothing"
     (declare (ignore application data layer4)))
+
+(defmethod signal-error((application application) layer4 error &rest args)
+  (apply #'error error args))

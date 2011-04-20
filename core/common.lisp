@@ -20,21 +20,6 @@
 
 (defconstant +c+ 299792458d0 "Speed of Light in m/sec")
 
-(defun modulus+(a b &optional (bit-length 32))
-  "Add two unsigned-byte integers using modulus arithmetic for given
-bit length"
-  (declare (unsigned-byte a b))
-  (the unsigned-byte (mod (+ a b) (dpb 1 (byte 1 bit-length) 0))))
-
-(define-compiler-macro modulus+ (&whole form a b &optional (bit-length 32))
-   "Add two unsigned-byte integers using modulus arithmetic for given
-bit length - optimisation where bit-length is a static number"
-  (cond
-    ((numberp bit-length)
-     `(the (unsigned-byte ,bit-length)
-        (mod (+ ,a ,b) ,(dpb 1 (byte 1 bit-length) 0))))
-    (t form)))
-
 ;; base class for in simulation errors (not program errors)
 (define-condition simulation-condition(condition)())
 

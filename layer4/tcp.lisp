@@ -12,7 +12,7 @@
 ;;; Commentary:
 
 ;; This provides the basic TCP protocol interface and common implementation
-;; specific varieties need to implement newack dupack retx-timeout-event
+;; specific varieties need to implement newack dupack retx-timer-event
 ;; The same class is used for listener and responder - the listener copies
 ;; itself on a new connection filling in the peer information etc
 
@@ -22,7 +22,7 @@
 (defpackage :protocol.layer4.tcp
   (:documentation "package for TCP class implementations")
   (:nicknames :tcp)
-  (:use :cl :common :protocol.layer4 :address)
+  (:use :cl :common :protocol.layer4 :address :protocol.layer4.rtt)
   (:import-from :packet
                 #:packet #:pop-pdu #:push-pdu #:peek-pdu #:trace-format)
   (:import-from :alg
@@ -30,8 +30,8 @@
   (:import-from :node
                 #:node #:interfaces #:find-interface)
   (:import-from :scheduler
-                #:time-type #:stop #:scheduled #:timer #:schedule #:timers
-                #:simulation-time)
+                #:time-type #:cancel #:timer #:schedule #:timers
+                #:simulation-time #:timeout)
   (:export #:tcp-header #:tcp-dmux #:tcp #:tcp-tahoe #:tcp-reno #:tcp-newreno))
 
 (in-package :protocol.layer4.tcp)
@@ -87,8 +87,6 @@
    (checksum  :type (unsigned-byte 16) :initarg :checksum :accessor checksum)
    (urgent-pointer  :type (unsigned-byte 16) :initarg :urgent-pointer
                     :initform 0 :reader urgent-pointer)
-   (fid  :initarg :fid :initform 0 :type integer :accessor fid
-        :documentation "Flow id's are not part of TCP, but useful for tracing")
    (data-length :initarg :data-length :initform 0 :type integer
                 :reader data-length
                 :documentation "Also not part of TCP but used for tracing")
@@ -340,9 +338,7 @@
     (bad-flags timed-wait no-act)))))
 
 (defgeneric process-action(action protocol &optional packet header dst-address)
-  (:documentation "Process action in response to events")
-  (:method((action (eql no-act)) tcp &optional packet header dst-address)
-    (declare (ignore tcp packet header dst-address))))
+  (:documentation "Process action in response to events"))
 
 
 ;; fill in flag events table
@@ -400,71 +396,88 @@
 ;; (defvar *default-ss-thresh* #xFFFF "Slow-start threshold")
 ;; (defvar *default-tx-buffer* most-positive-fixnum)
 ;; (defvar *default-rx-buffer* most-positive-fixnum)
-;; (defvar *default-tw-timeout* 5 "Default timeout in seconds")
-;; (defvar *default-conn-timeout* 6 "Default timeout in seconds")
-;; (defvar *default-del-ack-timeout* 0 "Default to not used")
+;; (defvar *default-tw-timer* 5 "Default timeout in seconds")
+;; (defvar *default-conn-timer* 6 "Default timeout in seconds")
+;; (defvar *default-del-ack-timer* 0 "Default to not used")
 ;; (defvar *default-initial-cwnd* 1 "Default initial cwnd in segments")
-;; (defvar *default-conn-count* 3 "Number of connection retries")
 
+;; note - use accessors where possible to enable tracing
 (defclass tcp(protocol timers-manager copyable-object)
-  ((protocol-number :initform 6 :reader protocol-number :allocation :class)
-   (mtu :initform 544 :initarg :mtu :accessor mtu ;576-32 for TCP&IPheaders
-        :documentation "Maximum transmission unit")
-   (state :initform closed :accessor state :type tcp-states
-          :documentation "Current state")
-   (pending-data :initform (make-queue)
-                 :documentation "Data sent by application but not sent")
-   (buffered-data :initform (make-hash-table) :type list :accessor buffered-data
+  ((pending-data :initform nil :accessor pending-data
+                 :documentation "Data sent by application but not acknowledged")
+   (buffered-data :initform nil :type list :accessor buffered-data
                   :documentation "data Received but out of sequence")
+   (rtt :initform (make-instance 'rtt-mdev) :initarg :rtt :reader rtt
+        :documentation "RTT estimator")
+
+   ;; connection state
+   (max-connection-retry-count
+    :type integer :initform 3 :accessor max-connection-retry-count
+    :initarg :max-connection-retry-count)
+   (connection-retry-count :type integer :accessor connection-retry-count)
+
+   ;; timers
+   (connection-timer :type timer :initform (make-instance 'timer :delay 6))
+   (delayed-ack-timer :type timer :initform (make-instance 'timer :delay 0))
+   (timed-wait-timer :type timer :initform (make-instance 'timer :delay 5))
+   (last-ack-timer :type timer :initform (make-instance 'timer))
+   (retransmit-packet-timer :type timer :initform (make-instance 'timer))
+
+   ;; sequence numbers
+   (first-pending-seq
+    :type (unsigned-byte 32) :accessor first-pending-seq
+    :documentation "Sequence number for start of pending data")
+   (next-tx-seq :initform (random #xFFFFFFFF) :type (unsigned-byte 32)
+                :documentation "Next sequence to send" :accessor next-tx-seq)
+   (high-tx-mark :initform 0 :type (unsigned-byte 32) :accessor high-tx-mark
+                 :documentation "TX High water mark, for counting retx")
+   (highest-rx-ack :initform 0 :type (unsigned-byte 32) :accessor highest-rx-ack
+                   :documentation "largest ack received")
+   (last-rx-ack :initform 0 :type (unsigned-byte 32) :accessor last-rx-ack
+                :documentation "For dupack testing")
+   (fast-recovery-mark :initform 0 :type (unsigned-byte 32)
+                       :accessor fast-recovery-mark
+                       :documentation "Mark for fast recovery")
+   (next-rx-seq :initform 0 :type (unsigned-byte 32)
+                :documentation"Next expected sequence number")
+   (next-ack-seq :type (unsigned-byte 32)
+                 :documentation "Set non-zero when using delayed acks")
+
+   ;; recorded times
+   (last-rx-time :accessor last-rx-time :type time-type
+                 :documentation "TIme last packet received")
    (syn-time :initform 0.0 :accessor syn-time :type time-type
              :documentation "Time SYN sent")
    (last-ack-time :initform 0.0 :type time-type
                   :documentation  "Time last Ack received")
-   (rtt :initform (make-instance 'rtt-mdev) :initarg :rtt :reader rtt
-        :documentation "RTT estimator")
-   ;; timers
-   (connTimeout :type timer
-                :initform (make-instance 'timer :delay 6)
-                :documentation "Pending connection timeout event")
-   (timedWaitTimeout :type timer
-                     :initform (make-instance 'timer :delay 5)
-                     :documentation "Timeout for timed-wait state")
-   (lastAckTimeout :type timer
-                   :initform (make-instance 'timer)
-                   :documentation " Timeout for last-ack state")
-   ;; (pending-data :initform (make-hash-table) :type pending-data
-   ;;               :accessor pending-data
-   ;;               :documentation )
-   ;; (first-pending-seq :initform 0 :type (unsigned-byte 32) :accessor first-pending-seq
-   ;;                    :documentation "First sequence number in pending data")
-   ;; ;; sequence information - sender side
-   ;; (next-tx-seq :initform 0 :type (unsigned-byte 32) :accessor next-tx-seq
-   ;;              :documentation "Next sequence to send")
-   ;; (high-tx-mark :initform 0 :type (unsigned-byte 32) :accessor high-tx-mark
-   ;;               :documentation "TX High water mark, for counting retx")
-   ;; (highest-rx-ack :initform 0 :type (unsigned-byte 32) :accessor highest-rx-ack
-   ;;                 :documentation "largest ack received")
-   ;; (last-rx-ack :initform 0 :type (unsigned-byte 32) :accessor last-rx-ack
-   ;;              :documentation "For dupack testing")
-   ;; (fast-recovery-mark :initform 0 :type (unsigned-byte 32) :accessor fast-recovery-mark
-   ;;                     :documentation "Mark for fast recovery")
-   ;; (dup-ack-count :initform 0 :type integer :accessor dup-ack-count
-   ;;                :documentation "Number of dup acks in a row")
+
+   ;; counters
+   (pkt-received-count :initform 0 :type integer :accessor pkt-received-count
+                       :documentation "Number of packets received")
+   (pkt-sent-count :initform 0  :type integer :accessor pkt-sent-count
+                   :documentation "Count of packets sent")
+   (retransmit-count :initform 0 :accessor retransmit-count :type integer
+                     :documentation "Count of retransmits")
+   (timeout-count :initform 0 :accessor timeout-count :type integer
+                  :documentation "Count of timeouts")
+   (dup-ack-count :initform 0 :type integer :accessor dup-ack-count
+                  :documentation "Number of dup acks in a row")
+   (bytes-sent :initform 0 :accessor bytes-sent :type integer
+               :documentation "Total bytes sent")
+   (bytes-received :initform 0 :accessor bytes-received :type integer
+                   :documentation "Total bytes received")
+
+
    ;; (fast-recovery-p :initform nil :type boolean :accessor fast-recovery-p
    ;;                  :documentation "True if fast recovery in progress")
-   ;; (need-ack :initform nil :type boolean :accessor need-ack
-   ;;             :documentation "True if need ACK bit transmit")
+   ;;
    ;; (no-timer-p  :initform nil :type boolean :accessor no-timer-p
    ;;              :documentation "True if skip resched of re-tx timer")
-   ;; ;; Sequence Information, receiver side
-   ;; (next-rx-seq :initform 0 :type (unsigned-byte 32) :accessor next-rx-seq
-   ;;              :documentation"Next expected sequence")
-   ;; (next-ack-seq :initform 0 :type (unsigned-byte 32) :accessor next-ack-seq
-   ;;               :documentation "Set non-zero when using delayed acks")
+
    ;; ;; Window Management
-   ;; (seg-size :initarg :seq-size :initform *default-seg-size*
-   ;;           :type integer :accessor seg-size
-   ;;           :documentation "SegmentSize")
+   (seg-size :initarg :seq-size :initform 512 :type (unsigned-byte 16)
+             :accessor seg-size
+             :documentation "SegmentSize")
    ;; (rx-win :initform *default-adv-win* :type integer :accessor rx-win
    ;;         :documentation "Window as received from peer")
    ;; (adv-win :initform *default-adv-win* :type integer :accessor adv-win
@@ -472,43 +485,22 @@
    ;; (cwnd :initform (* *default-initial-cwnd* *default-seg-size*)
    ;;       :type integer :accessor cwnd
    ;;       :documentation "Congestion window")
-   ;; (ssthresh :initform *default-ss-thresh* :type integer :accessor ssthresh
-   ;;            :documentation "Slow Start Threshold")
+   (slow-start-threshold :initform #xFFFF :type integer)
    ;; (initial-cwnd :initform *default-initial-cwnd*
    ;;               :type integer :accessor initial-cwnd
    ;;               :documentation "Initial (and reset) value for cWnd")
 
-   ;; (twtimeout :initform *default-tw-timeout*
-   ;;             :accessor tw-timeout :type time-type
-   ;;             :documentation "Timeout period for timed-wait state")
-   ;; (cntimeout :initform *default-conn-timeout*
-   ;;               :accessor conn-timeout :type time-type
-   ;;               :documentation "Timeout period for connection retry")
-   ;; (datimeout :initform *default-del-ack-timeout*
-   ;;                  :accessor del-ack-timeout :type time-type
-   ;;                  :documentation "Timeout period for delayed acks")
-
-   ;; (retxTimeout :type timer :documentation "Retransmit timeout")
-   ;; (delAckTimeout :type timer :documentation "Delayed ack timeout")
-
-   ;; (retry-count :initform 0 :accessor retry-count :type integer
-   ;;              :documentation "Limit the re-tx retries")
-   ;; (conn-count :initform *default-conn-count*
-   ;;             :accessor conn-count :type integer
-   ;;             :documentation "Connection retry count")
-   ;;
-   ;; ;; state
-   ;; (close-on-empty :initform nil :accessor close-on-empty :type boolean
-   ;;                  :documentation "True if send FIN pkt on empty data")
-   ;; (delete-on-complete :initform nil :accessor delete-on-complete :type boolean
-   ;;                     :documentation "True if should delete object on close")
-   ;; (delete-on-timed-wait :initform nil :accessor delete-on-timed-wait
-   ;;                       :type boolean
-   ;;                       :documentation "True if delete after timed wait")
+   ;; TCP state
+   (state :initform closed :accessor state :type tcp-states
+          :documentation "Current state")
+   (close-on-empty :initform nil :type boolean :accessor close-on-empty
+                   :documentation "True if send FIN pkt on empty data")
    ;; (pending-close :initform nil :accessor pending-close :type boolean
    ;;                :documentation "True if close pending")
-   ;; (close-notified :initform nil :accessor close-notified :type boolean
-   ;;                 :documentation "True if close has been notified")
+   (close-notified :initform nil :accessor close-notified :type boolean
+                   :documentation "True if close has been notified")
+   (need-ack :initform nil :type boolean :accessor need-ack
+             :documentation "True if need ACK bit transmit")
    ;; (close-req-notified
    ;;  :initform nil :accessor close-req-notified :type boolean
    ;;  :documentation "True if close request has been notified")
@@ -517,24 +509,16 @@
    ;;            :documentation "Size of tx buffer")
    ;; (rx-buffer :initform *default-rx-buffer* :accessor rx-buffer :type integer
    ;;            :documentation "Size of rx buffer")
-   ;; ;; Statistics
+   ;; Statistics
+
+
    ;; (total-ack :initform 0 :accessor total-ack :type integer
    ;;            :documentation "Total bytes acked")
    ;; (open-time :initform 0.0 :accessor open-time :type time-type
    ;;            :documentation "Time connection was opened")
 
-   ;; (retransmit-count :initform 0 :accessor retransmit-count :type integer
-   ;;                   :documentation "Count of retransmits")
-   ;; (timeout-count :initform 0 :accessor timeout-count :type integer
-   ;;                :documentation "Count of timeouts")
-   ;; (pkts-sent :initform 0 :accessor pkts-sent :type integer
-   ;;            :documentation "Count of packets sent")
-   ;; (pkts-received :initform 0 :accessor pkts-received :type integer
+   ;;
    ;;                :documentation "Count of packets received")
-   ;; (bytes-sent :initform 0 :accessor bytes-sent :type integer
-   ;;             :documentation "Total bytes sent")
-   ;; (bytes-received :initform 0 :accessor bytes-received :type integer
-   ;;                 :documentation "Total bytes received")
    ;; (time-seq-stats :initform nil :accessor time-seq-stats :type vector
    ;;                 :documentation "Pointer to Array of time/seq stats")
    ;; (parent :initform nil :accessor parent :type tcp
@@ -547,33 +531,44 @@
    ;; (number-fin :initform 0 :accessor number-fin :type integer
    ;;             :documentation "Number fin packets rx, just testing")
    ;; (next-fid :initform 0 :documentation "Next unique tcp flow id" :allocation :class)
-   ;; (last-timeout-delay
-   ;;  :initform 0.0 :accessor last-timeout-delay :type time-type
+   ;; (last-timer-delay
+   ;;  :initform 0.0 :accessor last-timer-delay :type time-type
    ;;  :documentation "Timeout delay of last scheduled retx timer")
    #+debug(dbvec :initform (alg:make-queue :initial-size 50 :element-type db-hist :implementation :wrap))
+   (initargs :type list
+             :documentation "Arguments passed during initialisation - used during reset")
 )
   (:documentation "A model of the Transmission Control Protocol."))
+
+(defmethod initialize-instance :after ((tcp tcp) &rest initargs
+                                       &key &allow-other-keys)
+  (setf (slot-value tcp 'initargs) initargs))&ALLOW-OTHER-KEYS
+
+(defmethod reset((tcp tcp))
+  (let ((initargs (slot-value tcp 'initargs)))
+    (dolist(slot (closer-mop:class-slots tcp))
+      (when (eql :instance (closer-mop:slot-definition-allocation slot))
+        (slot-makunbound tcp (closer-mop:slot-definition-name slot))))
+    (apply #'shared-initialize tcp t initargs)
+    (setf (slot-value tcp 'initargs) initargs)))
+
+(defmethod protocol-number((tcp tcp)) 6)
 
 (defmethod default-trace-detail((protocol tcp))
   `(type src-port dst-port sequence-number ack-number flags fid))
 
-(defun process-event(event tcp)
-  (let ((old-state (state tcp)))
-    (multiple-value-bind(new-state action) (lookup-state old-state event)
-      (setf (state tcp) new-state)
-      (cond
-        ((and (= new-state timed-wait) (/= old-state timed-wait))
-         (schedule 'timedWaitTimeout tcp))
-        ((and (= new-state closed)
-              (/= old-state closed)
-              (/= event timeout)
-              (bound-p tcp))
-         ;; finally closed so notify application
-         (connection-closed (application tcp) tcp)))
-      action)))
+(defmethod schedule((timer (eql 'last-ack-timer)) (tcp tcp))
+  (schedule (rtt-retransmit-timer (rtt tcp))
+            (timer 'last-ack-timer tcp)))
+
+(defmethod schedule((timeout (eql 'retransmit-packet-timeout)) (tcp tcp))
+  (schedule (rtt-retransmit-timer (rtt tcp))
+            (timer 'retransmit-packet-timer tcp)))
 
 (defmethod receive((tcp tcp) (packet packet) (layer4 layer3:ipv4)
                    &key dst-address &allow-other-keys)
+  (setf (last-rx-time tcp) (simulation-time))
+  (incf (pkt-received-count tcp))
   (let ((header (peek-pdu packet))
         (old-state (state tcp)))
     ;; Check if ACK bit set, and if so notify rtt estimator
@@ -581,7 +576,7 @@
       (rtt-ack-seq (ack-number header) (rtt tcp))
       ;; Also insure that connection timer is canceled,
       ;; as this may be the final part of 3-way handshake
-      (stop (slot-value tcp 'connTimeout)))
+      (cancel 'connection-timer tcp))
 
     ;; Check syn/ack and update rtt if so
     (when (and (= old-state syn-sent) (= (flags header) (logior syn ack)))
@@ -608,49 +603,305 @@
         ((and (/= state old-state) (= state timed-wait))
          (connection-closed (application tcp) tcp))
         ((and (= state closed) (/= old-state closed))
-         (map 'nil #'stop (timers tcp)))
+         (cancel :all tcp))
         ((= state timed-wait)
-         (map 'nil #'stop (timers tcp))
-         (schedule 'timedWaitTimeout tcp)))
+         (cancel :all tcp)
+         (schedule 'timed-wait-timer tcp)))
       (process-action action tcp packet header dst-address)
       (when (and (= state last-ack)
-                 (not (zerop (slot-value tcp 'last-ack-time))))
-      (schedule (rtt-retransmit-timeout (rtt tcp))
-                (slot-value tcp 'lastAckTimeout))))))
+                 (not (busy-p  (timer 'last-ack-timer tcp))))
+        (schedule 'last-ack-timer tcp)))))
 
-
-(defmethod send((tcp tcp) (data data) application
+(defmethod send((tcp tcp) data application
                 &key &allow-other-keys)
-  (unless (member (state tcp) #.(list established syn-sent close-wait))
-    (error "TCP ~A send wrong state ~A" tcp (state tcp)))
-  (enqueue data (pending-data tcp))
+  (assert (member (state tcp) #.(list established syn-sent close-wait))
+          ()
+          "TCP ~A send wrong state ~A" tcp (state tcp))
+  (let ((pending (pending-data tcp)))
+    (if pending
+        (layer5:add-data pending data)
+        (setf (pending-data tcp) (copy data))))
   (process-action (process-event app-send tcp) tcp)
   (length-bytes data))
 
 (defmethod open-connection(peer-address peer-port (tcp tcp))
   (call-next-method)
-  (unless (local-port protocol) (bind protocol))
+  (unless (bound-p protocol) (bind protocol))
+  (setf (connection-retry-count tcp) 0)
   (let ((state (state protocol))
         (action (process-event app-connect protocol)))
-    (unless (= action syn-tx)
-      (error "Bad connect action ~A from ~A state" action state))
+    (assert (= action syn-tx)
+            (action)
+            "Bad connect action ~A from ~A state" action state)
     (process-action action protocol)))
 
 (defmethod close-connection((tcp tcp))
-;;   (unless (= (state protocol) closed)
-;;     (let ((action (process-event app-close protocol)))
-;;       (unless (pending-data protocol)
-;;         (when (= action fin-tx)
-;;           (setf (close-on-empty protocol) t)
-;;           (return-from close-connection t)))
-;;       (prog1
-;;           (process-action action protocol)
-;;         (when (and (= (state protocol) last-ack)
-;;                    (not (last-ack-timeout-event protocol)))
-;;           (schedule-timer (retransmit-timeout (rtt protocol))
-;;                           'last-ack-timeout-event protocol))))))
+  (with-accessors(state) tcp
+    (unless (= state closed)
+      (let ((action (process-event app-close protocol))
+            (pending-data (pending-data tcp)))
+        (when (and pending-data (/= 0 (length-bytes pending-data)))
+           (when (= action fin-tx)
+             (setf (close-on-empty tcp) t)
+             (return-from close-connection t)))
+        (process-action action protocol)
+        (when (and (= state last-ack)
+                   (not (busy-p (timer 'last-ack-timer tcp))))
+          (schedule 'last-ack-timer tcp))))))
 
-;; the following 3 generic functions are implemented for different variations
+(defmethod connection-complete :around (application (tcp tcp) &key failure)
+  (setf (close-notified tcp) nil)
+  (call-next-method))
+
+(defmethod connection-closed :around (application (tcp tcp))
+  (unless (close-notified tcp)
+    (call-next-method)
+    (setf (close-notified tcp) t)))
+
+(defmethod timeout((timer (eql 'connection-timer)) (tcp tcp))
+  (with-accessors(connection-retry-count max-connection-retry-count
+                                         application) tcp
+    (if (= (state tcp)syn-sent)
+        ;; if active side of connection attempt
+        (cond
+          ((>= (incf connection-retry-count) max-connection-retry-count)
+           ;; if exceeded max number connections so timeout report failure
+           (process-action (process-event timeout tcp) tcp)
+           (incf (timeout-count tcp))
+           (connection-error application tcp :timeout))
+          (t ;; else try again
+           (process-action (process-event app-connect tcp) tcp))))
+    (t
+     ;; passive side of connection (listener) -
+     ;; notify application of missing ACK on 3-way handshake
+     (connection-error application tcp :timeout))))
+
+;; must be implemented in concrete classes
+(defmethod timeout :before ((timer (eql 'retransmit-packet-timer)) (tcp tcp))
+  (incf (timeout-count tcp)))
+
+(defmethod timeout((timer (eql 'delayed-ack-timer)) (tcp tcp))
+  (send-ack tcp (next-ack-seq tcp) t)
+  (slot-makunbound tcp 'next-ack-seq))
+
+(defmethod timeout((timer (eql 'timed-wait-timer)) (tcp tcp))
+  ;; finished so close down tcp endpoint
+  (cancel :all tcp)
+  (connection-closed (application tcp) tcp))
+
+(defmethod timeout((timer (eql 'last-ack-timer)) (tcp tcp))
+  ;; close connection assuming peer has gone
+  (when (= (state tcp) last-ack)
+      (process-action (process-event timeout tcp) tcp))
+  (connection-closed (application tcp) tcp))
+
+(defmethod timeout :after (timer (tcp tcp))
+  (when (and (= (state tcp) last-ack) (not (busy-p 'last-ack-timer tcp)))
+    (schedule 'last-ack-timer tcp)))
+
+;; tcp specific functions
+
+(defmethod bind :after((tcp tcp) &key &allow-other-keys)
+  ;; if no peer defined this is a listener
+  (unless (connected-p tcp)
+    (process-action (process-event app-listen tcp) tcp)))
+
+(defmethod connection-error((tcp tcp) (layer3 layer3:protocol) error)
+  ;; Called by ICMP when  unreachable response is received
+  (when (= state syn-sent)
+    (process-action (process-event timeout tcp) tcp)
+    (connection-error (application tcp) tcp :timeout)))
+
+(defun respond(tcp peer-address peer-port)
+  ;; called by copy of listeneing TCP. SYN packet received - bind to peer
+  (bind tcp :peer-address peer-address :peer-port peer-port)
+  (process-action syn-ack-tx))
+
+(defun un-ack-data-count(tcp) (- (next-tx-seq tcp) (highest-rx-ack tcp)))
+(defun bytes-in-flight(tcp) (- (high-tx-mark tcp) (highest-rx-ack tcp)))
+(defun window(tcp) (min (rx-win tcp) (c-wind tcp)))
+(defun available-window(tcp)
+  (let ((unack (un-ack-data-count tcp))
+        (win (window tcp)))
+    (if (< win unack) 0 (- win unack))))
+
+(defun process-event(event tcp)
+  (let ((old-state (state tcp)))
+    (multiple-value-bind(new-state action) (lookup-state old-state event)
+      (setf (state tcp) new-state)
+      (cond
+        ((and (= new-state timed-wait) (/= old-state timed-wait))
+         (schedule 'timedWaitTimeout tcp))
+        ((and (= new-state closed)
+              (/= old-state closed)
+              (/= event timeout)
+              (bound-p tcp))
+         ;; finally closed so notify application
+         (connection-closed (application tcp) tcp)))
+      action)))
+
+(defmethod process-action((action (eql no-act)) tcp
+                          &optional packet header dst-address)
+    (declare (ignore tcp packet header dst-address)))
+
+(defmethod process-action((action (eql ack-tx)) tcp
+                          &optional packet header dst-address)
+  (send-packet tcp ack (next-tx-seq tcp) (next-rx-seq tcp))
+  ;; save receiver advertised window
+  (when header (setf (rx-win tcp) (window header))))
+
+(defmethod process-action((action (eql ack-tx-1)) tcp
+                          &optional packet header dst-address)
+    ;; save receiver advertised window
+  (when header (setf (rx-win tcp) (window header)))
+  (cancel 'connection-timer tcp)
+  ;; notify application
+  (connection-complete (application tcp) tcp)
+  ;; if no data need to send ack
+  (unless (pending-data tcp)
+    (send-packet tcp ack (next-tx-seq tcp) (next-rx-seq tcp))))
+
+(defmethod process-action((action (eql tst-tx)) tcp
+                          &optional packet header dst-address)
+
+(defun send-ack(tcp ack-number &optional forced)
+  (let ((delayed-ack-timer (timer 'delayed-ack-timer tcp))
+        (send-it t))
+    (unless (or forced (zerop (timer-delay delayed-ack-timer)))
+        ;; need to delay this ack - see if pending
+        (if (busy-p delayed-ack-timer)
+            (cancel delayed-ack-timer tcp)
+            (progn
+              ;; delay this ack
+              (schedule 'delayed-ack-timer tcp)
+              (setf next-ack-seq ack-number)
+              (setf send-it nil)))))
+    (or
+     (send-pending-data tcp t)
+     (if send-it (send-packet tcp ack (next-tx-seq tcp) ack-number))))
+
+(defun send-packet(tcp flags sequence-number ack-number &key
+                   data
+                   (dst-address (peer-address tcp))
+                   (dst-port (peer-port tcp)))
+  (let ((packet (make-instance 'packet :data data :fid (fid tcp))))
+    (assert (<= (length-bytes data) (mtu tcp)))
+    (when data ;; if data
+      (unless (busy-p (timer 'retransmit-packet-timer tcp))
+        (schedule 'retransmit-packet-timer tcp)
+        (rtt-sent-seq seq (length-bytes packet) (rtt tcp))
+        (when (< seq (high-tx-mark tcp))
+          (incf (retransmit-count tcp)))))
+    (when (and (or (= state fin-wait-1) (= state fin-wait 2))
+               (not (penging-data tcp)))
+      (setf flags (logior flags fin)))
+    (when (need-ack tcp) (setf flags (logior flags ack)))
+    (push-pdu
+     (make-instance 'tcp-header
+                    :src-port (local-port tcp)
+                    :dst-port peer-port
+                    :seq sequence-number
+                    :ack ack-number
+                    :flags flags
+                    :window (adv-win tcp)
+                    :data-length (length-bytes packet)
+                    :cwnd (cwnd tcp))
+     packet)
+    (send  (layer3:find-protocol 'layer3:ipv4 (node udp)) packet tcp
+           :src-address (or (local-address tcp) (network-address (node tcp)))
+           :dst-address peer-address
+           :ttl (ttl tcp)
+           :tos (tos tcp))
+    (incf (pkts-sent-count tcp))))
+
+
+(defun send-pending-data(tcp &optional with-ack)
+  (let ((n-sent 0)
+        (pending-data (pending-data tcp))
+        (interface (find-interface (peer-address tcp) (node udp))))
+    (unless pending-data (return-from send-pending-data nil))
+    (loop
+       ;; if no data finished
+       (when (zerop (length-bytes pending-data))
+         (setf (pending-data tcp) nil)
+         (return))
+       (let ((w (available-window tcp))
+             (seg-size (seg-size tcp)))
+         ;; don't send if window less than segment size and more data
+         (when (and  (< w seg-size) (> (length-bytes data) w))
+           (return))
+         ;; if no buffer available stop and request
+         (unless (layer1:buffer-available-p
+                  (+ 100 (length-bytes data)) interface)
+           (add-notification udp #'send-pending-data interface)
+           (return))
+         (let ((s (min w seg-size))
+               (data (remove-data s pending-data))
+               (flags 0))
+           ;; see if we need fin flag
+           (when (and (close-on-empty tcp)
+                      (zerop (length-bytes pending-data)))
+             (setf flags (logior flags fin))
+             (setf (state tcp) fin-wait-1))
+           (send-packet tcp flags (next-tx-seq tcp) (next-rx-seq tcp) :data data)
+           (incf n-sent)
+           (setf (next-tx-seq tcp) (seq+ (next-tx-seq tcp) (length-bytes data)))
+           (setf (high-tx-mark tcp) (max (next-tx-seq tcp) (high-tx-mark tcp)))
+           (incf (bytes-sent tcp) (length-bytes data)))))
+    (when (> n-sent 0)
+      (schedule 'retransmit-packet tcp)
+      t)))
+
+
+
+
+(defclass tcp-reno(tcp)
+  ()
+  (:documentation "Tahoe tcp implementation"))
+
+(defmethod timeout((timer (eql 'retransmit-packet-timer)) (tcp tcp))
+  )
+
+
+(defmethod process-action(action protocol &optional packet header dst-address)
+  (:documentation "Process action in response to events")
+  (:method((action (eql no-act)) tcp &optional packet header dst-address)
+    (declare (ignore tcp packet header dst-address))))
+
+
+;; ;; timer events
+
+;; (defun conn-timer-event(protocol)
+;;   (let ((application (application protocol)))
+;;     (if (= (state protocol) syn-sent) ;; this is active side of connection
+;;         (if (> (decf (conn-count protocol)) 0)
+;;             (process-action (process-event app-connect protocol) protocol)
+;;             (progn
+;;               (process-action (process-event timeout protocol) protocol)
+;;               (when application (connection-failed application protocol))))
+;;         ;; is passive listener
+;;         (when application (connection-failed application protocol)))))
+
+;; (defun delayed-ack-timer-event(protocol)
+;;   (when (= 0 (next-ack-seq protocol))
+;;     (error "DelAck timeout with no pending ack"))
+;;   (send-ack  (next-ack-seq protocol) protocol t)
+;;   (setf  (next-ack-seq protocol) 0))
+
+;; (defun tw-timer-event(protocol)
+;;   (cancel-all-timers protocol)
+;;   (cancel-notification protocol)
+;;   (unbind protocol))
+
+;; (defun last-ack-timer-event(protocol)
+;;   (when (= (state protocol) last-ack)
+;;     (process-action (process-event timeout protocol) protocol))
+;;   (unless (close-notified protocol)
+;;     (setf (close-notified protocol) t)
+;;     (when-bind(a (application protocol)) (closed a protocol))))
+
+
+;; the following 3 generic functions ar<e implemented for different variations
 ;; of TCP
 
 ;; (defgeneric newack(seq tcp)
@@ -659,7 +910,7 @@
 ;; (defgeneric dupack(tcp-header count tcp)
 ;;   (:documentation "Duplicate Ack received"))
 
-;; (defgeneric retx-timeout-event(tcp)
+;; (defgeneric retx-timer-event(tcp)
 ;;   (:documentation "Retransmit timeout"))
 
 ;; (defun next-fid(tcp) (incf (slot-value tcp 'next-fid)))
@@ -692,9 +943,9 @@
 ;;      cwnd
 ;;      ss-thresh
 ;;      initial-cwnd
-;;      tw-timeout
-;;      conn-timeout
-;;      del-ack-timeout
+;;      tw-timer
+;;      conn-timer
+;;      del-ack-timer
 ;;      retry-count
 ;;      conn-count
 ;;      state
@@ -722,7 +973,7 @@
 ;;      number-children
 ;;      child-limit
 ;;      number-fin
-;;      last-timeout-delay
+;;      last-timer-delay
 ;;      last-measured-rtt))
 ;;   #+debug(setf (fill-pointer (slot-value tcp 'db-vec)) 0))
 
@@ -734,13 +985,13 @@
 ;;          #'(lambda(slot)
 ;;              (setf (slot-value copy slot) (slot-value original slot)))
 ;;          '(seg-size rx-win adv-win cwnd ss-thresh initial-cwnd
-;;            tw-timeout conn-timeout del-ack-timeout
+;;            tw-timer conn-timer del-ack-timer
 ;;            retry-count conn-count state close-on-empty
 ;;            pending-close close-notified close-req-notified
 ;;            tx-buffer rx-buffer
 ;;            retransmit-count timeout-count
 ;;            child-limit
-;;            last-timeout-delay last-measured-rtt))
+;;            last-timer-delay last-measured-rtt))
 ;;     (setf (rtt copy)
 ;;           (make-instance (class-of (rtt original))
 ;;                          :initial-estimate (estimate (rtt original))))
@@ -767,36 +1018,6 @@
 
 
 
-;; ;; timer events
-
-;; (defun conn-timeout-event(protocol)
-;;   (let ((application (application protocol)))
-;;     (if (= (state protocol) syn-sent) ;; this is active side of connection
-;;         (if (> (decf (conn-count protocol)) 0)
-;;             (process-action (process-event app-connect protocol) protocol)
-;;             (progn
-;;               (process-action (process-event timeout protocol) protocol)
-;;               (when application (connection-failed application protocol))))
-;;         ;; is passive listener
-;;         (when application (connection-failed application protocol)))))
-
-;; (defun delayed-ack-timeout-event(protocol)
-;;   (when (= 0 (next-ack-seq protocol))
-;;     (error "DelAck timeout with no pending ack"))
-;;   (send-ack  (next-ack-seq protocol) protocol t)
-;;   (setf  (next-ack-seq protocol) 0))
-
-;; (defun tw-timeout-event(protocol)
-;;   (cancel-all-timers protocol)
-;;   (cancel-notification protocol)
-;;   (unbind protocol))
-
-;; (defun last-ack-timeout-event(protocol)
-;;   (when (= (state protocol) last-ack)
-;;     (process-action (process-event timeout protocol) protocol))
-;;   (unless (close-notified protocol)
-;;     (setf (close-notified protocol) t)
-;;     (when-bind(a (application protocol)) (closed a protocol))))
 
 ;; (defun listen(protocol)
 ;;   ;; set endpoint to accept connection requests
@@ -904,7 +1125,7 @@
 ;;     ;; Ack in response to syn/ack"
 ;;      (when header  ;;Save the receiver advertised window
 ;;        (setf (rx-win tcp) (window header)))
-;;      (cancel-timer 'conn-timeout-event tcp)
+;;      (cancel-timer 'conn-timer-event tcp)
 ;;      (when-bind(a (application tcp)) ;;  Notify application
 ;;         (connection-complete a tcp))
 ;;      (unless (pending-data tcp)
@@ -922,7 +1143,7 @@
 ;;                           packet header dst-address)
 ;;     (declare (ignore packet header dst-address))
 ;;     ;; Schedule a Timeout for "no reply" processing
-;;     (schedule-timer (conn-timeout tcp) 'conn-timeout-event tcp)
+;;     (schedule-timer (conn-timer tcp) 'conn-timer-event tcp)
 ;;     ;; log time sent to get an initial rtt estimate
 ;;     (setf (syn-time tcp) (simulation-time))
 ;;     (send-packet syn 0 0 tcp))
@@ -958,8 +1179,8 @@
 ;;       (t
 ;;        ;; this is the responder so just respond
 ;;        (send-packet (logior syn ack) 0 0 tcp)
-;;        (schedule-timer (retransmit-timeout (rtt tcp))
-;;                        'conn-timeout-event tcp)))))
+;;        (schedule-timer (retransmit-timer (rtt tcp))
+;;                        'conn-timer-event tcp)))))
 
 ;; (defmethod process-action((action (eql 'fin-tx)) tcp &optional
 ;;                           packet header dst-address)
@@ -972,7 +1193,7 @@
 ;;   (send-packet (logior fin ack)
 ;;                (next-tx-seq tcp) (next-rx-seq tcp) tcp)
 ;;   (when (= (state tcp) last-ack)
-;;     (schedule-timer (retransmit-timeout (rtt tcp)) 'last-ack tcp)))
+;;     (schedule-timer (retransmit-timer (rtt tcp)) 'last-ack tcp)))
 
 ;; (defmethod process-action((action (eql 'new-ack)) tcp &optional
 ;;                           packet header dst-address)
@@ -1031,7 +1252,7 @@
 ;;       ;; need to ack app will close later
 ;;       (send-packet ack (next-tx-seq tcp) (next-rx-seq tcp) tcp)))
 ;;   (when (= (state tcp) last-ack)
-;;     (schedule (retransmit-timeout (rtt tcp)) 'last-ack-timeout-event)))
+;;     (schedule (retransmit-timer (rtt tcp)) 'last-ack-timer-event)))
 
 ;; (defmethod process-action((action (eql 'app-closed)) tcp &optional
 ;;                           packet header dst-address)
@@ -1051,11 +1272,11 @@
 ;;          (data-length (size data))
 ;;          (state (state tcp)))
 ;;     (when data
-;;       (let ((rto (retransmit-timeout (rtt tcp))))
+;;       (let ((rto (retransmit-timer (rtt tcp))))
 ;;         (unless (or (no-timer-p tcp)
-;;                     (find-timer 'retx-timeout-event tcp))
-;;           (schedule rto 'retx-timeout-event))
-;;         (setf (last-timeout-delay tcp) rto)
+;;                     (find-timer 'retx-timer-event tcp))
+;;           (schedule rto 'retx-timer-event))
+;;         (setf (last-timer-delay tcp) rto)
 ;;         (sent-seq seq data-length (rtt tcp)) ;; notify rtt estimator
 ;;         (when (< seq (high-tx-mark tcp)) ;; count retransmits
 ;;           (incf (retransmit-count tcp)))))
@@ -1088,57 +1309,12 @@
 ;;                          :protocol-number (protocol-number tcp)
 ;;                          :tos (tos tcp))))
 
-;; (defun tcp-send-pending(tcp &optional with-ack)
-;;   (declare (ignore with-ack))
-;;   (let ((pending-data (pending-data tcp))
-;;         (n-sent 0)) ;; count number packets sent
-;;     (when pending-data
-;;       (while (> (size-from-seq (first-pending-seq tcp) (next-tx-seq tcp)
-;;                                 pending-data)
-;;                 0)
-;;         (let ((w (available-window tcp)))
-;;           (when  (and (< w (seg-size tcp)) (> (size (pending-data tcp)) w))
-;;             (return))
-;;           (unless (buffer-available-p (+ (seg-size tcp) 100) tcp)
-;;             (request-notification tcp)
-;;             (return))
-;;           (let* ((s (min w (seg-size tcp)))
-;;                  (data (copy-from-seq s (first-pending-seq tcp)
-;;                                       (next-tx-seq tcp)))
-;;                  (sz (size data))
-;;                  (flags 0))
-;;             (let ((remaining-data (size-from-seq
-;;                                    (first-pending-seq tcp)
-;;                                    (+ (next-tx-seq tcp) sz)
-;;                                    pending-data)))
-;;               ;; Compute amount still remaining to see if we need FIN flag
-;;               (when (and (close-on-empty tcp)
-;;                          (= 0 remaining-data)
-;;                          (/= 0 (bytes-sent tcp)))
-;;                 (setf flags (logand flags fin)
-;;                       (state tcp) fin-wait-1)))
-;;             (note-time-seq log-seq-tx (next-tx-seq tcp) tcp)
-;;             (let((packet (make-instance 'packet)))
-;;               (push-pdu data packet)
-;;               (send-packet flags (next-tx-seq tcp) (next-rx-seq tcp) tcp
-;;                            :packet packet)
-;;               (incf n-sent)
-;;               (incf (next-tx-seq tcp) sz)
-;;               (incf (bytes-sent tcp) sz)
-;;               (setf (high-tx-mark sz)
-;;                     (max (next-tx-seq tcp) (high-tx-mark sz)))))))
-;;       (when (> n-sent 0)
-;;         ;; At least one packet sent, be sure we have pending re-tx timer
-;;         (unless (find-timer 'retx-timeout-event tcp)
-;;           (let ((rto (retransmit-timeout (rtt tcp))))
-;;             (schedule rto 'retx-timeout-event)
-;;             (setf (last-timeout-delay tcp) rto)))))))
 
 ;; (defun common-newack(sack tcp &optional skip-timer)
 ;;   "common-newack is called only for new (non-duplicate) acks
 ;;  and MUST be called by any subclass, from the newack function
 ;;  Always cancel any pending re-tx timer on new acknowledgement"
-;;   (unless skip-timer (cancel-timer 'retx-timeout-event tcp))
+;;   (unless skip-timer (cancel-timer 'retx-timer-event tcp))
 ;;   (let ((numberack (- sack (highest-rx-ack tcp))))
 ;;     (incf (total-ack tcp) numberack)
 ;;     (setf (highest-rx-ack tcp) sack) ;;Note the highest recieved Ack
@@ -1149,7 +1325,7 @@
 ;;                          first-pending-seq highest-rx-ack pending-data)))
 ;;         ;; All pending acked, can be deleted
 ;;         (setf pending-data nil)
-;;         (cancel-timer 'retx-timeout-event tcp)))
+;;         (cancel-timer 'retx-timer-event tcp)))
 ;;     ;; Notify application of data sent
 ;;     (when-bind(a (application tcp))
 ;;         (when (> numberack 0) (sent a numberack tcp))))
@@ -1157,25 +1333,25 @@
 ;;   (tcp-send-pending tcp)
 ;;   ;; See if we need to post a re-tx timer
 ;;   (when (and (not skip-timer)
-;;              (not (find-timer 'retx-timeout-event tcp))
+;;              (not (find-timer 'retx-timer-event tcp))
 ;;              (or (> (unack-data-count tcp) 0)
 ;;                  (= (state tcp) fin-wait-1)
 ;;                  (= (state tcp) fin-wait-2)))
-;;     (schedule-timer (retransmit-timeout (rtt tcp)) 'retx-timeout-event tcp)))
+;;     (schedule-timer (retransmit-timer (rtt tcp)) 'retx-timer-event tcp)))
 
 ;; (defun send-ack(sack tcp &optional forced)
 ;;   (let ((sendit
 ;;          (or forced
-;;              (unless (zerop (del-ack-timeout tcp))
+;;              (unless (zerop (del-ack-timer tcp))
 ;;               ;; Using delayed ack, see if already pending
 ;;               (cond
-;;                 ((find-timer 'del-ack-timeout-event tcp)
+;;                 ((find-timer 'del-ack-timer-event tcp)
 ;;                  ;; if already pending cancel and send packet
-;;                  (cancel-timer 'del-ack-timeout-event tcp)
+;;                  (cancel-timer 'del-ack-timer-event tcp)
 ;;                  t)
 ;;                 (t ;; else delay this ack
 ;;                  (schedule-timer
-;;                   (del-ack-timeout tcp) 'del-ack-timeout-event tcp)
+;;                   (del-ack-timer tcp) 'del-ack-timer-event tcp)
 ;;                  (setf (next-ack-seq tcp) ack)
 ;;                  nil))))))
 ;;     (unless (tcp-send-pending tcp)

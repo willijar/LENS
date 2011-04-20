@@ -76,12 +76,10 @@ output according to detail onto stream")
       (format stream " ~D" (if packet (uid packet) 0)))))
 
 (defclass packet()
-  ((uid :type integer
-        :initform (incf *packet-count*)
-        :reader uid
+  ((uid :type integer :initform (incf *packet-count*) :reader uid
         :documentation "Unique id of the packet")
    (fid :type integer :initarg :fid :reader fid
-        :documentation "Flow id - useful for tracing")
+        :documentation "Flow id - for tracing")
    (pdus :type vector :initform (make-array 5 :adjustable t :fill-pointer 0)
          :reader pdus)
    (created :type time-type :initform (simulation-time) :reader created

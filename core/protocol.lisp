@@ -47,7 +47,8 @@ See http://www.iana.org/assignments/protocol-numbers")
                    (stream trace:*lens-trace-output*))
   (dolist(stream (if (listp stream) stream (list stream)))
     (when (trace-enabled-p protocol stream)
-      (setf (slot-value stream 'node) node)
+      (setf (node stream) node)
+      (when packet (setf (packet:packet stream) packet))
       (pdu-trace pdu
                  (if protocol (trace-detail protocol stream) nil)
                  stream
@@ -57,12 +58,14 @@ See http://www.iana.org/assignments/protocol-numbers")
 ;; split-phase transmission (going down protocol layers)
 (defgeneric send(receiver packet sender &key &allow-other-keys)
   (:documentation "Called by sender to start sending packet - Returns
-  true if packet accepted for transmission, false otherwise.")
+  true if packet accepted for transmission, false otherwise. At
+  transport layer return the number of bytes accepted for
+  transmission")
   (:method :before((receiver protocol) packet (sender protocol)
                    &key &allow-other-keys)
-    (write-trace sender (peek-pdu packet) :packet packet :text "-"))
+           (write-trace sender (peek-pdu packet) :packet packet :text "-"))
   (:method :around (receiver packet (sender protocol) &key &allow-other-keys)
-    (when (node:call-callbacks :tx sender packet) (call-next-method))))
+     (when (node:call-callbacks :tx sender packet) (call-next-method))))
 
 (defgeneric receive(receiver packet sender &key &allow-other-keys)
   (:documentation "Called by packet when to pass received packet up to
@@ -79,6 +82,10 @@ See http://www.iana.org/assignments/protocol-numbers")
     (write-trace entity :drop :packet packet :text text))
   (:method(entity packet &key &allow-other-keys)
     (declare (ignore entity packet))))
+
+(defgeneric signal-error(receiver sender error &rest format-args)
+  (:documentation "Called by protocol to signal an error to a higher
+  layer"))
 
 (in-package :protocol.layer2)
 
@@ -184,7 +191,7 @@ See http://www.iana.org/assignments/protocol-numbers")
              :allocation :class)
    (ttl :accessor ttl :initarg :ttl :initform 64 :type integer
         :documentation "Layer 3 ttl")
-        (tos :accessor tos :initarg :tos :initform 0
+   (tos :accessor tos :initarg :tos :initform 0
         :documentation "Layer 3 type of service"))
   (:documentation "Base class for IP layer 4 protocol implementations"))
 
@@ -253,9 +260,9 @@ See http://www.iana.org/assignments/protocol-numbers")
 (defun next-available-port(protocol-dmux)
   "Return next available ephemeral port for a protocol demultiplexer"
   (do((port (slot-value protocol-dmux 'min-ephemeral-port)
-            (modulus+ 1 port 16)))
-     ((or (zerop port) (not (binding protocol-dmux port))
-          (the (unsigned-byte 16) port)))))
+            (1+ port)))
+     ((not (binding protocol-dmux port))
+      (when (<= port #xFFFF) port))))
 
 (defgeneric binding(entity local-port &key &allow-other-keys)
   (:documentation "Find best matching binding for given address details")
@@ -285,31 +292,34 @@ See http://www.iana.org/assignments/protocol-numbers")
       binding)))
 
 (defgeneric bind(protocol &key local-port peer-port
-                          peer-address local-address node)
+                          peer-address local-address node application)
   (:documentation "Bind a protocol - returning it if successful or nil if not")
   (:method((protocol protocol) &key
            (local-port (local-port protocol))
            (local-address (local-address protocol))
            (peer-port (peer-port protocol))
            (peer-address (peer-address protocol))
-           (node (node protocol)))
+           (application (application protocol))
+           (node (or (node protocol) (node application))))
     (let ((dmux (find-protocol (protocol-number protocol) node)))
       (unless local-port (setf local-port (next-available-port dmux)))
       (assert (or (not (or peer-port peer-address))
                   (and peer-port peer-address)))
-       (unless (binding dmux local-port :local-address local-address
+      (assert (not (bound-p protocol)))
+      (unless (binding dmux local-port :local-address local-address
                         :peer-port peer-port :peer-address peer-address)
          (setf (slot-value protocol 'local-port) local-port
                (slot-value protocol 'peer-port) peer-port
                (slot-value protocol 'local-address) local-address
                (slot-value protocol 'peer-address) peer-address
-               (slot-value protocol 'node) node)
+               (slot-value protocol 'node) node
+               (slot-value protocol 'application) application)
          (push protocol (bindings dmux))))))
 
 (defgeneric unbind(protocol)
   (:documentation "Remove protocol from dmux bindings")
   (:method((protocol protocol))
-    (let ((dmux (find-protocol (protocol-number protocol) (node protocol))))
+    (let ((dmux (protocol-dmux protocol)))
       (setf (bindings dmux) (delete protocol (bindings dmux))))))
 
 (defgeneric bound-p(protocol)
@@ -345,11 +355,11 @@ See http://www.iana.org/assignments/protocol-numbers")
           (slot-value protocol 'peer-port) peer-port
           (slot-value protocol 'fid) (incf (slot-value protocol 'last-fid)))))
 
-(defgeneric connection-complete(application protocol &key failure)
-  (:documentation "Called to signal completion of connection attempt -
-  either success or if failure set failed")
-  (:method(application protocol &key failure)
-    (declare(ignore application protocol failure))))
+(defgeneric connection-complete(application protocol)
+  (:documentation "Called to signal successfull completion of
+connection attempt")
+  (:method(application protocol)
+    (declare(ignore application protocol))))
 
 (defgeneric connected-p(protocol)
   (:documentation "Return true if protocol is connected")
@@ -369,7 +379,9 @@ has completely closed")
   (:method(app protocol) (declare (ignore app protocol)))
   (:method :after (app (protocol protocol))
       (declare (ignore app))
-      (unbind protocol)))
+      (unbind protocol)
+      (map 'nil #'(lambda(interface) (delete-notifications protocol interface))
+           (interfaces (node protocol)))))
 
 (defgeneric close-request(application protocol)
   (:documentation "Called by an associated layer 4 protocol when a connection
@@ -386,35 +398,79 @@ this occurs when the acknowledgement is received from the peer.")
   (:method(application no-octets-sent protocol)
     (declare (ignore application no-octets-sent protocol))))
 
-(defgeneric connection-from-peer(application protocol &key peer-address peer-port)
+(defgeneric connection-from-peer(application protocol)
   (:documentation "Called when a listening protocol receives a
-  connection request. Return true if connection accepted.")
-  (:method(application protocol &key &allow-other-keys)
-    "Default - acceot and do nothing"
+  connection request. Return true if connection accepted. Protocol will be the connected socket (not the listener)")
+  (:method(application protocol)
+    "Default - accept and do nothing"
     (declare (ignore application protocol))
     t))
 
-(defgeneric connection-error(application protocol error)
-  (:documentation "Called by protocol to signal an error to the application")
-  (:method(application protocol error)
-    (declare (ignore application))
-    (format *trace-output* "~A connection Error: ~A" protocol error)))
+(declaim (inline seq+ seq-))
+
+(defun seq+(seq length-bytes)
+  "32 bit modulus addition of a sequence number and a byte length"
+  (declare ((unsigned-byte 32) seq length-bytes))
+  (the (unsigned-byte 32) (mod (+ seq length-bytes) #x100000000)))
+
+(defun seq-(seq-end seq-start)
+  "Return the number of bytes between seq-start and seq-end"
+  (declare ((unsigned-byte 32) seq-end seq-start))
+  (the (unsigned-byte 32)
+    (if (>= seq-end seq-start)
+        (- seq-end seq-start)
+        (+ seq-end (- #x100000000 seq-end)))))
+
+(defun seq-in-segment(sequence-number segment-start segment-no-bytes)
+  "Return true if the sequence number corresponds to a byte in segment
+with the given sequence start number and byte count."
+  (declare ((unsigned-byte 32) sequence-number segment-start segment-no-bytes)
+           (optimize speed (safety 0)))
+  (let ((segment-end (seq+ segment-start segment-no-bytes)))
+    (declare ((unsigned-byte 32) segment-end))
+    ;; deal with wrap around edge case
+    (if (>= segment-end segment-start)
+         (and (>= sequence-number segment-start)
+              (< sequence-number segment-end))
+         (or (< sequence-number segment-end)
+             (>= sequence-number segment-start)))))
+
+(defun ack-after-segment(ack-number segment-start segment-no-bytes)
+  "Return true if an acknowledgement number is after a sequence with a
+given segment-start and no-bytes"
+  (declare ((unsigned-byte 32) ack-number segment-start segment-no-bytes)
+           (optimize speed (safety 0)))
+  (let ((segment-end (seq+ segment-start segment-no-bytes))
+        (wrap-around (seq+ segment-start #x7FFFFFFF)))
+    (declare ((unsigned-byte 32) segment-end wrap-around))
+    ;; deal with edge cases from modular arithmetic wrap around
+    (if (> wrap-around segment-end)
+        (and (>= ack-number segment-end)
+             (< ack-number wrap-around))
+        (or (>= ack-number segment-end)
+            (< ack-number wrap-around)))))
 
 (in-package :protocol.layer5)
 
+(defclass pdu(packet:pdu)
+  ()
+  (:documentation "Application layer pdu"))
+
+(defmethod layer((pdu pdu)) 5)
+
 (defclass data(packet:pdu)
-  ((layer :initform 5 :allocation :class :reader layer)
-   (length-bytes :type integer :initarg :length-bytes
-         :documentation "Number of data bytes if no contents")
-   (contents :type (or null (vector (unsigned-byte 8) *)) :initform nil :reader contents
-             :initarg :contents
-             :documentation "Vector of data if we are sending")
-   #+nil(response-size :type integer :initarg :response-size :initform 0
-                  :reader response-size
-                  :documentation "Size of response requested")
-   #+nil(checksum :type (unsigned-byte 16) :initarg :checksum
-                  :documentation "Checksum value"))
-  (:documentation "Data PDU"))
+  ((length-bytes :type integer :initarg :length-bytes :reader length-bytes
+                 :documentation "Number of data bytes represented by this pdu"))
+  (:documentation "Data representational PDU"))
+
+;; can send vector of bytes as data too
+(defmethod layer((pdu vector))
+  (check-type pdu (vector (unsigned-byte 8) *))
+  5)
+
+(defmethod length-bytes((pdu vector))
+  (check-type pdu (vector (unsigned-byte 8) *))
+  (fill-pointer pdu))
 
 (defmethod send((layer4 layer4:protocol) (length-bytes integer) application &rest args)
   (apply #'send layer4
@@ -425,92 +481,48 @@ this occurs when the acknowledgement is received from the peer.")
   (print-unreadable-object (data stream :type t :identity t)
     (format stream "~:/print-eng/bytes" (length-bytes data))))
 
-(defmethod length-bytes((pdu data))
-  (if (contents pdu) (length (contents pdu)) (slot-value pdu 'length-bytes)))
-
-(defmethod copy((data data))
-  (let ((copy (copy-with-slots data '(-size response-size checksum))))
-    (if (contents data)
-        (setf (slot-value copy 'contents) (copy-seq (contents data)))
-        (setf (slot-value copy 'length-bytes) (slot-value data 'length-bytes)
-              (slot-value copy 'contents) nil))
-    copy))
-
-(defgeneric checksum(entity)
-  (:documentation "Perform 16 bit xor checksum across entity data")
-  (:method((data vector))
-    "Perform 16 bit xor checksum across a vector of (unsigned-byte 8)"
-    (check-type data (vector (unsigned-byte 8) *))
-    (multiple-value-bind(s2 rem) (floor (length data) 2)
-      (let ((sum 0))
-        (declare (type (unsigned-byte 16) sum))
-        ;; do 16 bit checksum across contents
-        (loop :for i :from 0 :below s2
-              :do (setf sum (logxor sum
-                                    (ash (aref data i) 8)
-                                    (aref data (1+ i)))))
-        ;; odd size - add in last octet
+(defun checksum(data)
+  (check-type data (vector (unsigned-byte 8) *))
+  (multiple-value-bind(s2 rem) (floor (length data) 2)
+    (let ((sum 0))
+      (declare (type (unsigned-byte 16) sum))
+      ;; do 16 bit checksum across contents
+      (loop :for i :from 0 :below s2
+         :do (setf sum (logxor sum
+                               (ash (aref data i) 8)
+                               (aref data (1+ i)))))
+      ;; odd size - add in last octet
       (when (= 1 rem)
         (setf sum
               (logxor sum
                       (ash (aref data (1- (length data))) 8))))
       sum)))
-  (:method((pdu data))
-    (let ((contents (contents pdu)))
-      (if contents
-          (checksum contents)
-          (slot-value pdu 'checksum)))))
 
-(declaim (inline offset-from-seq size-from-offset))
+(defgeneric data-concatenate(a b)
+  (:documentation "Return a new data pdu made of the concatenation of a and b")
+  (:method((a data) (b data))
+    (make-instance 'data :length-bytes (+ (length-bytes a) (length-bytes b))))
+  (:method((a vector) (b vector))
+     (check-type a (vector (unsigned-byte 8) *))
+     (check-type b (vector (unsigned-byte 8) *))
+     (concatenate '(vector (unsigned-byte 8) *) a b)))
 
-(defun offset-from-seq(f o)
-  (when (< o f) (error "offset sequence < first sequence in data"))
-  (- o f))
-
-(defun size-from-offset(o data)
-  (let ((size (length-bytes data)))
-    (if (> o size) 0 (- size o))))
-
-(defun size-from-seq(f o data)
-  (size-from-offset (offset-from-seq f o) data))
-
-(defun copy-from-offset(size offset data)
-  (let ((size (min size (size-from-offset offset data))))
-    (when (> size 0)
-      (make-instance
-       'data
-       :contents (when (contents data)
-                   (subseq (contents data) offset (+ offset size)))
-       :length-bytes (unless (contents data) size)))))
-
-       ;;:response-size (response-size data)
-
-(defun copy-from-seq(size f o data)
-  (copy-from-offset size (offset-from-seq f o) data))
-
-(defun remove-data(s data)
-  "Remove s bytes from start of data"
-  (with-slots(length-bytes contents) data
-    (let ((r (min s length-bytes)))
-      (setf length-bytes (- length-bytes r))
-      (when contents
-        (if (> length-bytes 0)
-            (setf contents (subseq contents s))
-            (setf contents nil))))))
-
-(defun add-data(s data)
-  "Adds s (either byte-count or vector of octets) onto end of data"
-  (multiple-value-bind(s d)
-      (etypecase s
-        (integer (values s nil))
-        ((vector (unsigned-byte 8) *) (values (length s) s))
-        (data (values (length-bytes s) (contents s))))
-    (with-slots(length-bytes contents) data
-      (if contents
-          (setf contents
-                (concatenate 'vector contents
-                             (or d (make-array s
-                                               :element-type '(unsigned-byte 8)
-                                               :initial-element 0))))
-          (when d (setf contents (copy-seq d))))
-      (setf length-bytes (+ length-bytes s)))))
+(defgeneric data-subseq(data start &optional length)
+  (:documentation "Return a copy of a subset of data starting with
+  element number start continuing to end of sequence or up to length
+  bytes")
+  (:method((data data) start &optional length-bytes)
+    (let ((end (length-bytes data)))
+      (assert (<= start end))
+      (make-instance 'data :length-bytes
+                     (if (or (not length-bytes) (> (+ start length-bytes) end))
+                         (- end start)
+                         length-bytes))))
+  (:method ((data vector) (start integer)  &optional length-bytes)
+   (check-type data (vector (unsigned-byte 8) *))
+   (let* ((end (length-bytes data))
+          (length-bytes (if (or (not length-bytes)
+                                (> (+ start length-bytes) end))
+                            (- end start)
+                            length-bytes)))
+     (subseq data start (+ start length-bytes)))))

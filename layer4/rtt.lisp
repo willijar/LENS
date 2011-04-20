@@ -1,5 +1,5 @@
-;; Round Trip estimation for TCP
-;; Copyright (C) 2010 Dr. John A.R. Williams
+;; Layer 4 Round Trip estimation (for TCP)
+;; Copyright (C) 2011 Dr. John A.R. Williams
 
 ;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
 ;; Keywords:
@@ -11,13 +11,19 @@
 
 ;;; Commentary:
 
-
 ;; See Tanenbaum "Computer Networks" (TCN) section 6.5.
 ;;; Code:
 
-;;; round trip time estimation
 
-(in-package :protocol.layer4)
+
+(defpackage :protocol.layer4.rtt
+  (:documentation "Layer 4 Round Trip estimation (for TCP)")
+  (:nicknames :rtt :layer4.rtt)
+  (:use :cl :common :protocol.layer4 :address :math)
+  (:export #:mdev #:ack-seq #:retransmit-timeout
+           #:increase-multiplier #:record))
+
+(in-package :protocol.layer4.rtt)
 
 (defstruct rtt-history
   (seq 0 :type (unsigned-byte 32))       ; First sequence number in packet sent
@@ -45,36 +51,7 @@
   (:documentation "A virtual base class which defines the behavior of
 a round trip time estimator used by TCP."))
 
-(defun seq-in-segment(sequence-number segment-start segment-no-bytes)
-  "Return true if the sequence number corresponds to a byte in segment
-with the given sequence start number and byte count."
-  (declare ((unsigned-byte 32) sequence-number segment-start segment-no-bytes)
-           (optimize speed (safety 0)))
-  (let ((segment-end (modulus+ segment-start segment-no-bytes 32)))
-    (declare ((unsigned-byte 32) segment-end))
-    ;; deal with wrap around edge case
-    (if (>= segment-end segment-start)
-         (and (>= sequence-number segment-start)
-              (< sequence-number segment-end))
-         (or (< sequence-number segment-end)
-             (>= sequence-number segment-start)))))
-
-(defun ack-after-segment(ack-number segment-start segment-no-bytes)
-  "Return true if an acknowledgement number is after a sequence with a
-given segment-start and no-bytes"
-  (declare ((unsigned-byte 32) ack-number segment-start segment-no-bytes)
-           (optimize speed (safety 0)))
-  (let ((segment-end (modulus+ segment-start segment-no-bytes 32))
-        (wrap-around (modulus+ segment-start #x7FFFFFFF 32)))
-    (declare ((unsigned-byte 32) segment-end wrap-around))
-    ;; deal with edge cases from modular arithmetic wrap around
-    (if (> wrap-around segment-end)
-        (and (>= ack-number segment-end)
-             (< ack-number wrap-around))
-        (or (>= ack-number segment-end)
-            (< ack-number wrap-around)))))
-
-(defun rtt-sent-seq(seq no-bytes rtt)
+(defun sent-seq(seq no-bytes rtt)
   "Note that a particular sequence has been sent"
   (with-slots(next history) rtt
     (cond
@@ -82,7 +59,7 @@ given segment-start and no-bytes"
        (push
         (make-rtt-history :seq seq :count no-bytes :time (simulation-time))
         history)
-       (setf next (modulus+ seq no-bytes 32)))
+       (setf next (seq+ seq no-bytes)))
       (t ;; is a retransmit - find in list and mark as retx
        (let ((h
               (find-if
@@ -94,11 +71,11 @@ given segment-start and no-bytes"
            (setf (rtt-history-retx h) t)
            ;; ensure retx doesnt extend next
            (when (> (+ seq no-bytes) next)
-             (setf next (modulus+ seq no-bytes 32))
+             (setf next (seq+ seq no-bytes))
              (setf (rtt-history-count h)
                    (- (+ seq no-bytes) (rtt-history-seq h))))))))))
 
-(defun rtt-ack-seq(a rtt)
+(defun ack-seq(a rtt)
   "Notify the RTT estimator that a particular sequence number has been
 acknowledged."
   (let ((m 0.0))
@@ -122,14 +99,14 @@ acknowledged."
                  history)))))
     m))
 
-(defun rtt-sent-clear(rtt)
+(defun sent-clear(rtt)
   (with-slots(next history) rtt
     (setf next 0
           history nil)))
 
 (defun reset-multiplier(rtt) (setf (slot-value rtt 'multiplier ) 1.0))
 
-(defun rtt-increase-multiplier(rtt)
+(defun increase-multiplier(rtt)
   (with-slots(multiplier max-multiplier) rtt
     (setf multiplier (min (* 2 multiplier max-multiplier)))))
 
@@ -141,7 +118,7 @@ acknowledged."
           no-samples 0)
     (reset-multiplier rtt)))
 
-(defclass rtt-mdev(rtt-estimator)
+(defclass mdev(rtt-estimator)
   ((gain :initarg :gain :initform 0.1 :type real :accessor gain
          :documentation "Filter gain")
    (variance :initform 0.0 :type real :accessor variance
@@ -149,7 +126,7 @@ acknowledged."
   (:documentation "Mean-Deviation estimator, as discussed by Van Jacobson
 `Congestion Avoidance and Control', SIGCOMM 88, Appendix A"))
 
-(defmethod math:record(m (rtt rtt-mdev) &key time)
+(defmethod record(m (rtt mdev) &key time)
   (declare (ignore time))
   (with-slots(no-samples estimate gain variance) rtt
     (if (> no-samples 0)
@@ -160,15 +137,13 @@ acknowledged."
               variance  m))
     (incf no-samples)))
 
-(defmethod reset((rtt rtt-mdev))
+(defmethod reset((rtt mdev))
   (call-next-method)
   (setf (slot-value rtt 'variance) 0.0))
 
-(defun rtt-retransmit-timeout(rtt)
+(defun retransmit-timeout(rtt)
   ;;As suggested by Jacobson
   (with-slots(estimate variance multiplier) rtt
     (if (< variance  (/ estimate 4.0))
         (* 2 estimate multiplier)
         (* (+ estimate (* 4 variance)) multiplier))))
-
-(export '(rtt-estimator rtt-mdev rtt-ack-seq rtt-retransmit-timeout rtt-increase-multiplier))

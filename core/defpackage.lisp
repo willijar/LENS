@@ -25,7 +25,7 @@
   (:export #:start #:stop #:reset #:busy-p #:*reset-hooks*
            #:while #:until #:filter #:defenumeration
            #:when-bind #:when-bind* #:simulation-condition
-           #:uid #:name #:node #:length-bytes #:modulus+
+           #:uid #:name #:length-bytes
            #:interface #:link #:node #:application
            #:copy #:copy-with-slots #:immutable
            #:trace-accessor #:untrace-accessor
@@ -44,7 +44,7 @@
                 #:slot-definition-name #:slot-definition-type #:class-slots)
   (:export #:scheduler #:schedule #:simulation-time #:time-type
            #:status #:with-timers #:timer #:timers #:timeout #:with-delay
-           #:event #:handle))
+           #:event #:handle #:timer-delay #:event-time #:cancel))
 
 (defpackage :math
   (:documentation "Various mathematical functions and classes")
@@ -68,6 +68,7 @@
    (:use :cl :trivial-gray-streams :common)
 ;   (:import-from :address #:print-ip-format)
    (:import-from :scheduler #:simulation-time #:time-type)
+   (:import-from :packet #:packet)
    (:export #:trace-status #:trace-detail #:trace-stream #:time-format
             #:*lens-trace-output* #:trace #:default-trace-detail
             #:trace-enabled-p))
@@ -77,7 +78,7 @@
   (:use :cl #:common #:trace)
   (:import-from :packet #:pdu #:layer #:peek-pdu #:pdu-trace)
   (:export #:protocol-number #:protocol #:protocol-condition #:layer #:pdu
-           #:send #:receive #:drop #:default-trace-detail))
+           #:send #:receive #:drop #:signal-error #:default-trace-detail))
 
 (defpackage :address
   (:documentation "network and hardware addressing")
@@ -179,8 +180,9 @@
            #:src-port #:dst-port
            #:open-connection #:connection-complete
            #:close-connection #:connection-closed #:close-request
-           #:connection-from-peer #:connected-p #:connection-error
+           #:connection-from-peer #:connected-p
            #:send #:receive #:sent
+           #:seq+ #:seq- #:seq-in-segment #:ack-after-segment
            ;; conditions
            ;; specific default layer 4 protocols
            #:udp-dmux #:tcp-dmux #:udp-header #:tcp-header
@@ -191,9 +193,8 @@
   (:nicknames :layer5 :data :layer.application)
   (:use :cl :common :address :protocol.layer4)
   (:shadow #:protocol #:pdu)
-  (:export #:data #:contents #:msg-size #:response-size #:checksum
-           #:copy-from-offset #:size-from-seq #:copy-from-seq
-           #:add-data #:remove-data #:protocol #:pdu
+  (:export #:data #:checksum
+           #:data-concatenate #:data-subseq #:protocol #:pdu
            #:application
            #:abr-source #:udp-sink))
 

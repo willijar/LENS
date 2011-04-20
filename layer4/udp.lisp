@@ -61,8 +61,8 @@
 (defclass udp(protocol)
   ((protocol-number :type fixnum :initform 17 :allocation :class
                     :reader protocol-number)
-   (mtu :initform 556 :initarg :mtu :accessor mtu ;; 576-20 for udp&ip headers
-        :documentation "Maximum transmission unit")
+   (max-seg-size :initform 556 :initarg :max-seg-size :accessor max-seg-size
+        :documentation "Maximum segment size to use")
    (sequence-number :type integer :initform 0 :accessor sequence-number
                     :documentation "Sequence number of next packet")
    (pending-data :type list :initform nil :accessor pending-data
@@ -118,36 +118,33 @@
 (defun udp-send-pending(udp)
   (dolist(pd (pending-data udp))
     (when-bind (interface (find-interface (dst-address pd) (node udp)))
-      (loop
-           (let ((data (if (and (= (bytes-sent pd) 0)
-                                (< (length-bytes (data pd))
-                                   (mtu udp)))
-                           (data pd)
-                           (layer5:copy-from-offset
-                            (mtu udp) (bytes-sent pd) (data pd) ))))
-             (unless (layer1:buffer-available-p
-                      (+ 28 (length-bytes data)) interface)
-               (add-notification udp #'udp-send-pending interface)
-               (return))
-             (let ((packet (make-instance 'packet :data data :fid (fid udp))))
-               (incf (bytes-sent pd) (length-bytes data))
-               (push-pdu
-                (make-instance 'udp-header
-                               :src-port (or (local-port udp) 0)
-                               :dst-port (dst-port pd)
-                               :msg-size (length-bytes data)
-                               :sequence-number (incf (sequence-number udp)))
-                packet)
-               (send (layer3:find-protocol 'layer3:ipv4 (node udp)) packet udp
-                     :dst-address (dst-address pd)
-                     :src-address (or (local-address udp)
-                                      (network-address (node udp)))
-                     :ttl (ttl udp)
-                     :tos (tos udp))
-               (sent (application udp) (length-bytes data) udp)))
-         (when (= (bytes-sent pd) (length-bytes (data pd)))
-           (setf (pending-data udp) (delete pd (pending-data udp)))
-           (return)))))
+     (loop
+        (let ((data
+               (layer5:data-subseq
+                (data pd) (bytes-sent pd) (max-seg-size udp))))
+          (unless (layer1:buffer-available-p
+                   (+ 28 (length-bytes data)) interface)
+            (add-notification udp #'udp-send-pending interface)
+            (return))
+          (incf (bytes-sent pd) (length-bytes data))
+          (let ((packet (make-instance 'packet :data data :fid (fid udp))))
+            (push-pdu
+             (make-instance 'udp-header
+                            :src-port (or (local-port udp) 0)
+                            :dst-port (dst-port pd)
+                            :msg-size (length-bytes data)
+                            :sequence-number (incf (sequence-number udp)))
+             packet)
+            (send (layer3:find-protocol 'layer3:ipv4 (node udp)) packet udp
+                  :dst-address (dst-address pd)
+                  :src-address (or (local-address udp)
+                                   (network-address (node udp)))
+                  :ttl (ttl udp)
+                  :tos (tos udp))
+            (sent (application udp) (length-bytes data) udp)))
+        (when (= (bytes-sent pd) (length-bytes (data pd)))
+          (setf (pending-data udp) (delete pd (pending-data udp)))
+          (return)))))
   ;; udp will call connection closed once all data has been sent
   (unless (or (pending-data udp) (connected-p udp))
     (dolist(interface (interfaces (node udp)))
