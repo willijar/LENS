@@ -77,15 +77,18 @@ See http://www.iana.org/assignments/protocol-numbers")
     (when (node:call-callbacks :rx receiver packet) (call-next-method))))
 
 (defgeneric drop(entity packet &key text &allow-other-keys)
-  (:documentation "Drop a packet")
+  (:documentation "Drop a packet for entity")
   (:method :after (entity packet &key text &allow-other-keys)
+    "Trace drops"
     (write-trace entity :drop :packet packet :text text))
   (:method(entity packet &key &allow-other-keys)
     (declare (ignore entity packet))))
 
-(defgeneric signal-error(receiver sender error &rest format-args)
-  (:documentation "Called by protocol to signal an error to a higher
-  layer"))
+(defgeneric control-message(receiver message sender &key &allow-other-keys)
+  (:documentation "Called by sender protocol entity to signal a control message to the receiver protocol entity")
+  (:method (receiver message sender &rest args &key &allow-other-keys)
+    (format lens-user:*user-output* "~A received ~A signal from ~A ~@[~A~]"
+            receiver message sender args)))
 
 (in-package :protocol.layer2)
 

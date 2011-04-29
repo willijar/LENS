@@ -40,6 +40,3 @@ a web browser model with multiple simultaneous connections."))
   "Called by layer 4 protocol object when data is received. Default -
 do nothing"
     (declare (ignore application data layer4)))
-
-(defmethod signal-error((application application) layer4 error &rest args)
-  (apply #'error error args))

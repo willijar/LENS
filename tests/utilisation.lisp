@@ -54,7 +54,7 @@
 (schedule 10d0
 #'(lambda()
     (stop-simulation)
-    (format t "utilisation=~A loss=~A delay=~A~%"
+    (format *user-output* "utilisation=~A loss=~A delay=~A~%"
             (utilisation link)
             (average (loss-statistics sink))
             (average (delay-statistics sink)))))

@@ -145,7 +145,8 @@ are dispatched in current thread"
            :when (and granularity
                       (= (setf c (mod (1+ c) granularity)) 0))
            :do (yield-thread))
-          (format t "~%-- Simulation halted at ~,4f~%" (simulation-time))
+          (format lens-user::*user-output*
+                  "~%-- Simulation halted at ~,4f~%" (simulation-time))
           (setf (halted scheduler) t)))
     (stop scheduler :abort t)
     (if granularity

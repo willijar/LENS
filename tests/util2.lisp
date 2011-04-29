@@ -51,7 +51,7 @@
 
 (loop :for cbr-rate :from 100 :to 40000 :by 500
       :do
-      (format t "~A~%" cbr-rate)
+      (format *user-output* "~A~%" cbr-rate)
       (reset :all)
       (dolist(src sources)
         (schedule (random-value *start-rng*) `(start ,src))

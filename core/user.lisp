@@ -17,6 +17,9 @@
 
 (in-package :lens-user)
 
+(defvar *user-output* *standard-output*
+  "Stream used for writing user messages to")
+
 (defmacro with-new-instances((&rest defs) &body body)
   "Macro lexically binding variables to instances created using
 make-instance.  over the body. defs is a list of definitions. The
@@ -66,13 +69,14 @@ will run on a backgound thread."
   (scheduler::run (scheduler) :granularity granularity :step step))
 
 (defun run(&optional time)
+  (setf *user-output* *standard-output*)
   (when time (schedule time #'stop-simulation))
   (start-simulation)
   (values))
 
 (defun stop-simulation()
   (scheduler::stop (scheduler) :abort t)
-  (format t "~%-- Simulation stopped at ~,4f~%" (simulation-time)))
+  (format *user-output* "~%-- Simulation stopped at ~,4f~%" (simulation-time)))
 
 (defun load-test(name)
   (clear-nodes)
@@ -80,7 +84,7 @@ will run on a backgound thread."
   (load (merge-pathnames (make-pathname :name name :type "lisp")
                          #.(asdf:system-relative-pathname :lens "tests/"))
         :verbose nil :print nil)
-  (format t "~%-- Test ~S loaded~%" name))
+  (format *user-output* "~%-- Test ~S loaded~%" name))
 
 ;;; topology generation functions and helpers
 

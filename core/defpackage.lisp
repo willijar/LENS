@@ -78,7 +78,7 @@
   (:use :cl #:common #:trace)
   (:import-from :packet #:pdu #:layer #:peek-pdu #:pdu-trace)
   (:export #:protocol-number #:protocol #:protocol-condition #:layer #:pdu
-           #:send #:receive #:drop #:signal-error #:default-trace-detail))
+           #:send #:receive #:drop #:control-message #:default-trace-detail))
 
 (defpackage :address
   (:documentation "network and hardware addressing")
@@ -229,5 +229,6 @@
                  #:topology-changed)
    (:import-from :protocol.layer4
                  #:udp #:tcp #:icmp  #:tcp-tahoe #:tcp-reno #:tcp-newreno)
-   (:import-from :protocol.layer5 #:abr-source #:udp-sink))
+   (:import-from :protocol.layer5 #:abr-source #:udp-sink)
+   (:export #:*user-output*))
 
