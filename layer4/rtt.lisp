@@ -19,7 +19,7 @@
 (defpackage :protocol.layer4.rtt
   (:documentation "Layer 4 Round Trip estimation (for TCP)")
   (:nicknames :rtt :layer4.rtt)
-  (:use :cl :common :protocol.layer4 :address :math)
+  (:use :cl :common :protocol.layer4 :address :math :scheduler)
   (:export #:mdev #:ack-seq #:retransmit-timeout
            #:increase-multiplier #:record))
 

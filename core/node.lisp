@@ -76,7 +76,7 @@ form the packets are derived from this class."))
 
 (defgeneric node(entity)
   (:documentation "Return a node associated with entity")
-  (:method((entity integer)) (aref (nodes) entity))
+  (:method((entity integer)) (aref *nodes* entity))
   (:method((addr network-address))
     (find addr (nodes) :key #'network-address :test #'address=)))
 

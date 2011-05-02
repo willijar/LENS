@@ -1,6 +1,5 @@
-;; $Id: address.lisp,v 1.2 2007/11/10 10:45:02 willijar Exp willijar $
 ;; Internet Address and Mask functionality
-;; Copyright (C) 2007 Dr. John A.R. Williams
+;; Copyright (C) 2011 Dr. John A.R. Williams
 
 ;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
 ;; Keywords:
@@ -42,33 +41,72 @@
 (defgeneric address=(a b &optional mask)
   (:documentation "Return true if addresses are equal"))
 
+(defgeneric address<(a b)
+  (:documentation "Sort comparison for addressess"))
+
 (defclass address(immutable)
   ((address-bytes :type (unsigned-byte *) :initarg :bytes
                   :reader address-bytes))
   (:documentation "Generic class for addresses"))
 
+(defmethod print-object((addr address) stream)
+  (print-unreadable-object (addr stream :type t :identity nil)
+    (format stream "~X" (address-bytes addr))))
+
+(defclass network-mask(immutable)
+  ((bytespec :initarg :bytespec))
+  (:documentation "Network mask structure"))
+
+(defmethod length-bytes((m network-mask))
+  (with-slots(bytespec) m
+    (/ (+ (byte-position bytespec) (byte-size bytespec)) 8)))
+
+(defmethod address-bytes((m network-mask))
+  (deposit-field #xFFFFFFFF (slot-value m 'bytespec) 0))
+
+(defmethod print-object((addr network-mask) stream)
+  (print-unreadable-object (addr stream :type t :identity nil)
+    (format stream "~X" (address-bytes addr))))
+
+(eval-when(:compile-toplevel :load-toplevel :execute)
+(let ((masks (make-array 33)))
+  (dotimes(i 33)
+    (setf (svref masks i)
+          (make-instance 'network-mask :bytespec (byte i (- 32 i)))))
+  (defmethod network-mask((size integer)) (svref masks size))
+  (defmethod network-mask((class symbol))
+    (network-mask (ecase class (:a 8) (:b 16) (:c 24))))))
+
 (declaim (inline subnet))
 (defun subnet(addr mask)
-  (if mask
-      (logand mask (slot-value addr 'address-bytes))
-      (slot-value addr 'address-bytes)))
+  (with-slots(address-bytes) addr
+    (if mask
+      (mask-field (slot-value mask 'bytespec) address-bytes)
+      address-bytes)))
 
 (defmethod address=(a b &optional mask)
   (declare (ignore mask))
   (eql a b))
 
 (defmethod address=((a address) (b address) &optional mask)
-  (or (call-next-method)
+  (or (eql a b)
       (if mask
           (= (subnet a mask) (subnet b mask))
           (= (slot-value a 'address-bytes) (slot-value b 'address-bytes)))))
 
-(defun address<(a b) ;; used for sorting
+(defmethod address<((a address) (b address))
   (< (slot-value a 'address-bytes) (slot-value b 'address-bytes)))
+
+(defmethod address<((a network-mask) (b network-mask))
+  (< (byte-size (slot-value b 'bytespec))
+     (byte-size (slot-value a 'bytespec))))
 
 (defgeneric broadcast-p(address)
   (:documentation "Return true if a broadcast address")
-  (:method((address (eql :broadcast))) t))
+  (:method((address (eql :broadcast))) t)
+  (:method((address address))
+    (let ((b (address-bytes address)))
+      (= (logcount b) (integer-length b)))))
 
 (define-condition address-condition(condition)
   ())
@@ -88,9 +126,6 @@
 (defclass macaddr(hardware-address)
   ((nextmac :initform 0 :allocation :class :type mac))
   (:documentation "Standard mac address"))
-
-(defmethod broadcast-p((addr macaddr))
-  (= (slot-value addr 'address-bytes) #xFFFFFFFFFFFF))
 
 (defmethod length-bytes((addr macaddr)) 6)
 
@@ -189,36 +224,19 @@ addresses is defined.")
        (print-unreadable-object (addr stream :type t :identity t)
          (princ (ipaddr-to-dotted (slot-value addr 'address-bytes)) stream))))))
 
-(defun make-address-mask(mask-len &optional (address-length 32))
-  (when (symbolp mask-len)
-    (setf mask-len (ecase mask-len (:a 8) (:b 16) (:c 24))))
-  (unless (integerp address-length)
-    (setf address-length (* 8 (length-bytes address-length))))
-  (let ((v 0))
-    (multiple-value-bind(q r) (floor mask-len 8)
-      (unless (zerop r) (error "Mask length not a multiple of 8 bits"))
-      (dotimes(x q)
-        (setf v (dpb  #xFF (byte 8 (- address-length (* 8 (1+ x)))) v))))
-    v))
-
-(defmethod network-mask(entity)
-  (make-address-mask entity))
-
 (defun ipaddr-allocator(&optional
                         (start (ipaddr "192.168.0.0"))
-                        (mask (make-address-mask 16)))
+                        (mask (network-mask 16)))
   (let ((last start))
     #'(lambda()
         (setf last (ipaddr (1+  (address-bytes last))))
-          (assert (address= start last mask)
-                  (last)
-                  "Next allocated address ~A not in ~A/~A"
-                  last start (logcount mask))
-          last)))
+        (assert (address= start last mask)
+                (last)
+                "Next allocated address ~A not in ~A/~A"
+                last start mask)
+        last)))
 
 (defvar ipaddr-allocator (ipaddr-allocator) "Default ip address allocator")
 
 (defmethod ipaddr((ip (eql :next)))
   (funcall ipaddr-allocator))
-
-

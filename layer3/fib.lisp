@@ -1,13 +1,24 @@
-;;;; Copyright (C) 2010 John A.R. Williams <J.A.R.Williams@jarw.org.uk>
-;;;; Released under the GNU General Public License (GPL)
-;;;; See <http://www.gnu.org/copyleft/gpl.html> for license details
-;;;; $Id: packet.lisp,v 1.2 2005/11/29 09:00:39 willijar Exp $
+;; Fowarding Information Base implementation
+;; Copyright (C) 2011 Dr. John A.R. Williams
+
+;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
+;; Keywords:
+
+;; This file is part of Lisp Educational Network Simulator (LENS)
+
+;; This is free software released under the GNU General Public License (GPL)
+;; See <http://www.gnu.org/copyleft/gpl.html>
+
+;;; Commentary:
+
+;;
+
+;;; Code:
 
 (in-package :layer3)
 
 (defclass fib(routing)
-  ((fib-map :type hash-table
-            :initform (make-hash-table :size 4)
+  ((fib-map :type list
             :reader fib-map
             :documentation "fib tables per mask type")
    (address-length :initform 32 :allocation :class))
@@ -19,60 +30,47 @@ Information Base"))
 
 (defmethod reinitialise-routes((fib fib) (changed-entity null))
   (with-slots(fib-map address-length) fib
-    (setf fib-map (make-array (/ address-length 8)))
-    (dotimes(i (length fib-map))
-      (setf (aref fib-map i)
-            (cons (make-address-mask (* (- (length fib-map) i) 8)
-                                     address-length)
-                  (make-hash-table)))))
+    (setf fib-map
+          (list (cons (network-mask address-length)
+                      (make-hash-table)))))
   (call-next-method))
-
-(declaim (inline get-fib-hash))
-(defun get-fib-hash(mask fib)
-  (with-slots(fib-map) fib
-    (aref fib-map (if mask (- (length fib-map) (/ (logcount mask) 8)) 0))))
 
 (defmethod getroute((address network-address) (fib fib)
                       &key &allow-other-keys)
-    (let ((bytes (address-bytes address)))
-    (with-slots(fib-map) fib
-      (dotimes(i (length fib-map))
-        (let* ((v (aref fib-map i))
-               (mask (car v))
-               (hash (cdr v)))
-          (let ((match (gethash (logand mask bytes) hash)))
-            (when match (return-from getroute match))))))))
+  (map 'nil
+       #'(lambda(entry)
+           (let ((match (gethash (subnet address (car entry)) (cdr entry))))
+             (when match (return-from getroute match))))
+       (fib-map fib)))
 
-
-(defmethod (setf getroute)(vertex (address network-address) (fib fib) &key mask &allow-other-keys)
+(defmethod (setf getroute)(vertex (address network-address) (fib fib)
+                           &key (mask (caar (slot-value fib 'fib-map)))
+                           &allow-other-keys)
   (unless (vertex= vertex (default-route fib))
     (with-slots(fib-map) fib
-    (let ((bytes (address-bytes address)))
-      (if mask
-        (dotimes(i (length fib-map))
-          (let* ((v (aref fib-map i))
-                 (tmask (car v))
-                 (hash (cdr v))
-                 (k (logand mask bytes)))
-            (if (= mask tmask)
-                (return-from getroute
-                  (setf (gethash k hash) vertex))
-                (remhash k hash))))
-        (setf (gethash bytes (cdr (aref fib-map 0))) vertex))))))
+      (let ((entry
+             (or (find mask fib-map :key #'car)
+                 (let ((new-entry (cons mask (make-hash-table))))
+                   (setf fib-map (sort (cons new-entry fib-map) #'address<))
+                   new-entry))))
+        (setf (gethash (subnet address mask) (cdr entry)) vertex)))))
 
 (defmethod remroute((dest network-address) (fib fib)
-                     &key mask &allow-other-keys)
-  (remhash (logand mask (address-bytes dest)) (get-fib-hash mask fib)))
+                    &key (mask (caar (slot-value fib 'fib-map)))
+                     &allow-other-keys)
+  (let ((entry  (find mask (fib-map fib) :key #'car)))
+    (when entry (remhash (subnet dest mask) (cdr entry)))))
 
 (defmethod reinitialise-routes((fib fib) (interface interface))
   (unless (up-p interface)
-    (loop
-       :for h :across (fib-map fib)
-       :do
-       (maphash #'(lambda(k v)
-                    (when (eql (vertex-start v) interface)
-                      (remhash k h)))
-                h))))
+    (map 'nil
+         #'(lambda(entry)
+             (let ((h (cdr entry)))
+               (maphash #'(lambda(k v)
+                            (when (eql (vertex-start v) interface)
+                              (remhash k h)))
+                        h)))
+         (fib-map fib))))
 
 (defmethod reinitialise-routes((fib fib) (changed-entity node))
   (unless (up-p changed-entity) (reinitialise-routes fib nil)))

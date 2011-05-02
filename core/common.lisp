@@ -69,18 +69,6 @@ Returns:
       ,@(loop :for item :in items
               :collect
               `(defconstant ,(first item) ,@(rest item)))
-      ,(if (listp typename)
-          `(deftype ,(first typename)() ',@(rest typename))
-          `(deftype ,typename () '(member ,@(mapcar #'second items)))))))
-
-(defmacro defenumeration (typename (&rest items))
-  (let ((items (loop :for item :in items
-                     :for count :from 0
-                     :collect (if (consp item) item (list item count)))))
-    `(eval-when (:compile-toplevel :load-toplevel :execute)
-      ,@(loop :for item :in items
-              :collect
-              `(defconstant ,(first item) ,@(rest item)))
       ,@(if (listp typename)
             `((deftype ,(first typename)() ',@(rest typename))
               (defvar ,(first typename) ',(mapcar #'first items)))

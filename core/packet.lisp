@@ -62,13 +62,13 @@ mask specifying which slots to write."
 (defgeneric pdu-trace(pdu detail stream &key packet text)
   (:documentation "All PDUs should define this method to trace their
 output according to detail onto stream")
-  (:method((pdu (eql :drop)) detail stream &key packet text)
+  (:method((pdu (eql :drop)) detail (stream stream) &key packet text)
     "Trace a packet drop"
     (declare (ignore detail))
     (format stream " D-~A ~D~%" text (uid packet)))
-  (:method((pdu null) detail stream &key packet text)
+  (:method((pdu null) detail (stream stream) &key packet text)
     (format stream " ~A ~D" text (if packet (uid packet) 0)))
-  (:method((pdu pdu) detail stream &key packet text)
+  (:method((pdu pdu) detail (stream stream) &key packet text)
     (format stream " ~@[~A~]L~D~:[~*~;-~A~]"
             text (layer pdu)  (member 'type detail) (name pdu))
     (write-pdu-slots pdu detail stream)

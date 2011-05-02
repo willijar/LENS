@@ -43,11 +43,10 @@ using source routing in packet")
 
 (defgeneric (setf getroute)(vertex network-address routing
                                    &key &allow-other-keys)
-  (:documentation "Add a routing entry to dest ip address using subnet mask and
-interface and next hop IP address"))
+  (:documentation "Add a routing entry to a destination network address"))
 
 (defgeneric remroute(network-address routing &key &allow-other-keys)
-  (:documentation "Remove a route to dest using subnet"))
+  (:documentation "Remove a routing entry to a network address"))
 
 (defgeneric reinitialise-routes(routing changed-entity)
   (:documentation "Reinitialise routing table due to topology change -

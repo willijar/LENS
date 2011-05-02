@@ -86,10 +86,10 @@
   (:import-from :split-sequence #:split-sequence)
   (:import-from :protocol #:protocol-number)
   (:export  #:hardware-address #:network-address #:network-mask
-            #:address= #:subnet #:address-bytes #:make-address-mask
+            #:address= #:address< #:subnet #:address-bytes
             #:broadcast-p #:macaddr #:ipaddr #:ipport
             #:*print-ip-format* #:print-ip-format
-            #:src-address #:dst-address #:address-mask
+            #:src-address #:dst-address
             #:ipaddr-allocator))
 
 (defpackage :node
