@@ -68,14 +68,13 @@
   (print-unreadable-object (addr stream :type t :identity nil)
     (format stream "~X" (address-bytes addr))))
 
-(eval-when(:compile-toplevel :load-toplevel :execute)
 (let ((masks (make-array 33)))
   (dotimes(i 33)
     (setf (svref masks i)
           (make-instance 'network-mask :bytespec (byte i (- 32 i)))))
   (defmethod network-mask((size integer)) (svref masks size))
   (defmethod network-mask((class symbol))
-    (network-mask (ecase class (:a 8) (:b 16) (:c 24))))))
+    (network-mask (ecase class (:a 8) (:b 16) (:c 24)))))
 
 (declaim (inline subnet))
 (defun subnet(addr mask)
