@@ -24,15 +24,6 @@
   ((node :initarg :node :reader node))
   (:documentation "Base class for all protocol entities"))
 
-(defmethod copy((protocol protocol))
-  (copy-with-slots protocol '(name) (call-next-method)))
-
-;; base class for protocol conditions
-(define-condition protocol-condition(simulation-condition)
-  ((protocol :type protocol :initarg :protocol :reader protocol))
-  (:report (lambda(c s)
-               (format s "~A: ~A" (class-name (class-of c)) (protocol c)))))
-
 (defgeneric protocol-number(entity)
   (:documentation "Return the IANA protocol number.
 See http://www.iana.org/assignments/protocol-numbers")
@@ -40,8 +31,10 @@ See http://www.iana.org/assignments/protocol-numbers")
     (get (type-of protocol) 'protocol-number))
   (:method((protocol symbol)) (get protocol 'protocol-number)))
 
-(defmethod layer((protocol protocol)) (get (type-of protocol) 'layer))
-(defmethod layer((protocol symbol)) (get protocol 'layer))
+(defgeneric layer(protocol)
+  (:documentation "Return the protocol layer for an entity")
+  (:method((protocol protocol)) (get (type-of protocol) 'layer))
+  (:method((protocol symbol)) (get protocol 'layer)))
 
 (defun write-trace(protocol pdu &key (node (node protocol)) packet text
                    (stream trace:*lens-trace-output*))
@@ -85,7 +78,8 @@ See http://www.iana.org/assignments/protocol-numbers")
     (declare (ignore entity packet))))
 
 (defgeneric control-message(receiver message sender &key &allow-other-keys)
-  (:documentation "Called by sender protocol entity to signal a control message to the receiver protocol entity")
+  (:documentation "Called by sender protocol entity to signal a
+  control message to the receiver protocol entity")
   (:method (receiver message sender &rest args &key &allow-other-keys)
     (format lens-user:*user-output* "~A received ~A signal from ~A ~@[~A~]"
             receiver message sender args)))
@@ -197,12 +191,6 @@ See http://www.iana.org/assignments/protocol-numbers")
    (tos :accessor tos :initarg :tos :initform 0
         :documentation "Layer 3 type of service"))
   (:documentation "Base class for IP layer 4 protocol implementations"))
-
-(defmethod copy((protocol protocol))
-  (copy-with-slots protocol
-                   '(layer5:application local-address local-port
-                     peer-address peer-port fid ttl tos)
-                   (call-next-method)))
 
 ;; as per layer 3 standard layer 4 protocols may be registered so they
 ;; can be instantiated on nodes on demand.
@@ -409,7 +397,7 @@ this occurs when the acknowledgement is received from the peer.")
     (declare (ignore application protocol))
     t))
 
-(declaim (inline seq+ seq-))
+(declaim (inline seq+ seq- seq<))
 
 (defun seq+(seq length-bytes)
   "32 bit modulus addition of a sequence number and a byte length"
@@ -423,6 +411,11 @@ this occurs when the acknowledgement is received from the peer.")
     (if (>= seq-end seq-start)
         (- seq-end seq-start)
         (+ seq-end (- #x100000000 seq-end)))))
+
+(defun seq<(a b)
+  (declare ((unsigned-byte 32) a b))
+  (and (< a b)
+       (< (- b a)  #x10000000)))
 
 (defun seq-in-segment(sequence-number segment-start segment-no-bytes)
   "Return true if the sequence number corresponds to a byte in segment
@@ -474,6 +467,8 @@ given segment-start and no-bytes"
 (defmethod length-bytes((pdu vector))
   (check-type pdu (vector (unsigned-byte 8) *))
   (fill-pointer pdu))
+
+(defmethod length-bytes((pdu null)) 0)
 
 (defmethod send((layer4 layer4:protocol) (length-bytes integer) application &rest args)
   (apply #'send layer4

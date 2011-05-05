@@ -63,10 +63,6 @@
 
 (defmethod priority((pdu arp-header)) 2)
 
-(defmethod copy((h arp-header))
-  (copy-with-slots h '(srchwaddr srcprotoaddr dsthwaddr dstprotoaddr)
-                   (call-next-method)))
-
 (defclass arp(protocol)
   ((protocol-number :type (unsigned-byte 16)
                     :initform #x803 :allocation :class

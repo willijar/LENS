@@ -56,7 +56,7 @@
   (:documentation "Return the default peer (gateway) on a link"))
 
 (defgeneric receive-own-broadcast-p(link)
-  (:documentation "If true interfaces receive their own braodcast")
+  (:documentation "If true interfaces receive their own broadcast")
   (:method(link) (declare (ignore link)) nil))
 
 ;; this is equivalent to link-real in GTNetS

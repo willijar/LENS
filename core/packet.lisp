@@ -22,9 +22,6 @@
   ()
   (:documentation "base class for all PDU entities"))
 
-(defgeneric layer(pdu)
-  (:documentation "Return the layer associated with a PDU"))
-
 (defgeneric priority(pdu)
   (:documentation "Priority of a pdu for priority queueing")
   (:method(pdu) 0))

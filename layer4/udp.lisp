@@ -69,8 +69,9 @@
                  :documentation "Queue of pending data"))
   (:documentation "A model of the User Datagram Protocol."))
 
-(defmethod copy((udp udp))
-  (copy-with-slots udp '(mut sequence-number) (call-next-method)))
+(defmethod copy((udp udp) &optional (copy (allocate-instance (class-of udp))))
+  (setf (pending-data copy) nil)
+  (call-next-method udp copy))
 
 (defmethod default-trace-detail((protocol udp))
   `(type src-port dst-port msg-size))

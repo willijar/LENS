@@ -27,7 +27,7 @@
            #:when-bind #:when-bind* #:simulation-condition
            #:uid #:name #:length-bytes
            #:interface #:link #:node #:application
-           #:copy #:copy-with-slots #:immutable
+           #:copy #:copy-slots #:immutable
            #:trace-accessor #:untrace-accessor
            #:notifier #:add-notification #:delete-notifications
            #:do-notifications
@@ -59,7 +59,7 @@
   (:documentation "Packet implementation")
   (:use :cl :common)
   (:import-from :scheduler #:simulation-time #:time-type)
-  (:export #:pdu #:pdus #:layer #:packet #:created
+  (:export #:pdu #:pdus #:packet #:created
            #:push-pdu #:skip-pdu #:peek-pdu #:pop-pdu #:priority
            #:trace-format #:pdu-trace  #:fid))
 
@@ -76,7 +76,7 @@
 (defpackage :protocol
   (:documentation "Protocol stack layer implementations")
   (:use :cl #:common #:trace)
-  (:import-from :packet #:pdu #:layer #:peek-pdu #:pdu-trace)
+  (:import-from :packet #:pdu #:peek-pdu #:pdu-trace)
   (:export #:protocol-number #:protocol #:protocol-condition #:layer #:pdu
            #:send #:receive #:drop #:control-message #:default-trace-detail))
 
@@ -182,7 +182,7 @@
            #:close-connection #:connection-closed #:close-request
            #:connection-from-peer #:connected-p
            #:send #:receive #:sent
-           #:seq+ #:seq- #:seq-in-segment #:ack-after-segment
+           #:seq+ #:seq- #:seq< #:seq-in-segment #:ack-after-segment
            ;; conditions
            ;; specific default layer 4 protocols
            #:udp-dmux #:tcp-dmux #:udp-header #:tcp-header
