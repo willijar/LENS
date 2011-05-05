@@ -198,6 +198,9 @@ See http://www.iana.org/assignments/protocol-numbers")
 (defvar *standard-protocols* nil
   "List of standard registered layer 4 protocols")
 
+(defmethod reset :before ((protocol protocol))
+  (delete-notifications protocol (node protocol)))
+
 (defgeneric find-protocol(protocol entity)
   (:documentation "Find a layer 4 protocol on entity")
   (:method((protocol-number integer) (seq sequence))
@@ -365,14 +368,13 @@ connection attempt")
     (slot-makunbound protocol 'peer-address)))
 
 (defgeneric connection-closed(application protocol)
-  (:documentation "Called by an associated layer 4 protocol when a connection
-has completely closed")
+  (:documentation "Called by an associated layer 4 protocol when a
+connection has completely closed")
   (:method(app protocol) (declare (ignore app protocol)))
   (:method :after (app (protocol protocol))
       (declare (ignore app))
       (unbind protocol)
-      (map 'nil #'(lambda(interface) (delete-notifications protocol interface))
-           (interfaces (node protocol)))))
+      (delete-notifications protocol (node protocol))))
 
 (defgeneric close-request(application protocol)
   (:documentation "Called by an associated layer 4 protocol when a connection

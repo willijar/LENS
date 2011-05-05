@@ -112,9 +112,7 @@
   (udp-send-pending udp))
 
 (defmethod reset((udp udp))
-  (map 'nil #'(lambda(interface) (delete-notifications udp interface))
-       (interfaces (node udp)))
-  (setf  (pending-data udp) nil))
+  (setf (pending-data udp) nil))
 
 (defun udp-send-pending(udp)
   (dolist(pd (pending-data udp))

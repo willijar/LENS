@@ -226,6 +226,9 @@ are dispatched in current thread"
   (dolist(timer (timers object))
     (cancel timer object)))
 
+(defmethod reset((obj with-timers))
+  (cancell :all obj))
+
 (defmethod initialize-instance :after ((obj with-timers) &key &allow-other-keys)
   (dolist(timer-name (timers obj))
     (if (slot-boundp obj timer-name)

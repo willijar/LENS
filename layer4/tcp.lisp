@@ -1,4 +1,4 @@
-;; TCP base implementation
+;; TCP implementation
 ;; Copyright (C) 2011 Dr. John A.R. Williams
 
 ;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
@@ -35,10 +35,11 @@
   (:import-from :scheduler
                 #:time-type #:cancel #:timer #:schedule #:timers
                 #:simulation-time #:timeout #:with-timers)
-   (:import-from :protocol.layer3 #:ttl #:tos)
+  (:import-from :protocol.layer3 #:ttl #:tos)
+  (:import-from :trace #:default-trace-detail)
   (:import-from :protocol.layer5
                 #:data #:data-concatenate #:data-subseq)
-  (:export #:tcp-header #:tcp-dmux #:tcp #:tcp-tahoe #:tcp-reno #:tcp-newreno))
+  (:export #:tcp-header #:tcp-dmux #:tcp-tahoe #:tcp-reno #:tcp-newreno))
 
 (in-package :protocol.layer4.tcp)
 
@@ -86,7 +87,7 @@
     :type (unsigned-byte 32) :initarg :ack-number :initform 0
     :reader ack-number)
    (header-length
-    :type (unsigned-byte 8) :initarg :header-length :initform 0
+    :type (unsigned-byte 8) :initarg :header-length :initform 20
     :reader header-length)
    (flags
     :type (unsigned-byte 8) :initarg :flags :initform 0 :reader flags)
@@ -97,11 +98,8 @@
    (urgent-pointer
     :type (unsigned-byte 16) :initarg :urgent-pointer :initform 0
     :reader urgent-pointer)
-   (data-length
-    :initarg :data-length :initform 0 :type integer :reader data-length
-    :documentation "not part of TCP but used for tracing")
-   (cwnd
-    :initarg :cwnd :initform 0 :type integer :reader cwnd
+   (congestion-window
+    :initarg :cwnd :type integer :reader congestion-window
     :documentation "Not part of TCP header but used for simulation analysis"))
   (:documentation "TCP PDU class"))
 
@@ -112,12 +110,7 @@
 (defmethod trace-format((h tcp-header))
   '(src-port dst-port sequence-number ack-number header-length
     (flags "~/tcp-flags/") window (checksum "~4,'0X")
-    urgent-pointer))
-
-(defmethod header-fields((h tcp-header))
-  '(src-port dst-port sequence-number ack-number header-length
-    flags window checksum urgent fid data-length cwnd))
-
+    urgent-pointer congestion-window))
 
 ;; define TCP state machine
 
@@ -339,9 +332,6 @@
     (rst-rx timed-wait no-act)
     (bad-flags timed-wait no-act)))))
 
-(defgeneric process-action(action protocol &optional packet header dst-address)
-  (:documentation "Process action in response to events"))
-
 ;; fill in flag events table
 (eval-when(:compile-toplevel :load-toplevel :execute)
   (defparameter *flag-events*
@@ -392,28 +382,31 @@
 (defun flags-event(flags) (aref *flag-events* flags))
 
 (defun process-event(event tcp)
-  (let ((old-state (state tcp)))
-    (multiple-value-bind(new-state action) (lookup-state old-state event)
-      (setf (state tcp) new-state)
+  (let ((saved-state (state tcp)))
+    (multiple-value-bind(state action) (lookup-state saved-state event)
+      (setf (state tcp) state)
       (cond
-        ((and (= new-state timed-wait) (/= old-state timed-wait))
+        ((and (= state timed-wait) (/= saved-state timed-wait))
          (schedule 'timed-wait-timer tcp))
-        ((and (= new-state closed)
-              (/= old-state closed)
+        ((and (= state closed)
+              (/= saved-state closed)
               (/= event timeout)
               (bound-p tcp))
          ;; finally closed so notify application
          (connection-closed (application tcp) tcp)))
       action)))
 
+(defun make-packet-sequence-queue()
+  (make-binary-heap
+   :key-fn  #'(lambda(packet) (sequence-number (peek-pdu packet)))
+   :comp-fn #'seq<
+   :element-type 'packet))
+
 (defclass tcp(protocol timers-manager copyable-object)
   ((pending-data :initform nil :accessor pending-data
                  :documentation "Data sent by application but not acknowledged")
    (buffered-data
-    :initform (make-binary-heap
-               :key-fn  #'(lambda(packet) (sequence-number (peek-pdu packet)))
-               :comp-fn #'seq<
-               :element-type 'packet)
+    :initform (make-packet-sequence-queue)
     :type binary-heap  :accessor buffered-data
     :documentation "data received but out of sequence")
    (rtt :initform (make-instance 'rtt-mdev) :initarg :rtt :reader rtt
@@ -441,7 +434,7 @@
                    :accessor highest-rx-ack
                    :documentation "largest ack received")
    (last-rx-ack :initform 0 :type (unsigned-byte 32) :accessor last-rx-ack
-                :documentation "For dupack testing")
+                :documentation "For duplicate ack testing")
    (fast-recovery-mark :initform 0 :type (unsigned-byte 32)
                        :accessor fast-recovery-mark
                        :documentation "Mark for fast recovery")
@@ -487,15 +480,20 @@
     :initform 536 ;; this is usual size for IP networks (576-40)
     :initarg :mss :initarg :maximum-segment-size
     :reader maximum-segment-size
-    :documentation "Maximum Segment Size to use")
+    :documentation "Maximum Segment size to use")
    (rx-window :initform #xFFFF :type (unsigned-byte 16) :accessor rx-window
             :documentation "Window as received from peer")
    (advertised-window
     :initform #xFFFF :type (unsigned-byte 16) :accessor advertised-window
     :documentation "Window to advertise to peer")
-   (congestion-window :initform 536
-                      :type (unsigned-byte 16) :accessor congestion-window
-                      :documentation "Congestion window")
+   (congestion-window
+    :type (unsigned-byte 16) :accessor congestion-window
+    :documentation "Congestion window")
+   (initial-congestion-window
+    :initform 1 :initarg :initial-congestion-window
+    :type (unsigned-byte 16)
+    :reader initial-congestion-window
+    :documentation "Initial congestion window in segments")
    (slow-start-threshold :initform #xFFFF :type integer
                          :accessor slow-start-threshold)
 
@@ -518,26 +516,39 @@
    ;;            :documentation "Size of rx buffer")
    ;; Statistics
 
-
    (total-ack :initform 0 :accessor total-ack :type integer
               :documentation "Total bytes acked")
 
    (initargs :type list
-             :documentation "Arguments passed during initialisation - used during reset")
-)
-  (:documentation "A model of the Transmission Control Protocol."))
+             :documentation "Arguments passed during initialisation - used during reset"))
+  (:documentation "Base class for Transmission Control Protocol variants"))
+
+;; generic functions to be implemented by the variants
+(defgeneric retransmit-packet-timeout(tcp))
+(defgeneric new-ack(tcp &key packet header &allow-other-keys))
+(defgeneric dup-ack(tcp header count)
+  (:documentation "Implement for duplicate acks"))
+
+(defmethod copy((original tcp) &optional (copy (allocate-instance (class-of original))))
+  (setf (pending-data copy) nil
+        (buffered-data copy) (make-packet-sequence-queue))
+  (call-next-method original copy))
 
 (defmethod initialize-instance :after ((tcp tcp) &rest initargs
                                        &key &allow-other-keys)
-  (setf (slot-value tcp 'initargs) initargs))
+  (setf (slot-value tcp 'initargs) initargs
+        (congestion-window tcp)  (* (initial-congestion-window tcp)
+                                    (maximum-segment-size tcp))))
 
 (defmethod reset((tcp tcp))
   (call-next-method)
   (let ((initargs (slot-value tcp 'initargs)))
     (dolist(slot (closer-mop:class-slots tcp))
-      (when (eql :instance (closer-mop:slot-definition-allocation slot))
+      (when (eql (closer-mop:slot-definition-allocation slot) :instance )
         (slot-makunbound tcp (closer-mop:slot-definition-name slot))))
     (apply #'shared-initialize tcp t initargs)
+    (setf (congestion-window tcp)  (* (initial-congestion-window tcp)
+                                      (maximum-segment-size tcp)))
     (setf (slot-value tcp 'initargs) initargs)))
 
 (defmethod protocol-number((tcp tcp)) 6)
@@ -549,7 +560,7 @@
   (schedule (retransmit-timeout (rtt tcp))
             (timer 'last-ack-timer tcp)))
 
-(defmethod schedule((timer (eql 'retransmit-packet-timeout)) (tcp tcp))
+(defmethod schedule((timer (eql 'retransmit-packet-timer)) (tcp tcp))
   (schedule (retransmit-timeout (rtt tcp))
             (timer 'retransmit-packet-timer tcp)))
 
@@ -557,46 +568,49 @@
                    &key dst-address &allow-other-keys)
   (setf (last-rx-time tcp) (simulation-time))
   (incf (pkt-received-count tcp))
-  (let ((header (peek-pdu packet))
-        (old-state (state tcp)))
+  (let ((header (peek-pdu packet)))
     ;; Check if ACK bit set, and if so notify rtt estimator
-    (when (logtest  ack (flags header))
+    (when (logtest ack (flags header))
       (ack-seq (ack-number header) (rtt tcp))
       ;; Also insure that connection timer is canceled,
       ;; as this may be the final part of 3-way handshake
       (cancel 'connection-timer tcp))
 
     ;; Check syn/ack and update rtt if so
-    (when (and (= old-state syn-sent) (= (flags header) (logior syn ack)))
-      (math:record (- (simulation-time) (syn-time tcp)) (rtt tcp)))
+    (when (and (= (state tcp) syn-sent)
+               (let ((synack (logior syn ack)))
+                 (= (logand (flags header) synack) synack)))
+      (record (- (simulation-time) (syn-time tcp)) (rtt tcp)))
 
     ;; determine event type and process
     (let* ((event (flags-event (flags header)))
+           (saved-state (state tcp))
            (action (process-event event tcp))
            (state (state tcp)))
       ;; sanity checks
       (assert (not (and (= state close-wait) (= event seq-recv)))
               ()
-              "TCP ~A New seq in close-wait" tcp)
+              "TCP ~A new seq in close-wait" tcp)
       (assert (not (and (= state closed) (= event syn-rx)))
               ()
               "TCP ~A syn in closed l=~A:~A r=~A:~A"
                 tcp (ipaddr (node tcp)) (local-port tcp)
                 dst-address (src-port header))
-      (assert (not (and (= old-state listen) (/= state listen)))
+      (assert (not (and (= saved-state listen) (/= state listen)))
               ()
-               "TCP transition from ~A to ~A" old-state state)
-
-      (cond
-        ((and (/= state old-state) (= state timed-wait))
-         (connection-closed (application tcp) tcp))
-        ((and (= state closed) (/= old-state closed))
-         (cancel :all tcp))
-        ((= state timed-wait)
+               "TCP transition from ~A to ~A" saved-state state)
+      ;; some state checks
+      (when (and (/= state saved-state) (= state timed-wait))
+        (connection-closed (application tcp) tcp))
+      (when  (and (= state closed) (/= saved-state closed))
+        (cancel :all tcp))
+      (when (= state timed-wait)
          (cancel :all tcp)
-         (schedule 'timed-wait-timer tcp)))
+         (schedule 'timed-wait-timer tcp))
+      ;; carry out action
       (funcall action tcp
                :packet packet :header header :dst-address dst-address)
+      ;; more state checks
       (when (and (= state last-ack)
                  (not (busy-p  (timer 'last-ack-timer tcp))))
         (schedule 'last-ack-timer tcp)))))
@@ -618,27 +632,26 @@
   (setf (connection-retry-count tcp) 0)
   (let ((state (state tcp))
         (action (process-event app-connect tcp)))
-    (assert (= action syn-tx)
+    (assert (eql action 'syn-tx)
             (action)
             "Bad connect action ~A from ~A state" action state)
-    (syn-tx tcp)))
+    (funcall action tcp)))
 
 (defmethod close-connection((tcp tcp))
   (with-accessors((state state)) tcp
     (unless (= state closed)
-      (let ((action (process-event app-close tcp))
-            (pending-data (pending-data tcp)))
-        (when (and pending-data (/= 0 (length-bytes pending-data)))
-           (when (= action fin-tx)
-             (setf (close-on-empty tcp) t)
-             (return-from close-connection t)))
-        (funcall action tcp)
-        (when (and (= state last-ack)
-                   (not (busy-p (timer 'last-ack-timer tcp))))
-          (schedule 'last-ack-timer tcp))))))
+      (let ((action (process-event app-close tcp)))
+        (when (and (eql action 'fin-tx)
+                   (not (zerop  (length-bytes (pending-data tcp)))))
+          (setf (close-on-empty tcp) t)
+          (return-from close-connection t))
+        (prog1
+            (funcall action tcp)
+          (when (and (= state last-ack)
+                     (not (busy-p (timer 'last-ack-timer tcp))))
+            (schedule 'last-ack-timer tcp)))))))
 
-(defmethod connection-complete :around (application (tcp tcp) &key failure)
-  (declare (ignore failure))
+(defmethod connection-complete :before (application (tcp tcp))
   (setf (close-notified tcp) nil)
   (call-next-method))
 
@@ -648,7 +661,12 @@
     (setf (close-notified tcp) t)))
 
 (defmethod connection-closed :after (application (protocol with-timers))
+  (declare (ignore application))
   (cancel :all protocol))
+
+(defmethod connection-closed :after (application (tcp tcp))
+  (declare (ignore application))
+  (delete-notifications tcp (node tcp)))
 
 (defmethod timeout((timer (eql 'connection-timer)) (tcp tcp))
   (with-accessors((connection-retry-count connection-retry-count)
@@ -669,7 +687,8 @@
         (control-message application :timeout tcp))))
 
 ;; main method must be implemented in concrete classes
-(defmethod timeout :before ((timer (eql 'retransmit-packet-timer)) (tcp tcp))
+(defmethod timeout ((timer (eql 'retransmit-packet-timer)) (tcp tcp))
+  (retransmit-packet-timeout tcp)
   (incf (timeout-count tcp)))
 
 (defmethod timeout((timer (eql 'delayed-ack-timer)) (tcp tcp))
@@ -679,7 +698,8 @@
 (defmethod timeout((timer (eql 'timed-wait-timer)) (tcp tcp))
   ;; finished so close down tcp endpoint
   (cancel :all tcp)
-  (connection-closed (application tcp) tcp))
+  (connection-closed (application tcp) tcp)
+  (unbind tcp))
 
 (defmethod timeout((timer (eql 'last-ack-timer)) (tcp tcp))
   ;; close connection assuming peer has gone
@@ -703,35 +723,19 @@
 
 (defun bytes-in-flight(tcp) (- (high-tx-mark tcp) (highest-rx-ack tcp)))
 
-(defun window(tcp) (min (rx-window tcp) (congestion-window tcp)))
+(defmethod window((tcp tcp)) (min (rx-window tcp) (congestion-window tcp)))
 
 (defun available-window(tcp)
-  (let ((unack (un-ack-data-count tcp))
+  (let ((unack (unack-data-count tcp))
         (win (window tcp)))
     (if (< win unack) 0 (- win unack))))
-
-(defun new-congestion-window(tcp ackBytes)
-  (declare (ignore ackBytes))
-  ;; Adjust congestion window in response to new ack's received
-  (with-accessors((congestion-window congestion-window)
-                  (slow-start-threshold slow-start-threshold)
-                  (maximum-segment-size maximum-segment-size)) tcp
-      (incf congestion-window
-            (if (< congestion-window  slow-start-threshold)
-                ;; Slow start mode, add one segSize to cWnd
-                maximum-segment-size
-                ;; Congestion avoidance mode,
-                ;; adjust by (ackBytes*segSize) / cWnd as per  RFC2581
-                ;; changed to match RFC2581
-                (max 1 (/ (* maximum-segment-size maximum-segment-size)
-                          congestion-window))))))
 
 ;; TCP actions
 (defun no-act(tcp &key &allow-other-keys)
   (declare (ignore tcp)))
 
 (defun ack-tx(tcp &key header &allow-other-keys)
-  (send-packet tcp ack (next-tx-seq tcp) (next-rx-seq tcp))
+  (send-packet tcp ack)
   ;; save receiver advertised window
   (when header (setf (rx-window tcp) (window header))))
 
@@ -743,17 +747,17 @@
   (connection-complete (application tcp) tcp)
   ;; if no data need to send ack
   (unless (pending-data tcp)
-    (send-packet tcp ack (next-tx-seq tcp) (next-rx-seq tcp))))
+    (send-packet tcp ack)))
 
 (defun rst-tx(tcp &key header dst-address &allow-other-keys)
-  (send-packet tcp rst 0 0
+  (send-packet tcp rst :sequence-number 0 :ack-number 0
                :dst-address dst-address
                :dst-port  (if header (src-port header) (peer-port tcp))))
 
 (defun syn-tx(tcp &key &allow-other-keys)
   (schedule 'connection-timer tcp)
   (setf (syn-time tcp) (simulation-time)) ;; for initial RTT estimate
-  (send-packet tcp SYN 0 0))
+  (send-packet tcp syn :sequence-number 0 :ack-number 0))
 
 (defun respond(tcp peer-address peer-port)
   "This tcp is a copy of a listening tcp. The SYN packet was received
@@ -766,7 +770,8 @@
 
 (defun reject(tcp peer-address peer-port)
   "Application not accepting more connections"
-  (send-packet tcp RST 0 0 :dst-address peer-address :dst-port peer-port))
+  (send-packet tcp rst :sequence-number 0 :ack-number 0
+               :dst-address peer-address :dst-port peer-port))
 
 (defun syn-ack-tx(tcp &key header dst-address &allow-other-keys)
   (cond
@@ -778,16 +783,15 @@
            (reject  copy dst-address (src-port header)))))
     (t
      ;; this is copy - just respond - but timeout in case of syn-flood attacker
-     (send-packet tcp (logior syn ack) 0 0)
+     (send-packet tcp (logior syn ack) :sequence-number 0 :ack-number 0)
      (schedule 'connection-timeout tcp))))
 
 (defun fin-tx(tcp &key &allow-other-keys)
-  (send-packet tcp fin (next-tx-seq tcp) (next-rx-seq tcp)))
+  (send-packet tcp fin))
 
 (defun fin-ack-tx(tcp &key &allow-other-keys)
-  (send-packet tcp (logior fin ack) (next-tx-seq tcp) (next-rx-seq tcp))
-  (when (= (state tcp) last-ack)
-    (schedule 'last-ack-timer tcp)))
+  (send-packet tcp (logior fin ack))
+  (when (= (state tcp) last-ack)  (schedule 'last-ack-timer tcp)))
 
 (defun new-seq-rx(tcp &key packet &allow-other-keys)
   ;; data received
@@ -803,21 +807,18 @@
   ;; make sure FIN packet not out of sequence.
   (when (and header (/= (sequence-number header) (next-rx-seq tcp)))
     ;; process close later
-     (setf (pending-close tcp) t)
-     (new-rx tcp  packet)
-     (return-from peer-close t))
-   (when (let ((d (peek-pdu packet 1)))
-           (and d (> (length-bytes d) 0)))
-     ;; data came wqith fin so new rx
-     (new-rx tcp packet))
-   (with-accessors((state state)) tcp
-     (let ((saved-state state))
-       (close-request (application tcp) tcp)
-       (when (= state saved-state)
-       ;; need to ack - application will close later
-         (send-packet tcp ack (next-tx-seq tcp) (next-rx-seq tcp))))
-     (when (= state last-ack)
-       (schedule 'last-ack-timer tcp))))
+    (setf (pending-close tcp) t)
+    (new-rx tcp  packet)
+    (return-from peer-close t))
+  (new-rx tcp packet) ;; in case data came with fin
+  (with-accessors((state state)) tcp
+    (let ((saved-state state))
+      (close-request (application tcp) tcp)
+      (when (= state saved-state)
+        ;; need to ack - application will close later
+        (send-packet tcp ack)))
+    (when (= state last-ack)
+      (schedule 'last-ack-timer tcp))))
 
 (defun app-closed(tcp &key &allow-other-keys)
   (when (and (= (state tcp) syn-sent) (not (close-notified tcp)))
@@ -844,17 +845,20 @@
             (setf send-it nil))))
     (or
      (send-pending-data tcp t)
-     (if send-it (send-packet tcp ack (next-tx-seq tcp) ack-number)))))
+     (if send-it (send-packet tcp ack :ack-number ack-number)))))
 
-(defun send-packet(tcp flags sequence-number ack-number &key
+(defun send-packet(tcp flags
+                   &key
+                   (sequence-number (next-tx-seq tcp))
+                   (ack-number (next-rx-seq tcp))
                    data
                    (dst-address (peer-address tcp))
                    (dst-port (peer-port tcp))
                    (ipv4 (layer3:find-protocol 'layer3:ipv4 (node tcp))))
   "Send a TCP packet"
   (let ((packet (make-instance 'packet :data data :fid (fid tcp))))
-    (assert (<= (length-bytes data) (maximum-segment-size tcp)))
     (when data ;; if data
+      (assert (<= (length-bytes data) (maximum-segment-size tcp)))
       (unless (busy-p (timer 'retransmit-packet-timer tcp))
         (schedule 'retransmit-packet-timer tcp)
         (sent-seq sequence-number (length-bytes packet) (rtt tcp))
@@ -875,7 +879,6 @@
                          fin
                          0))
       :window (advertised-window tcp)
-      :data-length (length-bytes packet)
       :cwnd (congestion-window tcp))
      packet)
     (setf (need-ack tcp) nil)
@@ -887,25 +890,23 @@
     (incf (pkt-sent-count tcp))))
 
 (defun send-pending-data(tcp &optional with-ack)
-  "Send as much pending data as necessary/possible"
+  "Send as much pending data as necessary/possible. Return true if data sent"
   (let ((n-sent 0)
         (pending-data (pending-data tcp))
         (ipv4 (layer3:find-protocol 'layer3:ipv4 (node tcp)))
         (interface (find-interface (peer-address tcp) (node tcp))))
     (loop
        ;; if no data finished
-       (when (zerop (length-bytes pending-data))
-         (setf (pending-data tcp) nil)
-         (return))
-       (let* ((w (available-window tcp))
-              (mss (maximum-segment-size tcp))
-              (data
+       (when (zerop (length-bytes pending-data)) (return))
+       (let ((w (available-window tcp))
+             (mss (maximum-segment-size tcp)))
+         (when (and (< w mss) (> (length-bytes pending-data) w))
+            ;; don't send small segment unnecessarily
+           (return))
+         (let ((data
                  (data-subseq pending-data
                               (seq- (next-tx-seq tcp) (highest-rx-ack tcp))
                               (min w mss))))
-         ;; don't send small segment unnecessarily
-         (when (and  (< w mss) (> (length-bytes data) w))
-           (return))
          ;; if no buffer available stop and request
          ;;(100 extra bytes is to allow for headers)
          (unless (layer1:buffer-available-p
@@ -915,15 +916,14 @@
          (let ((flags (if with-ack ack 0)))
            ;; see if we need fin flag
            (when (and (close-on-empty tcp)
-                      (zerop (length-bytes pending-data)))
+                      (= (length-bytes data) (length-bytes pending-data)))
              (setf flags (logior flags fin))
              (setf (state tcp) fin-wait-1))
-           (send-packet tcp flags (next-tx-seq tcp) (next-rx-seq tcp)
-                        :data data :ipv4 ipv4)
+           (send-packet tcp flags :data data :ipv4 ipv4)
            (incf n-sent)
            (setf (next-tx-seq tcp) (seq+ (next-tx-seq tcp) (length-bytes data)))
            (setf (high-tx-mark tcp) (max (next-tx-seq tcp) (high-tx-mark tcp)))
-           (incf (bytes-sent tcp) (length-bytes data)))))
+           (incf (bytes-sent tcp) (length-bytes data))))))
     (when (> n-sent 0)
       (schedule 'retransmit-packet tcp)
       t)))
@@ -933,61 +933,52 @@
                             &key packet &allow-other-keys)
   "Called by ICMP when unreachable response is received"
   (when (= (state tcp) syn-sent)
-    (funcall (process-event timeout tcp) tcp :packet packet))
-  (control-message (application tcp) msg tcp))
+    (funcall (process-event timeout tcp) tcp :packet packet)
+    (control-message (application tcp) msg tcp)))
 
-(defgeneric rx-ack(tcp ack-number &optional skip-timer)
-  (:documentation "Ack management")
-  (:method(tcp ack-number  &optional skip-timer)
-    (unless skip-timer (cancel 'retransmit-packet-timer tcp))
-    (with-accessors((highest-rx-ack highest-rx-ack)
-                    (next-tx-seq next-tx-seq)
-                    (pending-data pending-data)
-                    (total-ack total-ack)
-                    (first-pending-seq first-pending-seq)
-                    (state state)) tcp
-      (let ((number-ack (- ack-number highest-rx-ack)))
-        (incf total-ack number-ack)
-        (setf highest-rx-ack ack-number)
-        (when (> ack-number next-tx-seq)
-          (setf next-tx-seq ack-number))
-        ;; delete ack'd pending data
-        (setf pending-data
-              (data-subseq pending-data number-ack))
-        ;; All pending acked, can be deleted
-        (cancel 'retransmit-packet-timer tcp)
-    ;; Notify application of data sent
-        (when (> number-ack 0) (send (application tcp) number-ack tcp)))
-    ;; Try to send more data
-    (send-pending-data tcp)
-    ;; See if we need to post a re-tx timer
-    (when (and (not skip-timer)
-               (not (busy-p (timer 'retransmit-packet-timer tcp)))
-               (or (> (unack-data-count tcp) 0)
-                   (= state fin-wait-1)
-                   (= state fin-wait-2)))
-      (schedule 'retransmit-packet-timer tcp)))))
-
-(defgeneric dup-ack(tcp count)
-  (:documentation "Implement for duplicate acks"))
-
-(defun new-ack(tcp &key header packet &allow-other-keys)
+(defmethod new-ack :around ((tcp tcp) &key header packet &allow-other-keys)
   (let ((highest-rx-ack (highest-rx-ack tcp))
         (ack-number (ack-number header)))
     (cond
-      ((< highest-rx-ack ack-number)
-       ;; old ack, no action
-       )
+      ((< ack-number highest-rx-ack)) ;; old ack, no action
       ((and (=  highest-rx-ack ack-number) (< ack-number (next-tx-seq tcp)))
        ;; duplicate ack received
-       (dup-ack tcp (incf (dup-ack-count tcp))))
+       (dup-ack tcp header (incf (dup-ack-count tcp))))
       (t
+       ;; not duplicate
        (when (> ack-number (highest-rx-ack tcp))
          (setf (dup-ack-count tcp) 0))
-       (rx-ack tcp ack-number)
+       (call-next-method)
        (new-rx tcp packet))))) ;; in case any data
 
-(defmethod receive (application (packet packet) (tcp tcp) &key &allow-other-keys)
+(defmethod new-ack((tcp tcp) &key packet (header (peek-pdu packet))
+                   (ack-number (ack-number header)) skip-timer &allow-other-keys)
+  (unless skip-timer (cancel 'retransmit-packet-timer tcp))
+  (with-accessors((next-tx-seq next-tx-seq)) tcp
+    (let ((number-ack (- ack-number (highest-rx-ack tcp)))
+          (state (state tcp)))
+      (incf (total-ack tcp) number-ack)
+      (setf (highest-rx-ack tcp) ack-number)
+      (when (> ack-number next-tx-seq)
+        (setf next-tx-seq ack-number))
+      ;; delete ack'd pending data
+      (setf (pending-data tcp)
+            (data-subseq (pending-data tcp) number-ack))
+      ;; All pending acked, can be deleted
+      (cancel 'retransmit-packet-timer tcp)
+      ;; Notify application of data sent
+      (when (> number-ack 0) (sent (application tcp) number-ack tcp))
+      ;; Try to send more data
+      (send-pending-data tcp)
+      ;; See if we need to post a re-tx timer
+      (when (and (not skip-timer)
+                 (not (busy-p (timer 'retransmit-packet-timer tcp)))
+                 (or (> (unack-data-count tcp) 0)
+                     (= state fin-wait-1)
+                     (= state fin-wait-2)))
+        (schedule 'retransmit-packet-timer tcp)))))
+
+(defmethod receive(application (packet packet) (tcp tcp) &key &allow-other-keys)
   (let ((header (pop-pdu packet))
         (data (pop-pdu packet)))
     (with-slots(next-rx-seq) tcp
@@ -1007,15 +998,15 @@
     (when (> s 0)
       ;;Note we need the ACK bit on next transmitted pkt
       (setf (need-ack tcp) t)
-      (with-accessors((next-rx-seq next-rx-seq)
-                      (buffered-data buffered-data)) tcp
+      (let((next-rx-seq (next-rx-seq tcp))
+           (buffered-data (buffered-data tcp)))
         (cond
           ((= (sequence-number header) next-rx-seq)
-           ;;  Received seq is expected, deliver this and any buffered data
+           ;;  Received seq is expected, deliver this
            (receive (application tcp) packet tcp)
            (when (close-notified tcp)
              (error "TCP ~A got data after close-notified" tcp))
-           ;; look for buffered data
+           ;; and sequential buffered data
            (loop
               :while (not (empty-p buffered-data))
               :until (> (sequence-number (peek-pdu (peek buffered-data)))
@@ -1027,32 +1018,159 @@
              (peer-close tcp)))
           ((> (sequence-number header) next-rx-seq)
            ;; buffer this packet
-           (enqueue packet buffered-data)))
-        (send-ack tcp next-rx-seq)))))
+           (enqueue packet buffered-data))))
+      ;; finally send ack ancknowledging all received and delivered data
+      (send-ack tcp (next-rx-seq tcp)))))
 
 (defun retransmit(tcp)
   "Retransmit the oldest pending packet"
-  (with-accessors ((pending-data pending-data)
-                   (state state)
-                   (next-tx-seq next-tx-seq)
-                   (highest-rx-ack highest-rx-ack)
-                   (next-rx-seq next-rx-seq)) tcp
+  (let ((pending-data (pending-data tcp))
+        (state (state tcp)))
     (cond
       ((zerop (length-bytes pending-data))
        (assert (or (= state fin-wait-1) (= state fin-wait-2)))
        ;; must have lost fin - retransmit
-       (send-packet tcp fin next-tx-seq next-rx-seq))
+       (send-packet tcp fin))
       (t
        (let* ((data (data-subseq pending-data 0 (maximum-segment-size tcp)))
               (remaining-bytes (- (length-bytes pending-data)
                                   (length-bytes data))))
-          (send-packet tcp
-                       (if (and (close-on-empty tcp) (zerop remaining-bytes))
-                           fin
-                           0)
-                       highest-rx-ack
-                       next-rx-seq))))))
+         (send-packet tcp
+                      (if (and (close-on-empty tcp) (zerop remaining-bytes))
+                          fin
+                          0)
+                      :sequence-number (highest-rx-ack tcp)
+                      :data data))))))
+
+(defclass tcp-tahoe(tcp)
+  ()
+  (:documentation "Tahoe TCP implementation"))
+
+(defmethod new-ack ((tcp tcp-tahoe) &key &allow-other-keys)
+  "Adjust congestion window in response to new acks received"
+  (let ((seg-size (maximum-segment-size tcp)))
+    (incf (congestion-window tcp)
+          (if (< (congestion-window tcp) (slow-start-threshold tcp))
+              ;; slow start mode add seg-size
+              seg-size
+              ;; congestion avoidance adjust as per RFC2581
+              (max 1 (floor (* seg-size seg-size) (congestion-window tcp))))))
+  (call-next-method))
+
+(defmethod dup-ack((tcp tcp-tahoe) header c)
+  (when (= c 3)
+    ;; triple dupack received - enter fast recovery mode as per RFC2581
+    (let ((seg-size (maximum-segment-size tcp)))
+      (setf (slow-start-threshold tcp) (max (/ (window tcp) 2) (* 2 seg-size))
+            (congestion-window tcp) (* (initial-congestion-window tcp) seg-size)
+            (next-tx-seq  tcp) (highest-rx-ack tcp))
+    (send-pending-data tcp))))
+
+(defmethod retransmit-packet-timeout((tcp tcp))
+  (let ((seg-size (maximum-segment-size tcp)))
+    (setf (slow-start-threshold tcp) (max (/ (window tcp) 2) (* 2 seg-size))
+          (congestion-window tcp) seg-size
+          (next-tx-seq tcp) (highest-rx-ack tcp)))
+  (increase-multiplier (rtt tcp))
+  (retransmit tcp))
 
 (defclass tcp-reno(tcp)
-  ()
-  (:documentation "Tahoe tcp implementation"))
+  ((fast-recovery :type boolean :initform nil :accessor fast-recovery
+                  :documentation "True if fast recovery in progress"))
+  (:documentation "Reno TCP implementation"))
+
+(defmethod new-ack ((tcp tcp-reno) &key &allow-other-keys)
+  (let ((seg-size (maximum-segment-size tcp))
+        (slow-start-threshold  (slow-start-threshold tcp)))
+    (with-accessors((congestion-window congestion-window)) tcp
+    (cond
+      ((fast-recovery tcp)
+       ;; If in fast recovery and have a new data ack, reset cWnd
+      ;; to  the ssthresh calculated when we entered fast recovery
+       ;; and exit fast recovery mode
+       (setf congestion-window slow-start-threshold
+             (fast-recovery tcp) nil))
+      ((< congestion-window slow-start-threshold)
+       ;; Slow start mode, add one segSize to cWnd
+       (incf congestion-window seg-size))
+      (t ;; Congestion avoidance mode, adjust by (ackBytes*segSize) / cWnd
+       (incf congestion-window
+             (max 1 (/ (* seg-size seg-size) congestion-window)))))))
+  (call-next-method tcp))
+
+(defmethod dup-ack((tcp tcp-reno) header c)
+  (let ((seg-size (maximum-segment-size tcp)))
+    (cond
+      ((fast-recovery tcp)
+       ;; inflate congestion window with every dup ack and send data
+       (incf (congestion-window tcp) seg-size)
+       (send-pending-data tcp))
+      ((= c 3)
+       ;; triple dupack received - enter fast recovery mode as per RFC2581
+       (setf (fast-recovery tcp) t)
+       (setf  (slow-start-threshold tcp)
+              (max (/ (window tcp) 2) (* 2 seg-size)))
+       (setf (congestion-window tcp)
+             (+ (slow-start-threshold tcp) (* 3 seg-size)))
+       (retransmit tcp)))))
+
+(defmethod retransmit-packet-timeout((tcp tcp-reno))
+  (setf (fast-recovery tcp) nil)
+  (call-next-method))
+
+(defclass tcp-newreno(tcp-reno)
+  ((recover :type (unsigned-byte 16) :accessor recover
+                  :documentation "High tx mark for new reno")
+   (partial-ack-count :initform 0 :accessor partial-ack-count
+                      :documentation "Number of parial acks in a row"))
+  (:documentation "Reno TCP implementation"))
+
+(defmethod new-ack ((tcp tcp-reno) &key header
+                    (ack-number (ack-number header)) &allow-other-keys)
+  (let ((seg-size (maximum-segment-size tcp))
+        (slow-start-threshold  (slow-start-threshold tcp))
+        (skip-timer nil))
+    (cond
+      ((fast-recovery tcp)
+       ;; if in fast recovery check for full or partial ack as per rfc 3781
+       (cond
+         ((>= ack-number (recover tcp)) ;; full ack
+          (setf (fast-recovery tcp) nil
+                (congestion-window tcp) (min slow-start-threshold
+                                             (+ seg-size (unack-data-count tcp)))
+                (partial-ack-count tcp) 0))
+         (t ;; partial ack
+          (decf (congestion-window tcp) (seq- ack-number (highest-rx-ack tcp)))
+          (when (>= (seq- ack-number (highest-rx-ack tcp)) seg-size)
+            (incf  (congestion-window tcp) seg-size))
+          (setf (highest-rx-ack tcp) ack-number)
+          (setf skip-timer (> (partial-ack-count tcp) 0))
+          (incf (partial-ack-count tcp))
+          (retransmit tcp))))
+      ((< (congestion-window tcp) slow-start-threshold)
+       ;; Slow start mode, add one segSize to cWnd
+       (incf (congestion-window tcp) seg-size))
+      (t ;; Congestion avoidance mode, adjust by (ackBytes*segSize) / cWnd
+       (incf (congestion-window tcp)
+             (max 1 (/ (* seg-size seg-size) (congestion-window tcp))))))
+    (call-next-method tcp :skip-timer skip-timer)))
+
+(defmethod dup-ack((tcp tcp-newreno) header c)
+  (let ((seg-size (maximum-segment-size tcp)))
+    (cond
+      ((fast-recovery tcp)
+       ;; inflate congestion window with every dup ack and send data
+       (incf (congestion-window tcp) seg-size)
+       (send-pending-data tcp))
+      ((and (= c 3) (> (ack-number header) (recover tcp)))
+       ;; triple dupack received - enter fast recovery mode as per RFC2581
+       (setf (fast-recovery tcp) t
+             (slow-start-threshold tcp) (max (/ (window tcp) 2) (* 2 seg-size))
+             (congestion-window tcp) (+ (slow-start-threshold tcp)
+                                        (* 3 seg-size))
+             (recover tcp) (next-tx-seq tcp))
+       (retransmit tcp)))))
+
+(defmethod retransmit-packet-timeout((tcp tcp-reno))
+   (setf (partial-ack-count tcp) 0)
+   (call-next-method))
