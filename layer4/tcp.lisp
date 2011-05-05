@@ -35,6 +35,7 @@
   (:import-from :scheduler
                 #:time-type #:cancel #:timer #:schedule #:timers
                 #:simulation-time #:timeout #:with-timers)
+   (:import-from :protocol.layer3 #:ttl #:tos)
   (:import-from :protocol.layer5
                 #:data #:data-concatenate #:data-subseq)
   (:export #:tcp-header #:tcp-dmux #:tcp #:tcp-tahoe #:tcp-reno #:tcp-newreno))
@@ -412,7 +413,7 @@
     :initform (make-binary-heap
                :key-fn  #'(lambda(packet) (sequence-number (peek-pdu packet)))
                :comp-fn #'seq<
-               :element-type packet)
+               :element-type 'packet)
     :type binary-heap  :accessor buffered-data
     :documentation "data received but out of sequence")
    (rtt :initform (make-instance 'rtt-mdev) :initarg :rtt :reader rtt
@@ -560,7 +561,7 @@
         (old-state (state tcp)))
     ;; Check if ACK bit set, and if so notify rtt estimator
     (when (logtest  ack (flags header))
-      (rtt-ack-seq (ack-number header) (rtt tcp))
+      (ack-seq (ack-number header) (rtt tcp))
       ;; Also insure that connection timer is canceled,
       ;; as this may be the final part of 3-way handshake
       (cancel 'connection-timer tcp))
@@ -698,11 +699,11 @@
   (unless (connected-p tcp)
     (funcall (process-event app-listen tcp) tcp)))
 
-(defun un-ack-data-count(tcp) (- (next-tx-seq tcp) (highest-rx-ack tcp)))
+(defun unack-data-count(tcp) (- (next-tx-seq tcp) (highest-rx-ack tcp)))
 
 (defun bytes-in-flight(tcp) (- (high-tx-mark tcp) (highest-rx-ack tcp)))
 
-(defun window(tcp) (min (rx-win tcp) (congestion-window tcp)))
+(defun window(tcp) (min (rx-window tcp) (congestion-window tcp)))
 
 (defun available-window(tcp)
   (let ((unack (un-ack-data-count tcp))
@@ -832,7 +833,7 @@
 (defun send-ack(tcp ack-number &optional forced)
   (let ((delayed-ack-timer (timer 'delayed-ack-timer tcp))
         (send-it t))
-    (unless (or forced (zerop (timer-delay delayed-ack-timer)))
+    (unless (or forced (zerop (scheduler:timer-delay delayed-ack-timer)))
       ;; need to delay this ack - see if pending
       (if (busy-p delayed-ack-timer)
           (cancel delayed-ack-timer tcp)
@@ -856,7 +857,7 @@
     (when data ;; if data
       (unless (busy-p (timer 'retransmit-packet-timer tcp))
         (schedule 'retransmit-packet-timer tcp)
-        (rtt-sent-seq sequence-number (length-bytes packet) (rtt tcp))
+        (sent-seq sequence-number (length-bytes packet) (rtt tcp))
         (when (< sequence-number (high-tx-mark tcp))
           (incf (retransmit-count tcp)))))
     (push-pdu
@@ -868,8 +869,8 @@
       :ack ack-number
       :flags (logior flags
                      (if  (need-ack tcp) ack 0)
-                     (if (and (or (= state fin-wait-1)
-                                  (= state fin-wait-2))
+                     (if (and (or (= (state tcp) fin-wait-1)
+                                  (= (state tcp) fin-wait-2))
                               (zerop (length-bytes (pending-data tcp))))
                          fin
                          0))
@@ -890,15 +891,15 @@
   (let ((n-sent 0)
         (pending-data (pending-data tcp))
         (ipv4 (layer3:find-protocol 'layer3:ipv4 (node tcp)))
-        (interface (find-interface (peer-address tcp) (node udp))))
+        (interface (find-interface (peer-address tcp) (node tcp))))
     (loop
        ;; if no data finished
        (when (zerop (length-bytes pending-data))
          (setf (pending-data tcp) nil)
          (return))
-       (let ((w (available-window tcp))
-             (mss (maximum-segment-size tcp))
-             (data
+       (let* ((w (available-window tcp))
+              (mss (maximum-segment-size tcp))
+              (data
                  (data-subseq pending-data
                               (seq- (next-tx-seq tcp) (highest-rx-ack tcp))
                               (min w mss))))
@@ -909,7 +910,7 @@
          ;;(100 extra bytes is to allow for headers)
          (unless (layer1:buffer-available-p
                   (+ 100 (length-bytes data)) interface)
-           (add-notification udp #'send-pending-data interface)
+           (add-notification tcp #'send-pending-data interface)
            (return))
          (let ((flags (if with-ack ack 0)))
            ;; see if we need fin flag
@@ -1038,7 +1039,7 @@
                    (next-rx-seq next-rx-seq)) tcp
     (cond
       ((zerop (length-bytes pending-data))
-       (assert (or (= state fin-wait-1 fin-wait-2)))
+       (assert (or (= state fin-wait-1) (= state fin-wait-2)))
        ;; must have lost fin - retransmit
        (send-packet tcp fin next-tx-seq next-rx-seq))
       (t

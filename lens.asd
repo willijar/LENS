@@ -79,7 +79,7 @@
               :components
               ((:file "udp")
                (:file "rtt")
-               #+nil(:file "tcp" :depends-on ("rtt"))))
+               (:file "tcp" :depends-on ("rtt"))))
      (:module "layer5" :depends-on ("core")
               :components
               ((:file "abr-source")

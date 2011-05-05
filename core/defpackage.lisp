@@ -159,7 +159,7 @@
             #:routing #:getroute #:remroute
             #:initialise-routes #:reinitialise-routes #:default-route
             #:*default-routing* #:topology-changed
-            #:routing-manual #:routing-static
+            #:routing-manual #:routing-static #:tos #:ttl
             ;; some specific default layer 3 protocols
             #:ipv4))
 
@@ -170,6 +170,7 @@
   (:shadow #:protocol #:pdu)
   (:import-from :packet #:packet #:pop-pdu #:push-pdu #:peek-pdu
                 #:trace-format #:fid)
+  (:import-from :protocol.layer3 #:ttl #:tos)
   (:import-from :alg #:enqueue #:dequeue #:make-queue #:empty-p)
   (:import-from :node #:node #:interfaces #:find-interface)
   (:import-from :scheduler #:simulation-time #:time-type #:timer #:schedule)

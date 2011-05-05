@@ -67,7 +67,7 @@ output according to detail onto stream")
     (format stream " ~A ~D" text (if packet (uid packet) 0)))
   (:method((pdu pdu) detail (stream stream) &key packet text)
     (format stream " ~@[~A~]L~D~:[~*~;-~A~]"
-            text (layer pdu)  (member 'type detail) (name pdu))
+            text (protocol:layer pdu)  (member 'type detail) (name pdu))
     (write-pdu-slots pdu detail stream)
     (when (member 'uid detail)
       (format stream " ~D" (if packet (uid packet) 0)))))

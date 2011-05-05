@@ -158,7 +158,7 @@ Optional argument destination is for inherited implementation use only.")
                                      (eql (slot-definition-allocation slot)
                                           :instance))
                                  (not (and unbound-only
-                                           (slot-boundp dest name)))
+                                           (slot-boundp dst name)))
                                  (not (member name excluding)))
                             (list name))))
                     (class-slots (class-of src)))))
@@ -172,8 +172,8 @@ instance-only: if true only instance allocated slots are copied (default t)
 excluding    : list of slot names to be excluded"
   (dolist(slot-name slot-names)
     (if (slot-boundp src slot-name)
-      (setf (slot-value dest slot-name) (copy (slot-value src  slot-name)))
-      (slot-makunbound dest slot-name)))
+      (setf (slot-value dst slot-name) (copy (slot-value src  slot-name)))
+      (slot-makunbound dst slot-name)))
   dst)
 
 (defmethod copy((obj standard-object) &optional

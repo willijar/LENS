@@ -18,7 +18,7 @@
   (:documentation "Layer 4 Round Trip estimation (for TCP)")
   (:nicknames :rtt :layer4.rtt)
   (:use :cl :common :protocol.layer4 :address :math :scheduler)
-  (:export #:mdev #:ack-seq #:retransmit-timeout
+  (:export #:mdev #:ack-seq #:sent-seq #:retransmit-timeout
            #:increase-multiplier #:record))
 
 (in-package :protocol.layer4.rtt)
