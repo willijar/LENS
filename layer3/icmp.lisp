@@ -74,11 +74,6 @@
         ;; not implemented
      0)))
 
-(defmethod copy((h icmp-header))
-  (copy-with-slots
-   h
-   '(icmp-type code identifier seq  originated received transmitted)))
-
 (defun icmp-receive(ipv4 packet ipv4hdr)
   (when (icmp-enabled-p ipv4)
     (let ((icmphdr (pop-pdu packet)))
@@ -86,7 +81,11 @@
         (echo (echo-reply ipv4 ipv4hdr icmphdr))
         (timestamp (timestamp-reply ipv4 ipv4hdr icmphdr))
         (destination-unreachable
-         (kill-pending-connection ipv4 packet))
+         (control-message (find-protocol (protocol-number ipv4hdr) (node ipv4))
+                          :destination-unreachable
+                          ipv4
+                          :packet packet
+                          :ipv4hdr ipv4hdr))
         ((echo-reply source-quench time-exceeded redirect
                      information-request information-reply parameter-problem)
       ;; not implemented

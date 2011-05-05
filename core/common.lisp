@@ -117,52 +117,76 @@ Returns:
         (function (funcall h))
         (t (reset h))))))
 
-(defgeneric copy(entity)
-  (:documentation "Create an return a (deep) copy of an entity")
-  (:method((entity (eql nil))) nil)
-  (:method((entity number)) entity)
-  (:method((entity symbol)) entity)
-  (:method((entity list)) (map 'list #'copy entity))
-  (:method((v vector))
-    (let ((copy (make-array (array-total-size v)
-                            :element-type (array-element-type v)
-                            :initial-element (array-element-type v)
-                            :adjustable (adjustable-array-p v)
-                            :fill-pointer (when (array-has-fill-pointer-p v)
-                                            (fill-pointer v)))))
+(defgeneric copy(entity &optional destination)
+  (:documentation "Create an return a (deep) copy of an entity.
+Optional argument destination is for inherited implementation use only.")
+  (:method((entity (eql nil)) &optional destination)
+    (declare (ignore destination))
+    nil)
+  (:method((entity number) &optional destination)
+    (declare (ignore destination))
+    entity)
+  (:method((entity symbol) &optional destination)
+    (declare (ignore destination))
+    entity)
+  (:method((entity list) &optional destination)
+    (declare (ignore destination))
+    (map 'list #'copy entity))
+  (:method((v vector) &optional
+           (copy (make-array (array-total-size v)
+                             :element-type (array-element-type v)
+                             :initial-element (array-element-type v)
+                             :adjustable (adjustable-array-p v)
+                             :fill-pointer (when (array-has-fill-pointer-p v)
+                                             (fill-pointer v)))))
       ;; note we copy all elements - even those past the fill pointer
       (do((i 0 (1+ i)))
          ((= i (array-total-size v))
           copy)
         (setf (aref copy i) (copy (aref v i))))))
-  (:method((obj standard-object))
-    (let* ((class (class-of obj))
-           (copy (allocate-instance class)))
-      (dolist(slot-definition (class-slots class))
-        (when (eql (slot-definition-allocation slot-definition) :instance)
-          (let ((slot-name (slot-definition-name slot-definition)))
-            (if (slot-boundp obj slot-name)
-                (setf (slot-value copy slot-name)
-                      (copy (slot-value obj slot-name)))
-                (slot-makunbound copy slot-name)))))
-      copy)))
 
-(defun copy-with-slots(original slots
-                       &optional (copy (allocate-instance (class-of original))))
-  "Given an original instance allocate and return a new instance of
-the same class and set specified slots of copy to the same values as
-the slots of the original."
-    (dolist(slot slots)
-      (if (slot-boundp original slot)
-          (setf (slot-value copy slot) (copy (slot-value original slot)))
-          (slot-makunbound copy slot)))
-    copy)
+(defun copy-slots(src dst &key
+                  (unbound-only t)
+                  (instance-only t)
+                  excluding
+                  (slot-names
+                   (mapcan
+                    #'(lambda(slot)
+                        (let ((name (slot-definition-name slot)))
+                          (when (and
+                                 (or (not instance-only)
+                                     (eql (slot-definition-allocation slot)
+                                          :instance))
+                                 (not (and unbound-only
+                                           (slot-boundp dest name)))
+                                 (not (member name excluding)))
+                            (list name))))
+                    (class-slots (class-of src)))))
+  "Copy slot values using copy (including unbound) from src instance
+to dst instance. Return dst (copy) instance. Keyword aguments:
+
+slot-names   : if provided the list of slot names to be copied. Otherwise
+               this is determined by remaining keyword arguments.
+unbound-only : if true only undound slots in destination are copied (default t)
+instance-only: if true only instance allocated slots are copied (default t)
+excluding    : list of slot names to be excluded"
+  (dolist(slot-name slot-names)
+    (if (slot-boundp src slot-name)
+      (setf (slot-value dest slot-name) (copy (slot-value src  slot-name)))
+      (slot-makunbound dest slot-name)))
+  dst)
+
+(defmethod copy((obj standard-object) &optional
+                (copy (allocate-instance (class-of obj))))
+  (copy-slots obj copy :unbound-only t :instance-only t))
 
 (defclass immutable()
   ()
   (:documentation "Base for classes which are immutable and so don't have to be deep copied."))
 
-(defmethod copy((obj immutable)) obj)
+(defmethod copy((obj immutable)  &optional destination)
+  (declare (ignore destination))
+  obj)
 
 (defmacro trace-accessor((slotname (objvar type)
                           &optional (slotvar (gensym))) &rest body)

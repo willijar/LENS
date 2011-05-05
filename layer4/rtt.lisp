@@ -14,8 +14,6 @@
 ;; See Tanenbaum "Computer Networks" (TCN) section 6.5.
 ;;; Code:
 
-
-
 (defpackage :protocol.layer4.rtt
   (:documentation "Layer 4 Round Trip estimation (for TCP)")
   (:nicknames :rtt :layer4.rtt)
