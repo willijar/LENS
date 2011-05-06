@@ -74,7 +74,7 @@ on stream. t means all")
     (terpri stream)))
 
 (defmethod (setf packet)(packet (stream trace-stream))
-  (unless (eql packet (packet stream))
+  (when (and (packet stream) (not (eql packet (packet stream))))
     (setf (slot-value stream 'packet) packet)
     (terpri stream)))
 

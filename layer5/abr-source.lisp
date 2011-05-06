@@ -1,4 +1,4 @@
-;; Constant or average bit rate source application
+;; Constant or average bit rate source generator application
 ;; Copyright (C) 2010 Dr. John A.R. Williams
 
 ;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
@@ -17,7 +17,7 @@
 
 (in-package :protocol.layer5)
 
-(defclass abr-source(application scheduler:event)
+(defclass abr-source(application event)
   ((peer-address :type network-address
                  :initarg :peer-address :reader peer-address
                  :documentation "Destination address for data")
@@ -42,11 +42,11 @@ fast as possible if rate is 0"))
   "Send a packet on every notification if rate is 0"
   (when (equal (rate app) 0) (send socket (pkt-size app) app)))
 
-(defmethod scheduler:handle((app abr-source))
+(defmethod handle((app abr-source))
   "Send a packet and reschedule"
   (with-slots(rate protocol pkt-size) app
     (send protocol (make-instance 'data :length-bytes pkt-size) app)
-    (scheduler:schedule (/ (* pkt-size 8) (math:random-value rate)) app)))
+    (schedule (/ (* pkt-size 8) (math:random-value rate)) app)))
 
 (defmethod start((app abr-source))
   (open-connection (peer-address app)  (peer-port app) (protocol app)))
@@ -56,7 +56,7 @@ fast as possible if rate is 0"))
     (setf protocol layer4)
     (if (equal rate 0)
         (send protocol (make-instance 'data :length-bytes pkt-size) app)
-        (scheduler:handle app))))
+        (handle app))))
 
 (defmethod stop((app abr-source) &key &allow-other-keys)
   (call-next-method)

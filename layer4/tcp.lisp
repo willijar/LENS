@@ -402,7 +402,7 @@
    :comp-fn #'seq<
    :element-type 'packet))
 
-(defclass tcp(protocol timers-manager copyable-object)
+(defclass tcp(protocol with-timers)
   ((pending-data :initform nil :accessor pending-data
                  :documentation "Data sent by application but not acknowledged")
    (buffered-data

@@ -76,7 +76,7 @@
 (defpackage :protocol
   (:documentation "Protocol stack layer implementations")
   (:use :cl #:common #:trace)
-  (:import-from :packet #:pdu #:peek-pdu #:pdu-trace)
+  (:import-from :packet #:pdu #:packet #:peek-pdu #:pdu-trace)
   (:export #:protocol-number #:protocol #:protocol-condition #:layer #:pdu
            #:send #:receive #:drop #:control-message #:default-trace-detail))
 
@@ -192,12 +192,13 @@
 (defpackage :protocol.layer5
   (:documentation "Application Layer protocol interface")
   (:nicknames :layer5 :data :layer.application)
-  (:use :cl :common :address :protocol.layer4)
+  (:use :cl :common :address :protocol :layer4 :scheduler :math)
   (:shadow #:protocol #:pdu)
   (:export #:data #:checksum
            #:data-concatenate #:data-subseq #:protocol #:pdu
            #:application
-           #:abr-source #:udp-sink))
+           #:message-data #:messages #:make-message-data
+           #:abr-source #:udp-sink #:message-source))
 
 (defpackage :lens-user
    (:documentation "LENS User interface")

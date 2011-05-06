@@ -21,7 +21,7 @@
 (in-package :protocol)
 
 (defclass protocol()
-  ((node :initarg :node :reader node))
+  ((node :initarg :node :accessor node))
   (:documentation "Base class for all protocol entities"))
 
 (defgeneric protocol-number(entity)
@@ -41,7 +41,7 @@ See http://www.iana.org/assignments/protocol-numbers")
   (dolist(stream (if (listp stream) stream (list stream)))
     (when (trace-enabled-p protocol stream)
       (setf (node stream) node)
-      (when packet (setf (packet:packet stream) packet))
+      (setf (packet:packet stream) packet)
       (pdu-trace pdu
                  (if protocol (trace-detail protocol stream) nil)
                  stream
@@ -54,18 +54,24 @@ See http://www.iana.org/assignments/protocol-numbers")
   true if packet accepted for transmission, false otherwise. At
   transport layer return the number of bytes accepted for
   transmission")
-  (:method :before((receiver protocol) packet (sender protocol)
+  (:method :before((receiver protocol) (packet packet) (sender protocol)
                    &key &allow-other-keys)
-           (write-trace sender (peek-pdu packet) :packet packet :text "-"))
+      (write-trace sender (peek-pdu packet) :packet packet :text "-"))
+  (:method :before((receiver protocol) (pdu pdu) (sender protocol)
+                   &key &allow-other-keys)
+      (write-trace sender pdu :text "-"))
   (:method :around (receiver packet (sender protocol) &key &allow-other-keys)
      (when (node:call-callbacks :tx sender packet) (call-next-method))))
 
 (defgeneric receive(receiver packet sender &key &allow-other-keys)
   (:documentation "Called by packet when to pass received packet up to
   receiver (once reception is complete)")
-  (:method :before((receiver protocol) packet (sender protocol)
+  (:method :before((receiver protocol) (packet packet) (sender protocol)
                    &key &allow-other-keys)
      (write-trace receiver (peek-pdu packet) :packet packet :text "+"))
+  (:method :before((receiver protocol) (pdu pdu) (sender protocol)
+                   &key &allow-other-keys)
+     (write-trace receiver pdu :text "+"))
   (:method :around((receiver protocol) packet sender &key &allow-other-keys)
     (when (node:call-callbacks :rx receiver packet) (call-next-method))))
 
@@ -169,7 +175,7 @@ See http://www.iana.org/assignments/protocol-numbers")
 (defclass protocol(protocol:protocol)
   ((layer :initform 4 :reader layer :allocation :class)
    (layer5:application :initarg :application :initform nil
-                       :reader layer5:application
+                       :accessor layer5:application
                        :documentation "Application entity for this flow")
    (local-address :initform nil :initarg :local-address
                   :type (or network-address null) :reader local-address
@@ -456,10 +462,12 @@ given segment-start and no-bytes"
 
 (defmethod layer((pdu pdu)) 5)
 
-(defclass data(packet:pdu)
+(defclass data(pdu)
   ((length-bytes :type integer :initarg :length-bytes :reader length-bytes
                  :documentation "Number of data bytes represented by this pdu"))
   (:documentation "Data representational PDU"))
+
+(defmethod packet:trace-format((data data)) '(length-bytes))
 
 ;; can send vector of bytes as data too
 (defmethod layer((pdu vector))
@@ -501,7 +509,8 @@ given segment-start and no-bytes"
 (defgeneric data-concatenate(a b)
   (:documentation "Return a new data pdu made of the concatenation of a and b")
   (:method((a data) (b data))
-    (make-instance 'data :length-bytes (+ (length-bytes a) (length-bytes b))))
+    (make-instance (class-of a)
+                   :length-bytes (+ (length-bytes a) (length-bytes b))))
   (:method((a vector) (b vector))
      (check-type a (vector (unsigned-byte 8) *))
      (check-type b (vector (unsigned-byte 8) *))
@@ -514,7 +523,7 @@ given segment-start and no-bytes"
   (:method((data data) start &optional length-bytes)
     (let ((end (length-bytes data)))
       (assert (<= start end))
-      (make-instance 'data :length-bytes
+      (make-instance (class-of data) :length-bytes
                      (if (or (not length-bytes) (> (+ start length-bytes) end))
                          (- end start)
                          length-bytes))))

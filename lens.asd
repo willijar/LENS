@@ -83,4 +83,6 @@
      (:module "layer5" :depends-on ("core")
               :components
               ((:file "abr-source")
-               (:file "udp-sink")))))
+               (:file "udp-sink")
+               (:file "message")
+               (:file "message-source" :depends-on ("message"))))))

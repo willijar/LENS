@@ -62,7 +62,7 @@ output according to detail onto stream")
   (:method((pdu (eql :drop)) detail (stream stream) &key packet text)
     "Trace a packet drop"
     (declare (ignore detail))
-    (format stream " D-~A ~D~%" text (uid packet)))
+    (format stream " D-~A ~D~%" text (if packet (uid packet) 0)))
   (:method((pdu null) detail (stream stream) &key packet text)
     (format stream " ~A ~D" text (if packet (uid packet) 0)))
   (:method((pdu pdu) detail (stream stream) &key packet text)
@@ -80,7 +80,7 @@ output according to detail onto stream")
    (pdus :type vector :initform (make-array 5 :adjustable t :fill-pointer 0)
          :reader pdus)
    (created :type time-type :initform (simulation-time) :reader created
-            :initarg :created :documentation "Time the packet was created")
+            :documentation "Time the packet was created")
    (routing :initarg :routing :initform nil :reader routing
             :documentation "Source routing e.g. nixvector data"))
   (:documentation  "A generic packet class composed of a vector of

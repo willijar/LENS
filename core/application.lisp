@@ -18,10 +18,9 @@
 
 (in-package :layer5)
 
-(defclass application()
+(defclass application(protocol:protocol)
   ((name :type string :initarg :name
-         :documentation "Name of this application")
-   (node :initarg :node :reader node))
+         :documentation "Name of this application"))
   (:documentation "Class Application is the base class for all applications.
 It defines the interface between the application class and
 the associated layer 4 protocols.  Applications can have one
@@ -32,6 +31,9 @@ a web browser model with multiple simultaneous connections."))
   (if (slot-boundp app 'name)
       (slot-value app 'name)
       (call-next-method)))
+
+(defmethod trace:default-trace-detail((application application))
+  '(length-bytes))
 
 (defmethod initialize-instance :after ((app application) &key node &allow-other-keys)
   (push app (node:applications node)))
