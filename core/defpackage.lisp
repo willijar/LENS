@@ -198,7 +198,7 @@
            #:data-concatenate #:data-subseq #:protocol #:pdu
            #:application
            #:message-data #:messages #:make-message-data
-           #:abr-source #:udp-sink #:message-source))
+           #:abr-source #:udp-sink #:message-source #:message-responder))
 
 (defpackage :lens-user
    (:documentation "LENS User interface")
@@ -231,6 +231,7 @@
                  #:topology-changed)
    (:import-from :protocol.layer4
                  #:udp #:tcp #:icmp  #:tcp-tahoe #:tcp-reno #:tcp-newreno)
-   (:import-from :protocol.layer5 #:abr-source #:udp-sink)
+   (:import-from :protocol.layer5 #:abr-source #:udp-sink #:message-source
+                 #:message-responder)
    (:export #:*user-output*))
 

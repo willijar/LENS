@@ -24,7 +24,7 @@
    (peer-port  :initarg :peer-port :initform nil
                :type ipport :reader peer-port
                :documentation "Port of peer to send to")
-   (protocol :type tcp :reader layer4:protocol
+   (protocol :type tcp :reader protocol :initarg :protocol
              :initform (make-instance 'tcp-reno)
              :documentation "The tcp (layer 4) protocol instance")
    (sleep-time :initarg :sleep-time :accessor sleep-time :initform 5
@@ -48,7 +48,7 @@ to a TCP server.  The application will optionally sleep for a random
 amount of time and send some more data, up to a user specified limit
 on the number of sending iterations."))
 
-(defmethod initialize-instance((app message-source)
+(defmethod initialize-instance :after ((app message-source)
                                &key
                                 &allow-other-keys)
   (with-slots(protocol) app
@@ -65,7 +65,10 @@ on the number of sending iterations."))
 
 (defmethod stop((app message-source) &key &allow-other-keys)
   (call-next-method)
-  (close-connection (protocol app)))
+  (close-connection (protocol app))
+  (unbind (protocol app)))
+
+(defmethod reset((app message-source)) (stop app))
 
 (defmethod connection-complete((app message-source) layer4)
   (handle app))

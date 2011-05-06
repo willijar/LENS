@@ -85,4 +85,5 @@
               ((:file "abr-source")
                (:file "udp-sink")
                (:file "message")
-               (:file "message-source" :depends-on ("message"))))))
+               (:file "message-source" :depends-on ("message"))
+               (:file "message-responder" :depends-on ("message"))))))

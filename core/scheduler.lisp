@@ -30,7 +30,8 @@ called after all entities created before running simulation")
    (event-time :initarg :time :type time-type :accessor event-time
 	 :initform -1.0d0
 	 :documentation "simulation time at which event is to be handled")
-   (event-id :type integer :documentation "Used to ensure events with
+   (event-id :initform -1 :type integer
+             :documentation "Used to ensure events with
    same time are scheduled in order of scheduling" :reader uid)
    (last-event-id :type integer :initform 0 :allocation :class))
   (:documentation "Class representing a scheduled event"))
@@ -176,7 +177,7 @@ are dispatched in current thread"
 ;; timeout is called with timer name and instance value after the
 ;; scheduled delay.
 
-(defclass timer(event)
+(defclass timer(simple-event)
   ((name :initarg :name :reader name
          :documentation "Slot name for instance in handler object")
    (timer-delay :initarg :delay :reader timer-delay

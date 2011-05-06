@@ -297,8 +297,8 @@ See http://www.iana.org/assignments/protocol-numbers")
   (:method((protocol protocol) &key
            (local-port (local-port protocol))
            (local-address (local-address protocol))
-           (peer-port (peer-port protocol))
-           (peer-address (peer-address protocol))
+           peer-port
+           peer-address
            (application (application protocol))
            (node (or (node protocol) (node application))))
     (let ((dmux (find-protocol (protocol-number protocol) node)))
@@ -309,11 +309,15 @@ See http://www.iana.org/assignments/protocol-numbers")
       (unless (binding dmux local-port :local-address local-address
                         :peer-port peer-port :peer-address peer-address)
          (setf (slot-value protocol 'local-port) local-port
-               (slot-value protocol 'peer-port) peer-port
                (slot-value protocol 'local-address) local-address
-               (slot-value protocol 'peer-address) peer-address
                (slot-value protocol 'node) node
                (slot-value protocol 'application) application)
+         (if (and peer-port peer-address)
+             (setf (slot-value protocol 'peer-port) peer-port
+                   (slot-value protocol 'peer-address) peer-address)
+             (progn
+               (slot-makunbound protocol 'peer-port)
+               (slot-makunbound protocol 'peer-address)))
          (push protocol (bindings dmux))))))
 
 (defgeneric unbind(protocol)

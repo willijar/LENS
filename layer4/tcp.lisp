@@ -71,8 +71,8 @@
      (let ((first t))
        (dolist(flag tcp-flags)
          (when (logtest (symbol-value flag) flags)
-           (write-string (string flag) os))
-         (if first (setf first nil) (write-char #\| os)))
+           (write-string (string flag) os)
+           (if first (setf first nil) (write-char #\| os))))
        (when first (write 0 :stream os))))
     (t (format os "~2,'0X" flags))))
 
@@ -109,7 +109,7 @@
 
 (defmethod trace-format((h tcp-header))
   '(src-port dst-port sequence-number ack-number header-length
-    (flags "~/tcp-flags/") window (checksum "~4,'0X")
+    (flags " ~/tcp-flags/") window (checksum " ~4,'0X")
     urgent-pointer congestion-window))
 
 ;; define TCP state machine
@@ -409,7 +409,7 @@
     :initform (make-packet-sequence-queue)
     :type binary-heap  :accessor buffered-data
     :documentation "data received but out of sequence")
-   (rtt :initform (make-instance 'rtt-mdev) :initarg :rtt :reader rtt
+   (rtt :initform (make-instance 'mdev) :initarg :rtt :reader rtt
         :documentation "RTT estimator")
 
    ;; connection state
@@ -628,7 +628,8 @@
 
 (defmethod open-connection(peer-address peer-port (tcp tcp))
   (call-next-method)
-  (unless (bound-p tcp) (bind tcp))
+  (unless (bound-p tcp)
+    (bind tcp :peer-address peer-address :peer-port peer-port))
   (setf (connection-retry-count tcp) 0)
   (let ((state (state tcp))
         (action (process-event app-connect tcp)))
@@ -869,8 +870,8 @@
       'tcp-header
       :src-port (local-port tcp)
       :dst-port dst-port
-      :seq sequence-number
-      :ack ack-number
+      :sequence-number sequence-number
+      :ack-number ack-number
       :flags (logior flags
                      (if  (need-ack tcp) ack 0)
                      (if (and (or (= (state tcp) fin-wait-1)
