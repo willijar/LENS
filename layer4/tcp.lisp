@@ -71,8 +71,8 @@
      (let ((first t))
        (dolist(flag tcp-flags)
          (when (logtest (symbol-value flag) flags)
-           (write-string (string flag) os)
-           (if first (setf first nil) (write-char #\| os))))
+           (if first (setf first nil) (write-char #\| os))
+           (write-string (string flag) os)))
        (when first (write 0 :stream os))))
     (t (format os "~2,'0X" flags))))
 
@@ -430,15 +430,15 @@
                 :documentation "Next sequence to send" :accessor next-tx-seq)
    (high-tx-mark :initform 0 :type (unsigned-byte 32) :accessor high-tx-mark
                  :documentation "TX High water mark, for counting retx")
-   (highest-rx-ack :initform 0 :type (unsigned-byte 32)
+   (highest-rx-ack :type (unsigned-byte 32)
                    :accessor highest-rx-ack
                    :documentation "largest ack received")
-   (last-rx-ack :initform 0 :type (unsigned-byte 32) :accessor last-rx-ack
+   (last-rx-ack ::type (unsigned-byte 32) :accessor last-rx-ack
                 :documentation "For duplicate ack testing")
-   (fast-recovery-mark :initform 0 :type (unsigned-byte 32)
+   (fast-recovery-mark :type (unsigned-byte 32)
                        :accessor fast-recovery-mark
                        :documentation "Mark for fast recovery")
-   (next-rx-seq  :type (unsigned-byte 32) :accessor next-rx-seq
+   (next-rx-seq :type (unsigned-byte 32) :accessor next-rx-seq
                 :documentation"Next expected sequence number")
    (next-ack-seq :type (unsigned-byte 32) :accessor next-ack-seq
                  :documentation "Set when using delayed acks")
@@ -467,10 +467,6 @@
    (bytes-received :initform 0 :accessor bytes-received :type integer
                    :documentation "Total bytes received")
 
-
-   ;; (fast-recovery-p :initform nil :type boolean :accessor fast-recovery-p
-   ;;                  :documentation "True if fast recovery in progress")
-   ;;
    ;; (no-timer-p  :initform nil :type boolean :accessor no-timer-p
    ;;              :documentation "True if skip resched of re-tx timer")
 
@@ -529,10 +525,14 @@
 (defgeneric dup-ack(tcp header count)
   (:documentation "Implement for duplicate acks"))
 
-(defmethod copy((original tcp) &optional (copy (allocate-instance (class-of original))))
+(defmethod copy((original tcp)
+                &optional (copy (allocate-instance (class-of original))))
   (setf (pending-data copy) nil
-        (buffered-data copy) (make-packet-sequence-queue))
-  (call-next-method original copy))
+        (buffered-data copy) (make-packet-sequence-queue)
+        (application copy) (application original)
+        (node copy) (node original))
+  (copy-slots original copy
+              :excluding '(application node pending-data buffered-data)))
 
 (defmethod initialize-instance :after ((tcp tcp) &rest initargs
                                        &key &allow-other-keys)
@@ -565,7 +565,7 @@
             (timer 'retransmit-packet-timer tcp)))
 
 (defmethod receive((tcp tcp) (packet packet) (layer4 layer3:ipv4)
-                   &key dst-address &allow-other-keys)
+                   &key src-address &allow-other-keys)
   (setf (last-rx-time tcp) (simulation-time))
   (incf (pkt-received-count tcp))
   (let ((header (peek-pdu packet)))
@@ -595,7 +595,7 @@
               ()
               "TCP ~A syn in closed l=~A:~A r=~A:~A"
                 tcp (ipaddr (node tcp)) (local-port tcp)
-                dst-address (src-port header))
+                src-address (src-port header))
       (assert (not (and (= saved-state listen) (/= state listen)))
               ()
                "TCP transition from ~A to ~A" saved-state state)
@@ -609,7 +609,7 @@
          (schedule 'timed-wait-timer tcp))
       ;; carry out action
       (funcall action tcp
-               :packet packet :header header :dst-address dst-address)
+               :packet packet :header header :dst-address src-address)
       ;; more state checks
       (when (and (= state last-ack)
                  (not (busy-p  (timer 'last-ack-timer tcp))))
@@ -653,8 +653,7 @@
             (schedule 'last-ack-timer tcp)))))))
 
 (defmethod connection-complete :before (application (tcp tcp))
-  (setf (close-notified tcp) nil)
-  (call-next-method))
+  (setf (close-notified tcp) nil))
 
 (defmethod connection-closed :around (application (tcp tcp))
   (unless (close-notified tcp)
@@ -742,12 +741,16 @@
 
 (defun ack-tx-1(tcp &key header &allow-other-keys)
   ;; save receiver advertised window
-  (when header (setf (rx-window tcp) (window header)))
+  (setf (rx-window tcp) (window header))
+  (setf (next-rx-seq tcp) (seq+ (sequence-number header) 1))
+  (setf (highest-rx-ack tcp) (ack-number header))
+  (setf (last-rx-ack tcp) (ack-number header))
   (cancel 'connection-timer tcp)
   ;; notify application
+  (setf (need-ack tcp) t)
   (connection-complete (application tcp) tcp)
   ;; if no data need to send ack
-  (unless (pending-data tcp)
+  (when (zerop (length-bytes (pending-data tcp)))
     (send-packet tcp ack)))
 
 (defun rst-tx(tcp &key header dst-address &allow-other-keys)
@@ -755,37 +758,40 @@
                :dst-address dst-address
                :dst-port  (if header (src-port header) (peer-port tcp))))
 
+(defun initialise-sequence-number(tcp)
+  (let ((seq (random #xFFFFFFFF)))
+    (setf (next-tx-seq tcp) seq
+          (high-tx-mark tcp) seq)))
+
 (defun syn-tx(tcp &key &allow-other-keys)
   (schedule 'connection-timer tcp)
   (setf (syn-time tcp) (simulation-time)) ;; for initial RTT estimate
-  (send-packet tcp syn :sequence-number 0 :ack-number 0))
+  (initialise-sequence-number tcp)
+  (send-packet tcp syn :ack-number 0))
 
-(defun respond(tcp peer-address peer-port)
-  "This tcp is a copy of a listening tcp. The SYN packet was received
-   by the listener, and it created a copy of itself.  This copy
-   will bind to the local port/ip, remote port/ip and respond to all
-  future packets."
-  (setf (state tcp) syn-rcvd)
-  (bind tcp :peer-address peer-address :peer-port peer-port)
-  (syn-ack-tx tcp))
-
-(defun reject(tcp peer-address peer-port)
-  "Application not accepting more connections"
-  (send-packet tcp rst :sequence-number 0 :ack-number 0
-               :dst-address peer-address :dst-port peer-port))
-
-(defun syn-ack-tx(tcp &key header dst-address &allow-other-keys)
-  (cond
-    ((and header (= (state tcp) listen))
-    ;; create clone of listener for connection
-     (let ((copy (copy tcp)))
-       (if (connection-from-peer (application copy) copy)
-           (respond copy dst-address (src-port header))
-           (reject  copy dst-address (src-port header)))))
-    (t
-     ;; this is copy - just respond - but timeout in case of syn-flood attacker
-     (send-packet tcp (logior syn ack) :sequence-number 0 :ack-number 0)
-     (schedule 'connection-timeout tcp))))
+(defun syn-ack-tx(tcp &key header dst-address
+                  &allow-other-keys)
+  (assert (and header (= (state tcp) listen) dst-address))
+   (let ((copy (copy tcp))
+         (dst-port  (src-port header)))
+     (setf (peer-port copy) dst-port
+           (peer-address copy) dst-address)
+     (if (connection-from-peer (application copy) copy)
+         (progn ;;
+           ;; copy accepts connection
+           (setf (state copy) syn-rcvd)
+           (initialise-sequence-number copy)
+           (setf (next-rx-seq copy) (seq+ (sequence-number header) 1))
+           (setf (last-rx-ack copy) (ack-number header))
+           (setf (slot-value copy 'fid)
+                 (incf (slot-value copy 'layer4::last-fid)))
+           (bind copy :peer-address dst-address :peer-port dst-port)
+           (send-packet copy (logior syn ack))
+           (schedule 'connection-timer copy))
+         ;; otherwise reject by sending rst from listener
+         (send-packet copy rst :sequence-number 0
+                      :ack-number (sequence-number header)
+                      :dst-address dst-address :dst-port dst-port))))
 
 (defun fin-tx(tcp &key &allow-other-keys)
   (send-packet tcp fin))
@@ -896,6 +902,7 @@
         (pending-data (pending-data tcp))
         (ipv4 (layer3:find-protocol 'layer3:ipv4 (node tcp)))
         (interface (find-interface (peer-address tcp) (node tcp))))
+    (break "~A sending ~A" tcp pending-data)
     (loop
        ;; if no data finished
        (when (zerop (length-bytes pending-data)) (return))
@@ -922,8 +929,10 @@
              (setf (state tcp) fin-wait-1))
            (send-packet tcp flags :data data :ipv4 ipv4)
            (incf n-sent)
-           (setf (next-tx-seq tcp) (seq+ (next-tx-seq tcp) (length-bytes data)))
-           (setf (high-tx-mark tcp) (max (next-tx-seq tcp) (high-tx-mark tcp)))
+           (setf (next-tx-seq tcp)
+                 (seq+ (next-tx-seq tcp) (length-bytes data)))
+           (setf (high-tx-mark tcp)
+                 (seq-max (next-tx-seq tcp) (high-tx-mark tcp)))
            (incf (bytes-sent tcp) (length-bytes data))))))
     (when (> n-sent 0)
       (schedule 'retransmit-packet tcp)

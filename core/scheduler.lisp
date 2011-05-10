@@ -188,7 +188,8 @@ are dispatched in current thread"
 (defmethod copy ((timer timer) &optional
                  (copy (make-instance (class-of timer))))
   ;; we initialise scheduler used slots as normal and copy other slots only
-  (copy-slots timer copy :slot-names '(name timer-delay handler)))
+  (setf (slot-value copy 'handler) (handler timer))
+  (copy-slots timer copy :slot-names '(name timer-delay)))
 
 (defmethod schedule((delay number) (timer timer))
   (setf (slot-value timer 'time-scheduled) (simulation-time))
@@ -242,7 +243,8 @@ are dispatched in current thread"
 (defmethod copy :around ((object with-timers) &optional
                          (copy (call-next-method)))
   (dolist(timer (timers copy))
-    (setf (slot-value (slot-value copy timer) 'handler) copy)))
+    (setf (slot-value (slot-value copy timer) 'handler) copy))
+  copy)
 
 (defmethod reset ((object with-timers))
   (cancel :all object))

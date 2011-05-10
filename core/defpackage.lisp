@@ -183,7 +183,7 @@
            #:close-connection #:connection-closed #:close-request
            #:connection-from-peer #:connected-p
            #:send #:receive #:sent
-           #:seq+ #:seq- #:seq< #:seq-in-segment #:ack-after-segment
+           #:seq+ #:seq- #:seq< #:seq-max #:seq-in-segment #:ack-after-segment
            ;; conditions
            ;; specific default layer 4 protocols
            #:udp-dmux #:tcp-dmux #:udp-header #:tcp-header

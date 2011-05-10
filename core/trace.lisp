@@ -56,9 +56,8 @@ on stream. t means all")
    (print-ipformat
     :initform :dotted :accessor print-ipformat :initarg :ipformat
     :documentation "How ip addresses are to be printed on this stream")
-   (last-log-time
-    :initform -1.0 :type time-type :accessor last-log-time
-    :documentation "")
+   (last-log-time :initform -1.0 :accessor last-log-time
+    :documentation "Last time status was logged")
    (status :type hash-table :initform (make-hash-table) :reader status)
    (detail :type hash-table :initform (make-hash-table) :reader detail))
   (:documentation "A packet trace stream"))
@@ -141,8 +140,10 @@ on stream. t means all")
 ;; trace status and trace detail are set by node, protocol
 ;; or protocol layer number
 
-(defvar *lens-trace-output*
-  (make-instance 'trace-stream :stream *standard-output*)
+(defparameter *lens-trace-output*
+  (if (and (boundp '*lens-trace-output*)  *lens-trace-output*)
+      *lens-trace-output*
+      (make-instance 'trace-stream :stream *standard-output*))
   "Global trace stream(s)")
 
 (defun reset-traces() (reset *lens-trace-output*))

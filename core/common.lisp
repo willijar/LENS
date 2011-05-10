@@ -327,3 +327,9 @@ Examples:
   (:method(a b)
     (distance (location a) (location b))))
 
+(defvar lens-user:*user-output* *standard-output*
+  "Stream used for writing user messages to")
+
+(defvar trace:*lens-trace-output*
+  nil
+  "Global trace stream(s)")

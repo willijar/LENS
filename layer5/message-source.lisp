@@ -33,7 +33,7 @@
               :documentation "Random size of message to send")
    (response-size :initarg :response-size :initform nil :accessor response-size
                   :documentation "Random size of response to request")
-   (loop-count :initarg loop-count :initform 1 :accessor loop-count)
+   (loop-count :initarg :loop-count :initform 1 :accessor loop-count)
    (repeat-count :initform 0 :accessor repeat-count)
    (bytes-sent :initform 0 :accessor bytes-sent
                :documentation "Bytes sent this loop")
@@ -65,6 +65,7 @@ on the number of sending iterations."))
 
 (defmethod stop((app message-source) &key &allow-other-keys)
   (call-next-method)
+  (break "Stopping ~A" app)
   (close-connection (protocol app))
   (unbind (protocol app)))
 

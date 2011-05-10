@@ -48,4 +48,4 @@
 (start client)
 
 ;; Always schedule simulation to stop at some time
-(schedule 6 #'stop-simulation)
+(schedule 100 #'stop-simulation)

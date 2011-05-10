@@ -403,13 +403,16 @@ this occurs when the acknowledgement is received from the peer.")
 
 (defgeneric connection-from-peer(application protocol)
   (:documentation "Called when a listening protocol receives a
-  connection request. Return true if connection accepted. Protocol will be the connected socket (not the listener)")
+  connection request. Return true if connection accepted. Protocol
+  will be the connected socket (not the listener). Applications which
+  accept a connection will probably want to keep track of it in their
+  implementation at this point.")
   (:method(application protocol)
     "Default - accept and do nothing"
     (declare (ignore application protocol))
     t))
 
-(declaim (inline seq+ seq- seq<))
+(declaim (inline seq+ seq- seq< seq-max))
 
 (defun seq+(seq length-bytes)
   "32 bit modulus addition of a sequence number and a byte length"
@@ -428,6 +431,9 @@ this occurs when the acknowledgement is received from the peer.")
   (declare ((unsigned-byte 32) a b))
   (and (< a b)
        (< (- b a)  #x10000000)))
+
+(defun seq-max(a b)
+  (if (seq< a b) b a))
 
 (defun seq-in-segment(sequence-number segment-start segment-no-bytes)
   "Return true if the sequence number corresponds to a byte in segment

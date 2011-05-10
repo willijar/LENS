@@ -17,9 +17,6 @@
 
 (in-package :lens-user)
 
-(defvar *user-output* *standard-output*
-  "Stream used for writing user messages to")
-
 (defmacro with-new-instances((&rest defs) &body body)
   "Macro lexically binding variables to instances created using
 make-instance.  over the body. defs is a list of definitions. The

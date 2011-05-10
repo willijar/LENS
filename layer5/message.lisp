@@ -32,7 +32,7 @@
   (make-instance 'message-data
                  :length-bytes length-bytes
                  :messages (list (make-message :response-size response-size
-                                               :offset (length-bytes data)))))
+                                               :offset length-bytes))))
 
 (defmethod data-concatenate((a message-data) (b message-data))
   (let ((result (call-next-method))
