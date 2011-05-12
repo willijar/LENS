@@ -82,8 +82,9 @@
                (:file "tcp" :depends-on ("rtt"))))
      (:module "layer5" :depends-on ("core")
               :components
-              ((:file "abr-source")
+              ((:file "client" :depends-on ("message"))
+               (:file "abr-source" :depends-on ("client"))
                (:file "udp-sink")
                (:file "message")
-               (:file "message-source" :depends-on ("message"))
+               (:file "message-source" :depends-on ("message" "client"))
                (:file "message-responder" :depends-on ("message"))))))

@@ -24,7 +24,7 @@
    (local-port :initarg :local-port
                :type ipport :reader local-port
                :documentation "Port number to bind to")
-   (responders :type list :accessor responders
+   (responders :initform nil :type list :accessor responders
                :documentation "List of responders (connections)")
    (bytes-sent :initform 0 :accessor bytes-sent
                :documentation "Bytes sent")

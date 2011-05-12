@@ -412,7 +412,7 @@ this occurs when the acknowledgement is received from the peer.")
     (declare (ignore application protocol))
     t))
 
-(declaim (inline seq+ seq- seq< seq-max))
+;(declaim (inline seq+ seq- seq< seq-max))
 
 (defun seq+(seq length-bytes)
   "32 bit modulus addition of a sequence number and a byte length"
@@ -489,11 +489,6 @@ given segment-start and no-bytes"
   (fill-pointer pdu))
 
 (defmethod length-bytes((pdu null)) 0)
-
-(defmethod send((layer4 layer4:protocol) (length-bytes integer) application &rest args)
-  (apply #'send layer4
-         (make-instance 'data :length-bytes length-bytes)
-         application args))
 
 (defmethod print-object((data data) stream)
   (print-unreadable-object (data stream :type t :identity t)

@@ -124,7 +124,7 @@ form the packets are derived from this class."))
   (direction :rx :type (member :tx :rx))
   (layer 0 :type (integer 5))
   (protocol-number 0 :type integer)
-  (interface nil :type interface)
+  (interface nil)
   (callback nil :type function)) ;; function of protocol entity and packet
 
 (defun add-callback(callback node)

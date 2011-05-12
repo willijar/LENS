@@ -64,6 +64,7 @@
                                   :response-size (message-response-size m)
                                   :created (message-created m)
                                   :offset (- o start))))))
-           (messages data)))))
+           (messages data)))
+    result))
 
 

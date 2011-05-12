@@ -32,13 +32,12 @@ a web browser model with multiple simultaneous connections."))
       (slot-value app 'name)
       (call-next-method)))
 
+(defmethod start((app application)))
+(defmethod stop((app application) &key &allow-other-keys))
+(defmethod reset((app application)))
+
 (defmethod trace:default-trace-detail((application application))
   '(length-bytes))
 
-(defmethod initialize-instance :after ((app application) &key node &allow-other-keys)
-  (push app (node:applications node)))
-
-(defmethod receive((application application) data layer4 &key &allow-other-keys)
-  "Called by layer 4 protocol object when data is received. Default -
-do nothing"
-    (declare (ignore application data layer4)))
+(defmethod initialize-instance :after ((app application) &key &allow-other-keys)
+  (push app (node:applications (node app))))
