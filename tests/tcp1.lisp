@@ -37,10 +37,9 @@
   (make-instance
    'message-source
    :node (node 0)
-   :data-size '(math:uniform 100 512)
-   :response-size '(math::uniform 5000 20000)
-   :loop-count 5
-   :sleep-time '(math:uniform 0.5 5.0)
+   :data-size 100
+   :response-size 100
+   :loop-count 1
    :peer-address (ipaddr (node 5))
    :peer-port 20000))
 

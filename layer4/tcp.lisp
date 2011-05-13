@@ -719,9 +719,9 @@
   (unless (connected-p tcp)
     (funcall (process-event app-listen tcp) tcp)))
 
-(defun unack-data-count(tcp) (- (next-tx-seq tcp) (highest-rx-ack tcp)))
+(defun unack-data-count(tcp) (seq- (next-tx-seq tcp) (highest-rx-ack tcp)))
 
-(defun bytes-in-flight(tcp) (- (high-tx-mark tcp) (highest-rx-ack tcp)))
+(defun bytes-in-flight(tcp) (seq- (high-tx-mark tcp) (highest-rx-ack tcp)))
 
 (defmethod window((tcp tcp)) (min (rx-window tcp) (congestion-window tcp)))
 
@@ -767,7 +767,8 @@
   (schedule 'connection-timer tcp)
   (setf (syn-time tcp) (simulation-time)) ;; for initial RTT estimate
   (initialise-sequence-number tcp)
-  (send-packet tcp syn :ack-number 0))
+  (send-packet tcp syn :ack-number 0)
+  (setf (next-tx-seq tcp) (seq+ (next-tx-seq tcp) 1)))
 
 (defun syn-ack-tx(tcp &key header dst-address
                   &allow-other-keys)
@@ -783,10 +784,12 @@
            (initialise-sequence-number copy)
            (setf (next-rx-seq copy) (seq+ (sequence-number header) 1))
            (setf (last-rx-ack copy) (ack-number header))
+           (setf (highest-rx-ack copy) (ack-number header))
            (setf (slot-value copy 'fid)
                  (incf (slot-value copy 'layer4::last-fid)))
            (bind copy :peer-address dst-address :peer-port dst-port)
            (send-packet copy (logior syn ack))
+           (setf (next-tx-seq tcp) (seq+ (next-tx-seq tcp) 1))
            (schedule 'connection-timer copy))
          ;; otherwise reject by sending rst from listener
          (send-packet copy rst :sequence-number 0
@@ -902,19 +905,19 @@
         (pending-data (pending-data tcp))
         (ipv4 (layer3:find-protocol 'layer3:ipv4 (node tcp)))
         (interface (find-interface (peer-address tcp) (node tcp))))
-    (break "~A sending ~A" tcp pending-data)
     (loop
        ;; if no data finished
-       (when (zerop (length-bytes pending-data)) (return))
-       (let ((w (available-window tcp))
-             (mss (maximum-segment-size tcp)))
-         (when (and (< w mss) (> (length-bytes pending-data) w))
+       (let* ((index (seq- (next-tx-seq tcp) (highest-rx-ack tcp)))
+              (no-bytes (- (length-bytes pending-data) index)))
+
+         (when (zerop no-bytes) (return))
+         (let ((w (available-window tcp))
+               (mss (maximum-segment-size tcp)))
+           (when (and (< w mss) (> no-bytes w))
             ;; don't send small segment unnecessarily
-           (return))
+             (return))
          (let ((data
-                 (data-subseq pending-data
-                              (seq- (next-tx-seq tcp) (highest-rx-ack tcp))
-                              (min w mss))))
+                (data-subseq pending-data index (min w mss))))
          ;; if no buffer available stop and request
          ;;(100 extra bytes is to allow for headers)
          (unless (layer1:buffer-available-p
@@ -924,7 +927,7 @@
          (let ((flags (if with-ack ack 0)))
            ;; see if we need fin flag
            (when (and (close-on-empty tcp)
-                      (= (length-bytes data) (length-bytes pending-data)))
+                      (= (length-bytes data) no-bytes))
              (setf flags (logior flags fin))
              (setf (state tcp) fin-wait-1))
            (send-packet tcp flags :data data :ipv4 ipv4)
@@ -933,9 +936,10 @@
                  (seq+ (next-tx-seq tcp) (length-bytes data)))
            (setf (high-tx-mark tcp)
                  (seq-max (next-tx-seq tcp) (high-tx-mark tcp)))
-           (incf (bytes-sent tcp) (length-bytes data))))))
+           (incf (bytes-sent tcp) (length-bytes data)))))))
     (when (> n-sent 0)
-      (schedule 'retransmit-packet tcp)
+      (when (not (busy-p (timer 'retransmit-packet-timer tcp)))
+        (schedule 'retransmit-packet-timer tcp))
       t)))
 
 (defmethod control-message((tcp tcp) (msg (eql :destination-unreachable))
@@ -1133,9 +1137,9 @@
                   :documentation "High tx mark for new reno")
    (partial-ack-count :initform 0 :accessor partial-ack-count
                       :documentation "Number of parial acks in a row"))
-  (:documentation "Reno TCP implementation"))
+  (:documentation "NewReno TCP implementation"))
 
-(defmethod new-ack ((tcp tcp-reno) &key header
+(defmethod new-ack ((tcp tcp-newreno) &key header
                     (ack-number (ack-number header)) &allow-other-keys)
   (let ((seg-size (maximum-segment-size tcp))
         (slow-start-threshold  (slow-start-threshold tcp))
@@ -1181,6 +1185,6 @@
              (recover tcp) (next-tx-seq tcp))
        (retransmit tcp)))))
 
-(defmethod retransmit-packet-timeout((tcp tcp-reno))
+(defmethod retransmit-packet-timeout((tcp tcp-newreno))
    (setf (partial-ack-count tcp) 0)
    (call-next-method))
