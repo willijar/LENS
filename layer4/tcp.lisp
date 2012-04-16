@@ -94,7 +94,7 @@
    (window
     :type (unsigned-byte 16) :initarg :window :initform 0 :reader window)
    (checksum
-    :type (unsigned-byte 16) :initarg :checksum :accessor checksum)
+    :type (unsigned-byte 16) :initarg :checksum :initform 0 :accessor checksum)
    (urgent-pointer
     :type (unsigned-byte 16) :initarg :urgent-pointer :initform 0
     :reader urgent-pointer)
@@ -133,6 +133,8 @@
      closing ;; both sides have tried to close simultaneously
      timed-wait ;; wait for all packets to die off
      last-state))
+
+(defun state-name(state) (elt tcp-states state))
 
 (defenumeration (tcp-events (unsigned-byte 4))
     (app-listen app-connect app-send seq-recv app-close timeout ack-rx
@@ -519,6 +521,16 @@
              :documentation "Arguments passed during initialisation - used during reset"))
   (:documentation "Base class for Transmission Control Protocol variants"))
 
+(defmethod (setf state)(state (tcp tcp))
+  (setf (slot-value tcp 'state) state))
+
+(defmethod print-object((tcp tcp) stream)
+  (print-unreadable-object(tcp stream :type t :identity t)
+    (format stream "~A ~A"
+            (state-name (state tcp))
+            (when (slot-boundp tcp 'local-port)
+              (local-port tcp)))))
+
 ;; generic functions to be implemented by the variants
 (defgeneric retransmit-packet-timeout(tcp))
 (defgeneric new-ack(tcp &key packet header &allow-other-keys))
@@ -761,7 +773,8 @@
 (defun initialise-sequence-number(tcp)
   (let ((seq (random #xFFFFFFFF)))
     (setf (next-tx-seq tcp) seq
-          (high-tx-mark tcp) seq)))
+          (high-tx-mark tcp) seq
+          (highest-rx-ack tcp) seq)))
 
 (defun syn-tx(tcp &key &allow-other-keys)
   (schedule 'connection-timer tcp)
@@ -780,21 +793,24 @@
      (if (connection-from-peer (application copy) copy)
          (progn ;;
            ;; copy accepts connection
+           (bind copy :peer-address dst-address :peer-port dst-port)
            (setf (state copy) syn-rcvd)
            (initialise-sequence-number copy)
            (setf (next-rx-seq copy) (seq+ (sequence-number header) 1))
            (setf (last-rx-ack copy) (ack-number header))
-           (setf (highest-rx-ack copy) (ack-number header))
            (setf (slot-value copy 'fid)
                  (incf (slot-value copy 'layer4::last-fid)))
-           (bind copy :peer-address dst-address :peer-port dst-port)
            (send-packet copy (logior syn ack))
-           (setf (next-tx-seq tcp) (seq+ (next-tx-seq tcp) 1))
+           (setf (next-tx-seq copy) (seq+ (next-tx-seq copy) 1))
            (schedule 'connection-timer copy))
          ;; otherwise reject by sending rst from listener
          (send-packet copy rst :sequence-number 0
                       :ack-number (sequence-number header)
                       :dst-address dst-address :dst-port dst-port))))
+
+(defun serv-notify(tcp &key &allow-other-keys)
+  "Notify Server application that its connection has moved to established state"
+  (connection-complete (application tcp) tcp))
 
 (defun fin-tx(tcp &key &allow-other-keys)
   (send-packet tcp fin))
@@ -909,7 +925,7 @@
        ;; if no data finished
        (let* ((index (seq- (next-tx-seq tcp) (highest-rx-ack tcp)))
               (no-bytes (- (length-bytes pending-data) index)))
-
+         (break "~A index (~A-~A)=~A no-bytes=~A" tcp (next-tx-seq tcp) (highest-rx-ack tcp) index no-bytes)
          (when (zerop no-bytes) (return))
          (let ((w (available-window tcp))
                (mss (maximum-segment-size tcp)))
@@ -992,7 +1008,7 @@
                      (= state fin-wait-2)))
         (schedule 'retransmit-packet-timer tcp)))))
 
-(defmethod receive(application (packet packet) (tcp tcp) &key &allow-other-keys)
+(defmethod receive (application (packet packet) (tcp tcp) &key &allow-other-keys)
   (let ((header (pop-pdu packet))
         (data (pop-pdu packet)))
     (with-slots(next-rx-seq) tcp
@@ -1029,7 +1045,7 @@
            ;; see if can close now
            (when (and (or (pending-close tcp) (> original-state established))
                       (empty-p buffered-data))
-             (peer-close tcp)))
+             (peer-close tcp :packet packet :header header)))
           ((> (sequence-number header) next-rx-seq)
            ;; buffer this packet
            (enqueue packet buffered-data))))

@@ -42,7 +42,7 @@ mask specifying which slots to write."
         (if (listp slot)
             (values (first slot) (second slot))
             (values slot " ~A"))
-      (when (or (member slot mask) (eql mask :all))
+      (when (or  (eql mask :all) (member slot mask))
         (let ((value
                (cond
                  ((functionp slot) (funcall slot pdu))

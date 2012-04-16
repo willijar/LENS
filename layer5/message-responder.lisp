@@ -57,7 +57,7 @@
   (close-connection (listener app))
   (unbind (listener app)))
 
-(defmethod connection-complete((app message-responder) layer4)
+(defmethod connection-from-peer((app message-responder) layer4)
   (unless (eql layer4 (listener app))
     (push layer4 (responders app))))
 
@@ -68,11 +68,15 @@
       (close-request app protocol)))
 
 (defmethod close-request((app message-responder) protocol)
-  (close-connection protocol)
-  (setf (responders app) (delete protocol (responders app))))
+  (setf (responders app) (delete protocol (responders app)))
+  (call-next-method))
 
-(defmethod receive((app message-responder) data protocol &key &allow-other-keys)
-  (incf (bytes-received app) (length-bytes data))
+(defmethod receive((app message-responder) (data data) protocol &key &allow-other-keys)
+  (incf (bytes-received app) (length-bytes data)))
+
+(defmethod receive((app message-responder) (data message-data) protocol &key &allow-other-keys)
+  (call-next-method)
+  (break "Received ~A from ~A" data protocol)
   (dolist(msg (messages data))
     (when (response-statistics app)
       (record (- (simulation-time) (message-created msg))

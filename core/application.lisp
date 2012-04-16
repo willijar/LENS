@@ -18,8 +18,9 @@
 
 (in-package :layer5)
 
-(defclass application(protocol:protocol)
-  ((name :type string :initarg :name
+(defclass application()
+  ((node :type node :initarg :node :reader node)
+   (name :type string :initarg :name
          :documentation "Name of this application"))
   (:documentation "Class Application is the base class for all applications.
 It defines the interface between the application class and
@@ -41,3 +42,13 @@ a web browser model with multiple simultaneous connections."))
 
 (defmethod initialize-instance :after ((app application) &key &allow-other-keys)
   (push app (node:applications (node app))))
+
+(defmethod receive :before ((receiver application) data
+                            (sender protocol:protocol) &key &allow-other-keys)
+  (protocol::write-trace receiver data :text "+"))
+
+(defmethod send :before ((receiver protocol:protocol) data (sender application)
+                         &key &allow-other-keys)
+  (protocol::write-trace sender data :text "-"))
+
+

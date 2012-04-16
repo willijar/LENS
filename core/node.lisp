@@ -171,3 +171,10 @@ form the packets are derived from this class."))
 (defmethod delete-notifications(entity (node node))
   (map 'nil #'(lambda(interface) (delete-notifications entity interface))
        (interfaces node)))
+
+(defmethod reset((entity (eql :all)))
+  (reset (node:nodes))
+  (dolist(h *reset-hooks*)
+    (typecase h
+      (function (funcall h))
+      (t (reset h)))))

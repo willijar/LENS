@@ -109,13 +109,7 @@ Returns:
   (:documentation "Reset an entity to same state as start of
  simulation i.e.  clear all packets etc.")
   (:method ((entities sequence))
-    (map nil #'reset entities))
-  (:method ((entity (eql :all)))
-    (reset (node:nodes))
-    (dolist(h *reset-hooks*)
-      (typecase h
-        (function (funcall h))
-        (t (reset h))))))
+    (map nil #'reset entities)))
 
 (defgeneric copy(entity &optional destination)
   (:documentation "Create an return a (deep) copy of an entity.

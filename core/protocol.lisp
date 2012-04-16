@@ -57,9 +57,6 @@ See http://www.iana.org/assignments/protocol-numbers")
   (:method :before((receiver protocol) (packet packet) (sender protocol)
                    &key &allow-other-keys)
       (write-trace sender (peek-pdu packet) :packet packet :text "-"))
-  (:method :before((receiver protocol) (pdu pdu) (sender protocol)
-                   &key &allow-other-keys)
-      (write-trace sender pdu :packet pdu :text "-"))
   (:method :around (receiver packet (sender protocol) &key &allow-other-keys)
      (when (node:call-callbacks :tx sender packet) (call-next-method))))
 
@@ -69,9 +66,6 @@ See http://www.iana.org/assignments/protocol-numbers")
   (:method :before((receiver protocol) (packet packet) (sender protocol)
                    &key &allow-other-keys)
      (write-trace receiver (peek-pdu packet) :packet packet :text "+"))
-  (:method :before((receiver protocol) (pdu pdu) (sender protocol)
-                   &key &allow-other-keys)
-     (write-trace receiver pdu :packet pdu :text "+"))
   (:method :around((receiver protocol) packet sender &key &allow-other-keys)
     (when (node:call-callbacks :rx receiver packet) (call-next-method))))
 
@@ -187,7 +181,8 @@ See http://www.iana.org/assignments/protocol-numbers")
                  :type (or network-address null)
                  :accessor peer-address
                  :documentation "network address of peer")
-   (peer-port  :initarg :peer-port :type (or ipport null) :accessor peer-port
+   (peer-port :initarg :peer-port :initform nil
+              :type (or ipport null) :accessor peer-port
                :documentation "Service access port of peer")
    (fid :type integer :reader fid :documentation "Flow id for packets")
    (last-fid :type integer :initform 0 :documentation "last allocated flow id"
@@ -306,19 +301,22 @@ See http://www.iana.org/assignments/protocol-numbers")
       (assert (or (not (or peer-port peer-address))
                   (and peer-port peer-address)))
       (assert (not (bound-p protocol)))
-      (unless (binding dmux local-port :local-address local-address
-                        :peer-port peer-port :peer-address peer-address)
-         (setf (slot-value protocol 'local-port) local-port
-               (slot-value protocol 'local-address) local-address
-               (slot-value protocol 'node) node
-               (slot-value protocol 'application) application)
-         (if (and peer-port peer-address)
-             (setf (slot-value protocol 'peer-port) peer-port
-                   (slot-value protocol 'peer-address) peer-address)
-             (progn
-               (slot-makunbound protocol 'peer-port)
-               (slot-makunbound protocol 'peer-address)))
-         (push protocol (bindings dmux))))))
+      (unless (find-if
+               #'(lambda(p)
+                   (and (eql local-port (local-port p))
+                        (or (not local-address)
+                            (not (local-address p))
+                            (eql (local-address p) local-address))
+                        (eql peer-address (peer-address p))
+                        (eql peer-port (peer-port p))))
+               (bindings dmux))
+        (setf (slot-value protocol 'local-port) local-port
+              (slot-value protocol 'local-address) local-address
+              (slot-value protocol 'node) node
+              (slot-value protocol 'application) application
+              (slot-value protocol 'peer-port) peer-port
+              (slot-value protocol 'peer-address) peer-address)
+        (push protocol (bindings dmux))))))
 
 (defgeneric unbind(protocol)
   (:documentation "Remove protocol from dmux bindings")
@@ -368,14 +366,14 @@ connection attempt")
 (defgeneric connected-p(protocol)
   (:documentation "Return true if protocol is connected")
   (:method((protocol protocol))
-    (slot-boundp protocol 'peer-port)))
+    (slot-value protocol 'peer-port)))
 
 (defgeneric close-connection(protocol)
   (:documentation "Close an open connection")
   (:method((protocol protocol))
     "Disassociate a peer address and port with a protocol implementation"
-    (slot-makunbound protocol 'peer-port)
-    (slot-makunbound protocol 'peer-address)))
+    (setf (slot-value protocol 'peer-port) nil
+          (slot-value protocol 'peer-address) nil)))
 
 (defgeneric connection-closed(application protocol)
   (:documentation "Called by an associated layer 4 protocol when a
