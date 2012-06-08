@@ -184,7 +184,8 @@ See http://www.iana.org/assignments/protocol-numbers")
    (peer-port :initarg :peer-port :initform nil
               :type (or ipport null) :accessor peer-port
                :documentation "Service access port of peer")
-   (fid :type integer :reader fid :documentation "Flow id for packets")
+   (fid :initarg :fid
+        :type integer :reader fid :documentation "Flow id for packets")
    (last-fid :type integer :initform 0 :documentation "last allocated flow id"
              :allocation :class)
    (ttl :accessor ttl :initarg :ttl :initform 64 :type integer

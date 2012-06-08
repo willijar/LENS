@@ -101,6 +101,8 @@
   (assert (and dst-address dst-port)
           (dst-address dst-port)
           "send of data to ~A:~A invalid for UDP" dst-address dst-port)
+  (unless (slot-boundp udp 'fid)
+    (setf (slot-value udp 'fid) (incf (slot-value udp 'last-fid))))
   (setf (pending-data udp)
         (nconc
          (pending-data udp)

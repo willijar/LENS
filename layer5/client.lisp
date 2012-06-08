@@ -69,3 +69,7 @@
 (defmethod sent((app client-application) n protocol)
   (declare (ignore protocol))
   (incf (bytes-ack app) n))
+
+(defmethod send((transport layer4:protocol) (length-bytes integer) app
+                &key &allow-other-keys)
+  (send transport (make-instance 'data :length-bytes length-bytes) app))
