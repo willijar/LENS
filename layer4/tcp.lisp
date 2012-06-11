@@ -428,7 +428,7 @@
    (retransmit-packet-timer :type timer :initform (make-instance 'timer))
 
    ;; sequence numbers
-   (next-tx-seq :initform (random #xFFFFFFFF) :type (unsigned-byte 32)
+   (next-tx-seq :initform 0 #+nil(random #xFFFFFFFF) :type (unsigned-byte 32)
                 :documentation "Next sequence to send" :accessor next-tx-seq)
    (high-tx-mark :initform 0 :type (unsigned-byte 32) :accessor high-tx-mark
                  :documentation "TX High water mark, for counting retx")
@@ -554,11 +554,19 @@
 
 (defmethod reset((tcp tcp))
   (call-next-method)
-  (let ((initargs (slot-value tcp 'initargs)))
-    (dolist(slot (closer-mop:class-slots tcp))
-      (when (eql (closer-mop:slot-definition-allocation slot) :instance )
+  ;; we initialize either both the specific tcp variant and the main
+  ;; tcp class slots to initargs or initforms.
+  (let ((initargs (slot-value tcp 'initargs))
+        (slots
+         (union (closer-mop:class-direct-slots (class-of tcp))
+                        (closer-mop:class-direct-slots (find-class 'tcp)))))
+    (dolist(slot slots)
+      (when  (eql (closer-mop:slot-definition-allocation slot) :instance)
         (slot-makunbound tcp (closer-mop:slot-definition-name slot))))
-    (apply #'shared-initialize tcp t initargs)
+    (apply #'shared-initialize
+           tcp
+           (mapcar #'closer-mop:slot-definition-name slots)
+           initargs)
     (setf (congestion-window tcp)  (* (initial-congestion-window tcp)
                                       (maximum-segment-size tcp)))
     (setf (slot-value tcp 'initargs) initargs)))
@@ -621,10 +629,10 @@
          (schedule 'timed-wait-timer tcp))
       ;; carry out action
       (funcall action tcp
-               :packet packet :header header :dst-address src-address)
+               :packet packet :dst-address src-address)
       ;; more state checks
       (when (and (= state last-ack)
-                 (not (busy-p  (timer 'last-ack-timer tcp))))
+                 (not (busy-p (timer 'last-ack-timer tcp))))
         (schedule 'last-ack-timer tcp)))))
 
 (defmethod send((tcp tcp) (data data) application
@@ -746,32 +754,38 @@
 (defun no-act(tcp &key &allow-other-keys)
   (declare (ignore tcp)))
 
-(defun ack-tx(tcp &key header &allow-other-keys)
+(defun ack-tx(tcp &key packet &allow-other-keys)
   (send-packet tcp ack)
   ;; save receiver advertised window
-  (when header (setf (rx-window tcp) (window header))))
+  (when packet (setf (rx-window tcp) (window (peek-pdu packet)))))
 
-(defun ack-tx-1(tcp &key header &allow-other-keys)
-  ;; save receiver advertised window
-  (setf (rx-window tcp) (window header))
-  (setf (next-rx-seq tcp) (seq+ (sequence-number header) 1))
-  (setf (highest-rx-ack tcp) (ack-number header))
-  (setf (last-rx-ack tcp) (ack-number header))
-  (cancel 'connection-timer tcp)
-  ;; notify application
-  (setf (need-ack tcp) t)
-  (connection-complete (application tcp) tcp)
-  ;; if no data need to send ack
-  (when (zerop (length-bytes (pending-data tcp)))
-    (send-packet tcp ack)))
+(defun ack-tx-1(tcp &key packet &allow-other-keys)
+  (let ((header (peek-pdu packet)))
+    ;; save receiver advertised window
+    (setf (rx-window tcp) (window header))
+    (setf (next-rx-seq tcp) (seq+ (sequence-number header) 1))
+    (setf (highest-rx-ack tcp) (ack-number header))
+    (setf (last-rx-ack tcp) (ack-number header))
+    (cancel 'connection-timer tcp)
+    ;; notify application
+    (setf (need-ack tcp) t)
+    (connection-complete (application tcp) tcp)
+    ;; if no data need to send ack
+    (when (zerop (length-bytes (pending-data tcp)))
+      (send-packet tcp ack))))
 
-(defun rst-tx(tcp &key header dst-address &allow-other-keys)
-  (send-packet tcp rst :sequence-number 0 :ack-number 0
-               :dst-address dst-address
-               :dst-port  (if header (src-port header) (peer-port tcp))))
+(defun rst-tx(tcp &key packet dst-address &allow-other-keys)
+  (send-packet
+   tcp rst
+   :sequence-number 0
+   :ack-number 0
+   :dst-address dst-address
+   :dst-port (if packet
+                 (src-port (peek-pdu packet))
+                 (peer-port tcp))))
 
 (defun initialise-sequence-number(tcp)
-  (let ((seq (random #xFFFFFFFF)))
+  (let ((seq 0 #+nil (random #xFFFFFFFF)))
     (setf (next-tx-seq tcp) seq
           (high-tx-mark tcp) seq
           (highest-rx-ack tcp) seq)))
@@ -783,11 +797,12 @@
   (send-packet tcp syn :ack-number 0)
   (setf (next-tx-seq tcp) (seq+ (next-tx-seq tcp) 1)))
 
-(defun syn-ack-tx(tcp &key header dst-address
+(defun syn-ack-tx(tcp &key packet dst-address
                   &allow-other-keys)
-  (assert (and header (= (state tcp) listen) dst-address))
-   (let ((copy (copy tcp))
-         (dst-port  (src-port header)))
+  (assert (and (= (state tcp) listen) dst-address))
+   (let* ((copy (copy tcp))
+          (header (peek-pdu packet))
+          (dst-port  (src-port header)))
      (setf (peer-port copy) dst-port
            (peer-address copy) dst-address)
      (if (connection-from-peer (application copy) copy)
@@ -817,7 +832,9 @@
 
 (defun fin-ack-tx(tcp &key &allow-other-keys)
   (send-packet tcp (logior fin ack))
-  (when (= (state tcp) last-ack)  (schedule 'last-ack-timer tcp)))
+  (when (and (= (state tcp) last-ack)
+             (not (busy-p (timer 'last-ack-timer tcp))))
+    (schedule 'last-ack-timer tcp)))
 
 (defun new-seq-rx(tcp &key packet &allow-other-keys)
   ;; data received
@@ -843,7 +860,8 @@
       (when (= state saved-state)
         ;; need to ack - application will close later
         (send-packet tcp ack)))
-    (when (= state last-ack)
+    (when (and (= state last-ack)
+               (not (busy-p (timer 'last-ack-timer tcp))))
       (schedule 'last-ack-timer tcp))))
 
 (defun app-closed(tcp &key &allow-other-keys)
@@ -925,8 +943,8 @@
        ;; if no data finished
        (let* ((index (seq- (next-tx-seq tcp) (highest-rx-ack tcp)))
               (no-bytes (- (length-bytes pending-data) index)))
-         (break "~A index (~A-~A)=~A no-bytes=~A" tcp (next-tx-seq tcp) (highest-rx-ack tcp) index no-bytes)
-         (when (zerop no-bytes) (return))
+         ;(break "~A index (~A-~A)=~A no-bytes=~A" tcp (next-tx-seq tcp) (highest-rx-ack tcp) index no-bytes)
+         (when (<= no-bytes 0) (return))
          (let ((w (available-window tcp))
                (mss (maximum-segment-size tcp)))
            (when (and (< w mss) (> no-bytes w))
@@ -966,9 +984,10 @@
     (funcall (process-event timeout tcp) tcp :packet packet)
     (control-message (application tcp) msg tcp)))
 
-(defmethod new-ack :around ((tcp tcp) &key header packet &allow-other-keys)
-  (let ((highest-rx-ack (highest-rx-ack tcp))
-        (ack-number (ack-number header)))
+(defmethod new-ack :around ((tcp tcp) &key packet &allow-other-keys)
+  (let* ((highest-rx-ack (highest-rx-ack tcp))
+         (header (peek-pdu packet))
+         (ack-number (ack-number header)))
     (cond
       ((< ack-number highest-rx-ack)) ;; old ack, no action
       ((and (=  highest-rx-ack ack-number) (< ack-number (next-tx-seq tcp)))
@@ -981,11 +1000,12 @@
        (call-next-method)
        (new-rx tcp packet))))) ;; in case any data
 
-(defmethod new-ack((tcp tcp) &key packet (header (peek-pdu packet))
-                   (ack-number (ack-number header)) skip-timer &allow-other-keys)
+(defmethod new-ack((tcp tcp) &key packet skip-timer
+                   &allow-other-keys)
   (unless skip-timer (cancel 'retransmit-packet-timer tcp))
   (with-accessors((next-tx-seq next-tx-seq)) tcp
-    (let ((number-ack (- ack-number (highest-rx-ack tcp)))
+    (let* ((ack-number (ack-number (peek-pdu packet)))
+          (number-ack (- ack-number (highest-rx-ack tcp)))
           (state (state tcp)))
       (incf (total-ack tcp) number-ack)
       (setf (highest-rx-ack tcp) ack-number)
@@ -1126,7 +1146,7 @@
       (t ;; Congestion avoidance mode, adjust by (ackBytes*segSize) / cWnd
        (incf congestion-window
              (max 1 (/ (* seg-size seg-size) congestion-window)))))))
-  (call-next-method tcp))
+  (call-next-method))
 
 (defmethod dup-ack((tcp tcp-reno) header c)
   (let ((seg-size (maximum-segment-size tcp)))
@@ -1155,9 +1175,9 @@
                       :documentation "Number of parial acks in a row"))
   (:documentation "NewReno TCP implementation"))
 
-(defmethod new-ack ((tcp tcp-newreno) &key header
-                    (ack-number (ack-number header)) &allow-other-keys)
-  (let ((seg-size (maximum-segment-size tcp))
+(defmethod new-ack ((tcp tcp-newreno) &key packet &allow-other-keys)
+  (let ((ack-number (ack-number (peek-pdu packet)))
+        (seg-size (maximum-segment-size tcp))
         (slow-start-threshold  (slow-start-threshold tcp))
         (skip-timer nil))
     (cond
@@ -1183,7 +1203,7 @@
       (t ;; Congestion avoidance mode, adjust by (ackBytes*segSize) / cWnd
        (incf (congestion-window tcp)
              (max 1 (/ (* seg-size seg-size) (congestion-window tcp))))))
-    (call-next-method tcp :skip-timer skip-timer)))
+    (call-next-method tcp :packet packet :skip-timer skip-timer)))
 
 (defmethod dup-ack((tcp tcp-newreno) header c)
   (let ((seg-size (maximum-segment-size tcp)))

@@ -1,6 +1,5 @@
-;; $Id$
 ;; Application Interface
-;; Copyright (C) 2006 Dr. John A.R. Williams
+;; Copyright (C) 2006-2012 Dr. John A.R. Williams
 
 ;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
 ;; Keywords:
