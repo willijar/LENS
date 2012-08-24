@@ -28,6 +28,11 @@
   ((messages :type list :initform nil :accessor messages :initarg :messages
              :documentation "List of messages in this data segment")))
 
+(defmethod print-object((m message-data) stream)
+  (print-unreadable-object(m stream :type t :identity t)
+    (format stream "~D bytes ~D messages"
+            (length-bytes m) (length (messages m)))))
+
 (defun make-message-data(length-bytes &key response-size)
   (make-instance 'message-data
                  :length-bytes length-bytes
@@ -45,8 +50,7 @@
                 (make-message
                  :created (message-created m)
                  :response-size (message-response-size m)
-                 :offset (+ (message-offset m)
-                            offset)))
+                 :offset (+ (message-offset m) offset)))
             (messages b))))
     result))
 
@@ -58,13 +62,11 @@
           (mapcan
            #'(lambda(m)
                (let ((o (message-offset m)))
-                 (when (and (>= o start) (< o end))
+                 (when (and (> o start) (<= o end))
                    (list
                     (make-message
-                                  :response-size (message-response-size m)
-                                  :created (message-created m)
-                                  :offset (- o start))))))
+                     :response-size (message-response-size m)
+                     :created (message-created m)
+                     :offset (- o start))))))
            (messages data)))
     result))
-
-

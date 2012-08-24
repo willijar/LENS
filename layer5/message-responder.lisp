@@ -76,7 +76,6 @@
 
 (defmethod receive((app message-responder) (data message-data) protocol &key &allow-other-keys)
   (call-next-method)
-  #+nil(break "Received ~A from ~A" data protocol)
   (dolist(msg (messages data))
     (when (response-statistics app)
       (record (- (simulation-time) (message-created msg))
