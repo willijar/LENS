@@ -17,21 +17,23 @@
            (3 4)
            (4 5)))
 
-;; configure tracing
-(setf (trace-status (node 0) *lens-trace-output*) :enabled)
-(setf (trace-status (node 5) *lens-trace-output*) :enabled)
+;; configure Layer 4 tracing
+;(setf (trace-status (node 0) *lens-trace-output*) :default)
+;(setf (trace-status (node 5) *lens-trace-output*) :default)
+(setf (trace-status 4 *lens-trace-output*) :enabled)
 
 ;; notify routing of new topology
 (topology-changed (nodes))
 
 ;; put in sources and sinks and appropriate monitoring
 
+(defparameter stats (make-instance 'average-min-max))
 (defparameter server
   (make-instance
    'message-responder
    :local-port 20000
    :node (node 5)
-   :response-statistics (make-instance 'average-min-max)))
+   :response-statistics stats))
 
 (defparameter client
   (make-instance
@@ -47,4 +49,7 @@
 (start client)
 
 ;; Always schedule simulation to stop at some time
-(schedule 100 #'stop-simulation)
+
+(schedule 10
+          #'(lambda() (math::write-log stats :stream *user-output*)))
+(run)
