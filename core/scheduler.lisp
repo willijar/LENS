@@ -54,8 +54,8 @@ called after all entities created before running simulation")
 (defmethod busy-p((event event)) (>= (slot-value event 'rank) 0))
 
 (defmethod print-object((event event) stream)
-  (print-unreadable-object (event stream :type t :identity t)
-    (format stream "~D T=~,5f" (uid event) (event-time event) )))
+  (print-unreadable-object (event stream :type t :identity nil)
+    (format stream "T=~,5f ~D"(event-time event)  (uid event) )))
 
 (defgeneric handle(entity)
   (:documentation "Method called by scheduler on a scheduled entity")
@@ -179,10 +179,16 @@ are dispatched in current thread"
 (defclass timer(simple-event)
   ((name :initarg :name :reader name
          :documentation "Slot name for instance in handler object")
-   (timer-delay :initarg :delay :reader timer-delay
+   (timer-delay :initarg :delay :reader timer-delay :initform -1
                 :documentation "Default delay for this timer")
-   (time-scheduled :type time-type))
+   (time-scheduled :type time-type :initform -1))
   (:documentation "A timer event"))
+
+(defmethod print-object((event timer) stream)
+  (print-unreadable-object (event stream :type t :identity nil)
+    (format stream "~A(+~,5f) T=~,5f ~D"
+            (name event) (timer-delay event)
+            (event-time event) (uid event) )))
 
 (defmethod copy ((timer timer) &optional
                  (copy (make-instance (class-of timer))))
@@ -191,7 +197,8 @@ are dispatched in current thread"
   (copy-slots timer copy :slot-names '(name timer-delay)))
 
 (defmethod schedule((delay number) (timer timer))
-  (setf (slot-value timer 'time-scheduled) (simulation-time))
+  (setf (slot-value timer 'time-scheduled) (simulation-time)
+        (slot-value timer 'timer-delay) delay)
   (call-next-method))
 
 (defmethod handle((timer timer))
