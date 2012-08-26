@@ -55,7 +55,7 @@
         (bytes-requested app) 0)
   (reset (protocol app)))
 
-(defmethod receive((app client-application) data protocol &key &allow-other-keys)
+(defmethod receive((app client-application) (data data) protocol &key &allow-other-keys)
   (incf (bytes-received app) (length-bytes data)))
 
 (defmethod send :before(layer4 data (app client-application) &key &allow-other-keys)
