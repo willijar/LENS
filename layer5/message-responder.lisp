@@ -71,7 +71,12 @@
   (setf (responders app) (delete protocol (responders app)))
   (call-next-method))
 
-(defmethod receive((app message-responder) (data message-data) protocol &key &allow-other-keys)
+(defmethod receive((app message-responder) (data data) protocol
+                   &key &allow-other-keys)
+  (incf (bytes-received app) (length-bytes data)))
+
+(defmethod receive((app message-responder) (data message-data) protocol
+                   &key &allow-other-keys)
   (call-next-method)
   (dolist(msg (messages data))
     (when (response-statistics app)

@@ -70,7 +70,7 @@ and maximum values for the measured statistics."))
                &key (stream *standard-output*) header (separator ", "))
   (unless (zerop (no-samples stats))
     (when header (write-line header stream))
-    (format stream "Min ~A~AMax ~A~AAverage ~A~%"
+    (format stream "~&Min ~A~AMax ~A~AAverage ~A~%"
             (min-sample stats)
             separator
             (max-sample stats)
