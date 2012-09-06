@@ -582,6 +582,7 @@
   `(type src-port dst-port sequence-number ack-number flags))
 
 (defun tcp-debug(str &rest args)
+  #+debug
   (format *trace-output* "~&> ~,5f ~?~%" (simulation-time) str args))
 
 #+debug
@@ -1034,14 +1035,16 @@
          (header (peek-pdu packet))
          (ack-number (ack-number header)))
     (cond
-      ((< ack-number highest-rx-ack)) ;; old ack, no action
-      ((and (=  highest-rx-ack ack-number) (< ack-number (next-tx-seq tcp)))
+      ((seq< ack-number highest-rx-ack)) ;; old ack, no action
+      ((and (=  highest-rx-ack ack-number) (seq< ack-number (next-tx-seq tcp)))
        ;; duplicate ack received
+       #+debug(format t "Dup Ack~%")
        (dup-ack tcp header (incf (dup-ack-count tcp))))
       (t
        ;; not duplicate
-       (when (> ack-number (highest-rx-ack tcp))
+       (when (seq< (highest-rx-ack tcp) ack-number)
          (setf (dup-ack-count tcp) 0))
+       #+debug(format t "New Ack~%")
        (call-next-method)
        (new-rx tcp packet))))) ;; in case any data
 
@@ -1181,6 +1184,9 @@
   (let ((seg-size (maximum-segment-size tcp))
         (slow-start-threshold  (slow-start-threshold tcp)))
     (with-accessors((congestion-window congestion-window)) tcp
+    #+debug(tcp-debug "TCPReno NewCWND enter cwin ~A ssThresh ~A"
+                      congestion-window slow-start-threshold )
+
     (cond
       ((fast-recovery tcp)
        ;; If in fast recovery and have a new data ack, reset cWnd
@@ -1190,11 +1196,14 @@
              (fast-recovery tcp) nil))
       ((< congestion-window slow-start-threshold)
        ;; Slow start mode, add one segSize to cWnd
+       #+debug(tcp-debug "NewCWnd Slow start")
        (incf congestion-window seg-size))
       (t ;; Congestion avoidance mode, adjust by (ackBytes*segSize) / cWnd
        (incf congestion-window
-             (max 1 (/ (* seg-size seg-size) congestion-window)))))))
-  (call-next-method))
+             (max 1 (floor (* seg-size seg-size) congestion-window)))))
+  (call-next-method)
+    #+debug(tcp-debug "TCPReno NewCWND exit cwin ~A ssThresh ~A"
+                      congestion-window slow-start-threshold ))))
 
 (defmethod dup-ack((tcp tcp-reno) header c)
   (let ((seg-size (maximum-segment-size tcp)))

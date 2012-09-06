@@ -186,7 +186,10 @@ interface is busy. Requires address"
 (defmethod receive((interface interface) packet link
                    &key errors &allow-other-keys)
   (with-slots(rx-packet) interface
-    (assert (eql packet rx-packet))
+    (assert (eql packet rx-packet)
+            (rx-packet packet)
+            "Received packet ~A does not match interface rx-packet ~A"
+            packet rx-packet)
     (setf rx-packet nil))
   (if (zerop errors)
       (receive (layer2:protocol interface) packet interface)
