@@ -424,7 +424,7 @@ this occurs when the acknowledgement is received from the peer.")
   (the (unsigned-byte 32)
     (if (>= seq-end seq-start)
         (- seq-end seq-start)
-        (+ seq-end (- #x100000000 seq-end)))))
+        (+ seq-end (- #x100000000 seq-start)))))
 
 (defun seq<(a b)
   (declare ((unsigned-byte 32) a b))

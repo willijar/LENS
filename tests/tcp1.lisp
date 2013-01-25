@@ -48,8 +48,8 @@
 (start server)
 (start client)
 
-;; Always schedule simulation to stop at some time
-
-(schedule 10
-          #'(lambda() (math::write-log stats :stream *user-output*)))
-(run)
+;(schedule 100 #'stop-simulation)
+;; Output log at end
+(schedule 10 #'(lambda() (math::write-log stats :stream *user-output*)))
+(start-simulation :granularity nil)
+;(run)
