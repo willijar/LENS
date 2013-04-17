@@ -12,7 +12,7 @@
 
 ;;; Code:
 
-(in-package :scheduler)
+(in-package :lens)
 
 (defvar *scheduler* nil "The global scheduler instance")
 (defvar *reset-hooks* nil "List of hooks to call to reset simulation -
@@ -136,7 +136,7 @@ are dispatched in current thread"
   (flet((run(scheduler)
           (setf (halted scheduler) nil)
           (loop
-           :with c = 1
+           :with count = 1
            :with q =  (slot-value scheduler 'event-queue)
            :while (not (or (empty-p q) (halted scheduler)))
            :for event = (dequeue q)
@@ -145,7 +145,7 @@ are dispatched in current thread"
                  (when step (funcall step event))
                  (handle event))
            :when (and granularity
-                      (= (setf c (mod (1+ c) granularity)) 0))
+                      (= (setf count (mod (1+ count) granularity)) 0))
            :do (yield-thread))
           (setf (halted scheduler) t)))
     (stop scheduler :abort t)

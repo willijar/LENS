@@ -17,7 +17,7 @@
 
 ;;; Code:
 
-(in-package :scheduler)
+(in-package :lens)
 
 (defun make-thread(function name)
   #+sb-thread(sb-thread:make-thread function :name name))
@@ -28,6 +28,6 @@
 (defun yield-thread()
   #+sb-thread(sb-thread::release-foreground))
 
-(in-package :trace)
+;;(in-package :trace)
 
-(import 'sb-gray:stream-line-length)
+;;(import 'sb-gray:stream-line-length)
