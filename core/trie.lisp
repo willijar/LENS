@@ -51,15 +51,15 @@
 (defgeneric make-trie(sequence value)
   (:documentation "Make a heirarchy from a sequence with value stored"))
 
-(defgeneric nmerge-trie(trie1 trie2 &key test)
+(defgeneric nmerge-trie(trie1 trie2)
   (:documentation "merge children of trie2 into trie1 and return
   modified trie1"))
 
-(defgeneric nmerge-child(trie1 trie2 &key test)
+(defgeneric nmerge-child(trie1 trie2)
   (:documentation "merge trie2 as a child into trie 1 returning the
   modified trie1. Note trie1 may share structure with trie1."))
 
-(defgeneric trie-match(pattern structure &key test)
+(defgeneric trie-match(pattern structure)
   (:documentation "Matching function returns value from structure
   matching pattern and whether match was found"))
 
@@ -83,35 +83,50 @@
                (format stream "Error merging ~A into ~A"
                        (trie2 condition) (trie condition)))))
 
-(defmethod nmerge-trie(trie1 trie2 &key (test #'eql))
+(defmethod nmerge-trie(trie1 trie2)
   (flet ((do-merge(trie1 trie2)
            (when (slot-boundp trie2 'trie-value)
              (setf (slot-value trie1 'trie-value)
                    (slot-value trie2 'trie-value)))
            (dolist(child (trie-children trie2))
-             (nmerge-child trie1 child :test test))
+             (nmerge-child trie1 child))
            trie1))
     (restart-case
-        (if (or (not (funcall test (trie-prefix trie1) (trie-prefix trie2)))
+        (if (or (not (eql (trie-prefix trie1) (trie-prefix trie2)))
                 (and (slot-boundp trie2 'trie-value)
                      (slot-boundp trie1 'trie-value)))
             (error 'trie-merge-condition :trie trie1 :trie2 trie2)
             (do-merge trie1 trie2))
       (merge-anyway() (do-merge trie1 trie2)))))
 
-(defmethod nmerge-child(trie1 child &key (test #'eql))
+(defmethod nmerge-child(trie1 child)
   (let ((m (find (trie-prefix child) (trie-children trie1)
-                 :test test :key #'trie-prefix)))
+                  :key #'trie-prefix)))
     (if m
-        (nmerge-trie m child :test test)
+        (nmerge-trie m child)
         (setf (trie-children trie1)
               (cons child (trie-children trie1)))))
   trie1)
 
-(defmethod trie-match((pattern list) (trie trie) &key (test #'eql))
-  (when (or (funcall test (first pattern) (trie-prefix trie))
+(defun match-range(value range)
+  (labels((do-match(range)
+          (if (eql (first range) '|:|)
+              (when (and (or (not (second range)) (>= value (second range)))
+                        (or (not (third range)) (<= value (third range))))
+                (return-from match-range t))
+              (dolist(r range)
+                (etypecase r
+                  (number (when (= r value) (return-from match-range t)))
+                  (list (do-match r)))))))
+    (when (and (numberp value) (listp range))
+      (do-match range)))
+  nil)
+
+(defmethod trie-match((pattern list) (trie trie))
+  (when (or (eql (first pattern) (trie-prefix trie))
          (eql (trie-prefix trie) '*)
-         (eql (trie-prefix trie) '**))
+         (eql (trie-prefix trie) '**)
+         (match-range (first pattern) (trie-prefix trie)))
      (let ((more (rest pattern))
            (any-child nil)
            (any-suffix nil))
@@ -127,17 +142,17 @@
            ((eql (trie-prefix child) '**) (setf any-suffix child))
            (t
             (multiple-value-bind(value found-p)
-                (trie-match more child :test test)
+                (trie-match more child)
               (when found-p (return-from trie-match (values value found-p)))))))
        (when any-child
          (multiple-value-bind(value found-p)
-             (trie-match more any-child  :test test)
+             (trie-match more any-child)
            (when found-p (return-from trie-match (values value found-p)))))
        (when any-suffix
          (maplist
           #'(lambda(pattern)
               (multiple-value-bind(value found-p)
-                  (trie-match pattern any-suffix :test test)
+                  (trie-match pattern any-suffix)
                 (when found-p (return-from trie-match (values value found-p)))))
           more))))
     (values nil nil))

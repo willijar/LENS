@@ -20,6 +20,8 @@
 (defpackage :lens
   (:documentation "LENS Simulator Base")
   (:use :closer-common-lisp :closer-common-lisp-user)
+  (:import-from :alg
+                 #:enqueue #:dequeue #:make-binary-heap #:empty-p #:size)
   (:export
    #:lens-object #:owned-object #:object-array #:named-object
    #:owner #:default-owner #:yield-ownership

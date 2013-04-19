@@ -4,13 +4,13 @@
   ()
   (:documentation "Lightweight base class."))
 
-(defclass owned-object(lens-object)
-  ((owner :accessor owner :initarg :owner :type lens-object :initform nil)))
-
-(defclass named-object(owned-object)
+(defclass named-object()
   ((name :type symbol :initarg :name :reader name)))
 
-(defclass object-array(named-object)
+(defclass owned-object(named-object)
+  ((owner :accessor owner :initarg :owner :type lens-object :initform nil)))
+
+(defclass object-array(owned-object)
   ((vec :type array :reader vec
         :initform (make-array 2 :element-type 'owned-object
                               :adjustable t))))
@@ -68,13 +68,27 @@ user interface (Tkenv) together with other object data (e.g. class name)
 wherever it is feasible to display a multi-line string.")
   (:method(o) (info o)))
 
-(defgeneric dup(o)
+(defun copy-slots(slots source destination)
+  "Copies anemd slot values shallowly from source to destination
+returning the modifed destination object."
+  (dolist(slot slots)
+    (if (slot-boundp source slot)
+        (setf (slot-value destination slot) (slot-value source slot))
+        (slot-makunbound destination slot)))
+  destination)
+
+(defgeneric duplicate(object &optional duplicate)
   (:documentation "Should be redefined in subclasses to create an
   exact copy of this object. The default implementation just throws an
-  error, to indicate that the method was not redefined.")
-  (:method(o)
+  error, to indicate that the method was not redefined. The second argument, if defined should be the instance that the object is being duplicated into.")
+  (:method(o &optional duplicate)
+    (declare (ignore duplicate))
     (error "The dup method is not defined for class ~S"
-           (class-name (class-of o)))))
+           (class-name (class-of o))))
+  (:method((entity named-object) &optional duplicate)
+    (if duplicate
+        (copy-slots '(name) entity duplicate)
+        (call-next-method))))
 
 (defgeneric serialise(o stream)
   (:documentation "Serialise an object into a stream")

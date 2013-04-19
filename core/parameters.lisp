@@ -24,26 +24,34 @@
 
 (defgeneric read-parameter(full-path source format)
   (:documentation "Actually read a fully named parameter from source
-  using specified format"))
+  using specified format")
+  (:method(full-path source format)
+    (format nil "Debug-read ~A ~A" format full-path)))
 
 (defgeneric parameter-slot-read(slot instance)
-  (:documentation "Read a paramater slot for a paramater-class instance"))
+  (:documentation "Read a parameter slot for a parameter-class instance"))
 
 (defgeneric format-from-type(type)
   (:documentation "Given a type declaration return a format declaration")
   (:method((type list)) (first type))
   (:method(type) type))
 
+;; TODO - diferentiate between default values and initvalues for parameter slots
+;; ensure do not initialise parameter slots from default values before checking
+;; parameter source - then if not inited from parameter source reinit from slot
+;; i.e. :initform for paramaters should be default value.
+
 (defclass parameter-slot()
-  ((format :initarg :format :initform nil :reader slot-definition-format
+  ((format :initarg :format :reader slot-definition-format
            :documentation "Format for reading/writing parameter")))
 
-(defmethod initialize-instance :after ((slot parameter-slot) &key parameter type &allow-other-keys)
+(defmethod initialize-instance :after ((slot parameter-slot)
+                                       &key parameter type &allow-other-keys)
   (declare (ignore parameter))
   (unless (slot-boundp slot 'format)
-    (setf (slot-value slot 'format)
-          (format-from-type type))))
+    (setf (slot-value slot 'format) (format-from-type type))))
 
+;; The directs slot type identifies whether this should be a volatile slot
 (defclass parameter-direct-slot-definition
     (standard-direct-slot-definition parameter-slot)
   ((volatile :initform nil :initarg :volatile :type boolean
@@ -51,31 +59,46 @@
              :documentation "If true parameter is reread every time it
              is needed during simulation")))
 
+;; We use different types of effective slots for volatile or non-volatile
+;; Volatile slots will always contain a function to return the value
 (defclass parameter-effective-slot-definition
     (standard-effective-slot-definition parameter-slot)
   ())
 
-(defclass parameter-volatile-effective-slot-definition(parameter-effective-slot-definition)
+(defclass parameter-volatile-effective-slot-definition
+    (parameter-effective-slot-definition)
   ())
+
 
 (defclass parameter-class(standard-class)
   ()
-  (:documentation "Metaclass for parsed objects"))
+  (:documentation "Metaclass for classes which have slots initialised
+  from an external source"))
 
 (defmethod direct-slot-definition-class ((class parameter-class)
                                          &rest initargs)
-  (if (getf initargs :parameter)
+  "If we specify either :parameter or :volatile in a slot definition then
+it is a parameter direct slot"
+  (if (or (getf initargs :parameter) (getf initargs :volatile))
       (find-class 'parameter-direct-slot-definition)
       (call-next-method)))
 
 (defmethod sb-pcl::compute-effective-slot-definition-initargs
     ((class parameter-class) direct-slot-definitions)
+  "Only if the highest priority direct slot is a parameter slot do we need
+any parameter initargs - they aren't inherited."
+;; TODO if volatile add specific slot-value method for this class and slot-name
   (let ((initargs (call-next-method))
         (slot (first direct-slot-definitions)))
-    (when (typep slot 'parameter-direct-slot-definition)
-        (setf (getf initargs :parameter) t)
-        (setf (getf initargs :format) (slot-definition-format slot))
-        (setf (getf initargs :volatile) (slot-definition-volatile slot)))
+    (cond
+      ((typep slot 'parameter-direct-slot-definition)
+       (setf (getf initargs :parameter) t)
+       (setf (getf initargs :format) (slot-definition-format slot))
+       (when (slot-definition-volatile slot)
+         (setf (getf initargs :volatile) t)
+         (setf (getf initargs :type) 'function)))
+      (t
+       (remf initargs :parameter)))
     initargs))
 
 (defmethod effective-slot-definition-class
@@ -90,53 +113,143 @@
                                        (superclass standard-class))
   t)
 
-(defmethod slot-value-using-class
-    ((class parameter-class) instance
-     (slot parameter-volatile-effective-slot-definition))
-  (multiple-value-bind(v defined-p)
-          (parameter-slot-read slot instance)
-    (cond
-      (defined-p (eval v))
-      ((slot-definition-initfunction slot)
-       (funcall (slot-definition-initfunction slot)))
-      ((slot-definition-initform slot))
-      ((slot-unbound class instance (slot-definition-name slot))))))
-
-(defmethod slot-boundp-using-class
-    ((class parameter-class) instance
-     (slot-definition parameter-effective-slot-definition))
-  (multiple-value-bind(v v-p)
-      (parameter-slot-read slot-definition instance)
-    (declare (ignore v))
-    (or v-p (call-next-method))))
-
 (defclass parameter-object()
   ()
   (:metaclass parameter-class))
 
-(defmethod shared-initialize :after ((instance parameter-object) slot-names
-                                     &rest initargs &key &allow-other-keys)
-  ;;(declare (ignore initargs))
-  (format t "slot-names=~A~%initargs=~A~%" slot-names initargs)
-  (dolist(slot-definition (class-slots (class-of instance)))
-    (when (and (typep slot-definition 'parameter-effective-slot-definition)
-               (not (typep slot-definition
-                           'parameter-volatile-effective-slot-definition))
-               (or (eql slot-names t)
-                   (member (slot-definition-name slot-definition) slot-names)))
-      (multiple-value-bind(v defined-p)
-          (parameter-slot-read slot-definition instance)
-        (when defined-p
-          (setf (slot-value instance (slot-definition-name slot-definition))
-                (eval v)))))))
+;; as per Pascal Constanza ensure parameter-object is default direct superclass
+(defmethod initialize-instance :around
+    ((class parameter-class) &rest initargs
+     &key direct-superclasses)
+  (declare (dynamic-extent initargs))
+  (if (loop for superclass in direct-superclasses
+         thereis (subtypep superclass 'parameter-object))
+      (call-next-method)
+      (apply #'call-next-method class
+             :direct-superclasses
+             (append direct-superclasses
+                     (list (find-class 'parameter-object)))
+             initargs)))
+
+(defmethod reinitialize-instance :around
+    ((class parameter-class) &rest initargs
+     &key (direct-superclasses () direct-superclasses-p))
+  (declare (dynamic-extent initargs))
+  (if direct-superclasses-p
+      (if (loop for superclass in direct-superclasses
+             thereis (subtypep superclass 'parameter-object))
+          (call-next-method)
+          (apply #'call-next-method class
+                 :direct-superclasses
+                 (append direct-superclasses
+                         (list (find-class 'parameter-object)))
+                 initargs))
+      (call-next-method)))
+
+(defmethod shared-initialize :before ((object parameter-object) slot-names
+                                      &rest all-keys)
+  (declare (dynamic-extent all-keys))
+  ;; read parameters first if no key specified to initialise parameter
+  ;; if no key specified for parameter read it from config file
+  (dolist(slot (class-slots (class-of object)))
+    (when (typep slot 'parameter-slot)
+      (let ((slot-initargs (slot-definition-initargs slot))
+            (slot-name (slot-definition-name slot)))
+        (when (and (or (eql slot-names 't) (member slot-name slot-names))
+                   (not (get-properties all-keys slot-initargs)))
+          (multiple-value-bind(value read-p)
+              (parameter-slot-read slot object))
+          (when read-p
+            (setf (slot-value object slot-name) value)))))))
+
+;; this would be semantically what shared-intialize does
+;; (defmethod shared-initialize
+;;   (declare (dynamic-extent all-keys))
+;;   (loop
+;;      :for slot :in (class-slots (class-of object))
+;;      :for slot-initargs = (slot-definition-initargs slot)
+;;      :for slot-name = (slot-definition-name slot)
+;;      ;; first we initalise using initargs if specified
+;;      :when slot-initargs :do
+;;      (multiple-value-bind
+;;            (indicator value)
+;;          (get-properties all-keys slot-initargs)
+;;        (when indicator
+;;          (setf (slot-value object slot-name)
+;;                value)))
+;;      ;; then we check for initforms and use them if
+;;      :when (and (not (slot-boundp object slot-name))
+;;                 (or (eq slot-names 't) (member slot-name slot-names))) :do
+;;      (let ((slot-initfunction (slot-definition-initfunction slot)))
+;;        (when (typep slot 'parameter-slot) ;; look up value in parameter slot
+;;          (multiple-value-bind(value found-p)
+;;              (parameter-slot-read slot object)
+;;            (when found-p
+;;              (setf (slot-value object slot-name) value))))
+;;        ;; default if ordinary slot or no parameter
+;;        (when (and slot-initfunction  (not (slot-boundp object slot-name)))
+;;          (setf (slot-value object slot-name)
+;;                (funcall slot-initfunction)))))
+;;   object)
 
 (defmethod parameter-slot-read((slot parameter-effective-slot-definition)
                                instance)
-  (read-parameter (concatenate 'string (full-path instance) "."
-                               (string (slot-definition-name slot)))
-                  (parameter-source instance)
-                  (slot-definition-format slot)))
+;; need to change between class allocation using class names and instance names
+;; using instance name!!
+  (multiple-value-bind(value read-p)
+      (read-parameter
+       (append (full-path instance) (list (slot-definition-name slot)))
+       (parameter-source instance)
+       (slot-definition-format slot)))
+  (when read-p
+    (when (and (not (functionp value) (typep slot 'parameter-volatile-effective-slot-definition)))
+      (setf value #'(lambda() (eval value))))
+    (values value t)))
 
-(defmethod parameter-source((instance component))
-  *simulation-configuration*)
+;; (defclass property-object()
+;;   ((properties :initform nil :initarg :properties
+;;                :documentation "plist of plists"))
+;;   (:documentation "An object which can properties associated with them"))
+
+;; (defgeneric property(key instance)
+;;   (:documentation "Return a named property list for instance")
+;;   (:method((key symbol) (instance property-object))
+;;     (getf key (slot-value instance 'properties))))
+
+;; (defclass signal-record
+;;     ((signalID :initarg :id :initform 0 :reader signalID
+;;                :type integer :documentation "Unique signal id")
+;;      (listeners :type array :initform (make-array 0) :reader listeners)))
+
+;; (defclass component(named-object object-array property-object parameter-object)
+;;   ((signal-table :type (array signal-record *) :initform (make-array)
+;;                  :reader signal-table)
+;;    (signal-has-local-listeners
+;;     :type bit-vector
+;;     :initform (make-array 64 :element-type 'bit)
+;;     :reader signal-has-local-listeners
+;;     :documentation "bit[k]==1: signalID k has local listeners")
+;;    (signal-has-ancestor-listeners
+;;     :type bit-vector
+;;     :initform (make-array 64 :element-type 'bit)
+;;     :reader signal-has-ancestor-listeners
+;;     :documentation "bit[k]==1: signalID k has listener in any ancestor component")
+;;    (signalIDs :type hash-table :initform (make-hash-table :test 'equal)
+;;               :reader signalIDs
+;;               :documentation "Mapping name to signal ids")
+;;    (signalNames :type hash-table :initform (make-hash-table)
+;;                 :reader signalNames
+;;                 :documentation "Mapping signal id to name")
+;;    (lastSignalID :initform 0 :allocation :class)
+;;    (rngMapping :initform #() :paramater t :reader rngMapping
+;;                :documentation "Mapping from module local rng to global rng"))
+;;   (:documentation "Base class for all component types - modules & channels")
+;;   (:metaclass parameter-class))
+
+;; (defun RNG(k instance)
+
+
+
+;; (defmethod parameter-source((instance component))
+;;   *simulation-configuration*)
 
