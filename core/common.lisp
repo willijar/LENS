@@ -18,7 +18,11 @@
 
 ;; Basic types
 
-(defconstant c 299792458d0 "Speed of Light in m/sec")
+(defconstant +c+ 299792458d0 "Speed of Light in m/sec")
+
+(defparameter *context* nil
+  "Current global context in which evaluation (e.g. random functions)
+  is to be done.")
 
 ;; base class for in simulation errors (not program errors)
 (define-condition simulation-condition(condition)())
@@ -54,3 +58,10 @@ Returns:
                (when (funcall ,test (funcall ,key it))
                  (list it)))
     ,lst))
+
+(defmacro for ((var start stop) &body body)
+  (let ((gstop (gensym)))
+    `(do ((,var ,start (1+ ,var))
+          (,gstop ,stop))
+      ((>= ,var ,gstop))
+      ,@body)))

@@ -23,68 +23,22 @@
     :maintainer "Dr. John A.R. Williams <J.A.R.Williams@aston.ac.uk>"
     :licence "GPL v3"
     :version "2.0"
-    :long-description "A Network Simulator in LISP inspired by GTNetS and NS2"
-    :depends-on (:split-sequence :trivial-gray-streams :clrs :closer-mop)
+    :long-description "A Network Simulator in LISP inspired by OMNET++"
+    :depends-on (:split-sequence :data-format-validation
+                 :trivial-gray-streams :clrs :closer-mop)
     :components
     ((:module "core"
               :components
               ((:file "defpackage")
                (:file "common" :depends-on ("defpackage"))
-               (:file "random" :depends-on ("defpackage"))
+               (:file "object" :depends-on ("common"))
+               (:file "parameters" :depends-on ("object" "trie"))
+               (:file "trie" :depends-on ("defpackage"))
+               (:file "message" :depends-on ("object" "simulation"))
                (:file "compatibility" :depends-on ("defpackage"))
-               (:file "scheduler" :depends-on
-                      ("defpackage" "common" "compatibility"))
-               (:file "packet" :depends-on ("defpackage" "scheduler"))
-               (:file "address" :depends-on ("defpackage" "common"))
-               (:file "packet-queue"
-                      :depends-on ("defpackage" "common" "scheduler" "packet"
-                                                "protocol"))
-               (:file "protocol"
-                      :depends-on ("address" "common" "packet"))
-               (:file "interface"
-                      :depends-on ("defpackage" "packet-queue" "link"))
-               (:file "trace" :depends-on
-                      ("defpackage" "common" "compatibility"
-                                    "scheduler" "protocol"))
-               (:file "routing" :depends-on ("common" "address"))
-               (:file "node"
-                       :depends-on ("common" "address" "protocol" "routing"))
-               (:file "link"
-                       :depends-on ("common" "scheduler" "random"
-                                    "address" "packet-queue" "node"))
-               (:file "application"
-                       :depends-on ("common" "scheduler" "protocol" "node"))
-               (:file "statistics" :depends-on ("common" "scheduler"))
-               (:file "user"
-                       :depends-on ("common" "address" "scheduler" "link"
-                                             "node"))))
-     (:module "nodes" :depends-on ("core")
-              :components ((:file "node")))
-     (:module "layer1" :depends-on ("core")
-              :components
-              ((:file "p2p")))
-     (:module "layer2" :depends-on ("core")
-              :components
-              ((:file "arp")
-               (:file "llcsnap")
-               (:file "ieee802.3" :depends-on ("llcsnap"))))
-     (:module "layer3" :depends-on ("core")
-              :components
-              ((:file "icmp")
-               (:file "ipv4" :depends-on ("icmp"))
-               (:file "fib")
-               (:file "manual" :depends-on ("fib"))
-               (:file "static" :depends-on ("fib"))))
-     (:module "layer4" :depends-on ("layer3" "core")
-              :components
-              ((:file "udp")
-               (:file "rtt")
-               (:file "tcp" :depends-on ("rtt"))))
-     (:module "layer5" :depends-on ("core")
-              :components
-              ((:file "client" :depends-on ("message"))
-               (:file "abr-source" :depends-on ("client"))
-               (:file "udp-sink")
-               (:file "message")
-               (:file "message-source" :depends-on ("message" "client"))
-               (:file "message-responder" :depends-on ("message"))))))
+               (:file "simulation" :depends-on
+                       ("defpackage" "common" "compatibility" "parameters"))
+               (:file "signals" :depends-on ("object"))
+               (:file "model-change" :depends-on ("defpackage"))
+               (:file "gate" :depends-on ("object" "model-change"))
+               (:file "component" :depends-on ("signals" "simulation"))))))

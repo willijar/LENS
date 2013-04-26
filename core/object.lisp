@@ -8,7 +8,8 @@
   ((name :type symbol :initarg :name :reader name)))
 
 (defclass owned-object(named-object)
-  ((owner :accessor owner :initarg :owner :type lens-object :initform nil)))
+  ((owner :accessor owner :initarg :owner :type lens-object :initform nil
+          :initarg :parent :reader parent-module)))
 
 (defclass object-array(owned-object)
   ((vec :type array :reader vec
