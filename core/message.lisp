@@ -82,6 +82,8 @@ model domain."))
   ((encapsulated-packet
     :type packet
     :documentation "Higher level encapsulated protocol packet.")
+   (duration :accessor duration :type number :initform 0
+             :documentation "Duration of last transmission")
    (control-info
     :accessor control-info :initarg :control-info
     :documentation "Additional data to be passed with packet between

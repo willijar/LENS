@@ -4,7 +4,8 @@
   ()
   (:documentation " Common base class for data objects that accompany PRE_MODEL_CHANGE and POST_MODEL_CHANGE notifications (signals).)"))
 
-(defmacro def-change-notification(name (&optional (classes '(model-change-notification))) fields &rest rest)
+(defmacro def-change-notification(name (&rest classes) fields &rest rest)
+  (unless classes (setf classes  '(model-change-notification)))
   `(defclass ,name(,@classes)
      (,@(mapcar
          #'(lambda(field)
@@ -65,8 +66,7 @@ Fields in this class carry the module object on which the gate or gate
 vector was created, and the name of the gate or gate vector."))
 
 (def-change-notification pre-gate-delete-notification()
-  (module gate-name)
-  (:documentation
+  (module gate-name))
 
 (def-change-notification post-gate-delete-notification()
   (module gate-name gate-type vector-p)

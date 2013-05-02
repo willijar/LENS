@@ -224,5 +224,9 @@ are dispatched in current thread"
   (:documentation "Called depth first at end of simulation")
   (:method((sim simulation)) (finish (network simulation))))
 
+(defstruct timestamped
+  (timestamp (simulation-time) :type time-type)
+  value)
+
 ;;interactive scheduling commands
 

@@ -2,8 +2,15 @@
 
 (defclass component(entity-with-signals parameter-object)
   ((rng-map :type array :reader rng-map
-            :documentation "RNG map for this component"))
+            :documentation "RNG map for this component")
+   (initialized-p :initform nil :reader initialized-p
+                  :documentation "True if this component has been initialized."))
   (:metaclass parameter-class))
+
+(defmethod initialize-instance :around
+    ((component component) &key &allow-other-keys)
+  (let ((*context* component))
+    (call-next-method)))b
 
 (defmethod initialize-instance :after
     ((component component) &key config num-rngs &allow-other-keys)
@@ -21,17 +28,15 @@
                         (aref (rng-map *simulation*) (if found-p m 0))))))
             (rng-map *simulation*))))
 
-(defgeneric initalize-stage(component stage)
+(defgeneric initalize(component &optional stage)
   (:documentation "Allowed depth-first staged initialization. Return
   true if action taken otherwise return nil to parent")
-  (:method :around((component component) stage)
-      (let ((r nil))
-        (for-each-child component
-                        #'(lambda(child)
-                            (setf r (or child initialize-stage child stage))))
-        (or (call-next-method) r)))
+  (:method :around((component component) &optional (stage 0))
+    (let ((*context* component))
+      (prog1
+          (when (call-next-method) (initialize component (1+ stage)))
+        (when (zerop stage) (setf (slot-value component initialized-p) t)))))
   (:method((component component) stage) nil))
 
 (defmethod finish((component component))
   (for-each-child component #'finish))
-

@@ -1,4 +1,4 @@
-;; Metaclass for component classes that take paramaters
+;; Metaclass for component classes that take parameters
 ;; Copyright (C) 2013 Dr. John A.R. Williams
 
 ;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
@@ -11,7 +11,13 @@
 
 ;;; Commentary:
 
-;;
+;; Parameters are read at point of objecvt creation - object must
+;; therefore have full-path available at this point to know its
+;; address in heirarchy.
+
+;; Note properties are also covered in ths base
+;; class as parameters can have properties as can all objects which
+;; can take parameters.
 
 ;;; Code:
 
@@ -49,14 +55,40 @@
 ;; i.e. :initform for paramaters should be default value.
 
 (defclass parameter-slot()
-  ((format :initarg :format :reader slot-definition-format
-           :documentation "Format for reading/writing parameter")))
+  ((properties :initarg :properties :reader slot-definition-properties
+               :documentation "plist of properties for this parameter")))
 
-(defmethod initialize-instance :after ((slot parameter-slot)
-                                       &key parameter type &allow-other-keys)
-  (declare (ignore parameter))
-  (unless (slot-boundp slot 'format)
-    (setf (slot-value slot 'format) (format-from-type type))))
+(defmethod initialize-instance :after
+    ((slot parameter-slot) &key parameter &allow-other-keys)
+  (declare (ignore parameter)))
+
+(defgeneric slot-definition-format(slot)
+  (:documentation "Return the parse/writing format for a given slot")
+  (:method((slot parameter-slot))
+    (let ((format (getf (slot-definition-properties slot) :format)))
+      (or
+       (when (subtypep (slot-definition-type slot) 'number)
+          (let ((units  (getf (slot-definition-properties slot) :units)))
+            (when (and units (not format))
+              `(dfv:eng :units units))))
+       format))))
+
+(defun property-union(list1 list2)
+  "Returns a merged property list combining properties from list1 and
+list2. list1 property will have priority excepti if the property
+values are themselves a list in which case the result is list2 value
+appended onto end of list1 value"
+  (let ((result (copy-list list2)))
+    (loop :for a :on list1 :by #'cddr
+       :for k = (car a)
+       :for v1 = (cadr a)
+       :for v2 = (getf list2 k)
+       :when v1
+       :do (setf (getf result k)
+                 (if (and (listp v1) (listp v2))
+                     (append v1 v2)
+                     v1)))
+    result))
 
 ;; The directs slot type identifies whether this should be a volatile slot
 (defclass parameter-direct-slot-definition
@@ -76,11 +108,19 @@
     (parameter-effective-slot-definition)
   ())
 
+;; (defclass volatile-reader(closer-mop::standard-reader-method)
+;; ()
 
 (defclass parameter-class(standard-class)
-  ()
+  ((properties :type list :reader properties
+               :documentation "The properties for this class"))
   (:documentation "Metaclass for classes which have slots initialised
   from an external source"))
+
+;; (defmethod reader-method-class((class parameter-class) (slot parameter-direct-slot-definition) &rest initargs)
+;;   (if (slot-definition-volatile slot)
+;;       (find-class 'volatile-reader)
+;;       (call-next-method)))
 
 (defmethod direct-slot-definition-class ((class parameter-class)
                                          &rest initargs)
@@ -94,13 +134,18 @@ it is a parameter direct slot"
     ((class parameter-class) direct-slot-definitions)
   "Only if the highest priority direct slot is a parameter slot do we need
 any parameter initargs - they aren't inherited."
-;; TODO if volatile add specific slot-value method for this class and slot-name
   (let ((initargs (call-next-method))
         (slot (first direct-slot-definitions)))
     (cond
       ((typep slot 'parameter-direct-slot-definition)
        (setf (getf initargs :parameter) t)
-       (setf (getf initargs :format) (slot-definition-format slot))
+       (setf (getf initargs :properties)
+             (reduce #'property-union
+                 (mapcan
+                  #'(lambda(slot)
+                      (when (typep slot 'parameter-slot)
+                        (list (slot-definition-properties slot))))
+                  direct-slot-definitions)))
        (when (slot-definition-volatile slot)
          (setf (getf initargs :volatile) t)
          (setf (getf initargs :type) 'function)))
@@ -124,6 +169,9 @@ any parameter initargs - they aren't inherited."
   ()
   (:metaclass parameter-class))
 
+(defmethod properties((obj parameter-object))
+  (properties (class-of obj)))
+
 ;; as per Pascal Constanza ensure parameter-object is default direct superclass
 (defmethod initialize-instance :around
     ((class parameter-class) &rest initargs
@@ -137,6 +185,27 @@ any parameter initargs - they aren't inherited."
              (append direct-superclasses
                      (list (find-class 'parameter-object)))
              initargs)))
+
+(defmethod initalize-instance :after ((class parameter-class)
+                                      &key direct-superclasses
+                                      properties
+                                      &allow-other-keys)
+  (dolist(slot (class-direct-slots class))
+    (when (slot-definition-volatile slot)
+      (dolist(gf (slot-definition-readers slot-definition))
+        ;; not ideal but MOP use of add-method etc not well documented
+        (eval
+         `(defmethod :around ,(generic-function-name gf)
+            ((entity ,(class-name class)))
+            (funcall (call-next-method)))))))
+  ;; deal with property inheritance
+  (setf (slot-value class 'properties)
+        (reduce #'property-union
+                (cons properties
+                      (mapcan #'(lambda(super)
+                                  (when (typep super parameter-class)
+                                    (list (properties class))))
+                              direct-superclasses)))))
 
 (defmethod reinitialize-instance :around
     ((class parameter-class) &rest initargs
@@ -165,12 +234,12 @@ any parameter initargs - they aren't inherited."
             (multiple-value-bind(value read-p)
                 (parameter-slot-read slot object config)
               (cond
-            (read-p
-              (setf (slot-value object slot-name) value))
-            ((and (typep slot 'parameter-volatile-effective-slot-definition)
-                  (slot-definition-initfunction slot))
-              (setf (slot-value object slot-name)
-                    (slot-definition-initfunction slot)))))))))))
+                (read-p
+                 (setf (parameter object slot) value))
+                ((and (typep slot 'parameter-volatile-effective-slot-definition)
+                      (slot-definition-initfunction slot))
+                 (setf (slot-value object slot-name)
+                       (slot-definition-initfunction slot)))))))))))
 
 (defmethod shared-initialize :before ((object parameter-object) slot-names
                                       &rest all-keys &key config)
@@ -179,11 +248,29 @@ any parameter initargs - they aren't inherited."
   ;; if no key specified for parameter read it from config file
   (configure object config slot-names all-keys))
 
-(defgeneric volatile-slot-value(entity alot-name)
-  (:documentation "slot-value for volatile slots - ensure context is object")
-  (:method((entity parameter-object) (slot-name symbol))
-    (let ((*context* entity))
-      (funcall (slot-value entity slot-name)))))
+;; (defgeneric volatile-slot-value(entity alot-name)
+;;   (:documentation "slot-value for volatile slots - ensure context is object")
+;;   (:method((entity parameter-object) (slot-name symbol))
+;;     (let ((*context* entity))
+;;       (funcall (slot-value entity slot-name)))))
+
+;; (defgeneric (setf parameter)(entity slot-name value)
+;;   (:documentation "Should be used to change parameter values dynamically")
+;;   (:method((entity parameter-object)
+;;            (slot parameter-volatile-effective-slot-definition)
+;;            value)
+;;     (setf (slot-value entity (slot-definition-name slot))
+;;           (if (functionp value) value (eval `(lambda() ,value)))))
+;;   (:method((entity parameter-object)
+;;            (slot parameter-effective-slot-definition)
+;;            value)
+;;     (setf (slot-value entity (slot-definition-name slot)) value))
+;;   (:method((entity parameter-object) (slot-name symbol) value)
+;;     (setf (parameter entity
+;;                      (find slot-name (class-slots (class-of entity))
+;;                            :key #'sot-definition-name))
+;;           value)))
+
 
 ;; this would be semantically what shared-intialize does
 ;; (defmethod shared-initialize

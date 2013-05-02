@@ -166,6 +166,17 @@
   (:method((entity entity-with-signals) (signal symbol) listener)
     (member listener (gethash signal (slot-value entity 'signal-table)))))
 
+(defgeneric repair-signal-flags(component)
+  (:documentation " adjusts hasAncestorListeners bits in the
+    component's subtree; to be called when the component's ownership
+    changes")
+  (:method((component component))
+    (let ((parent (parent-module this)))
+      (setf (slot-value component 'has-ancestor-listeners)
+            (map 'bit-vector #'logand
+                 (slot-value parent 'has-ancestor-listeners)
+                 (slot-value parent 'has-local-listeners))))))
+
 ;; TODO finish methods???
 
 
