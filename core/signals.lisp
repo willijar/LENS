@@ -167,11 +167,11 @@
     (member listener (gethash signal (slot-value entity 'signal-table)))))
 
 (defgeneric repair-signal-flags(component)
-  (:documentation " adjusts hasAncestorListeners bits in the
+  (:documentation " adjusts has-ancestor-listeners bits in the
     component's subtree; to be called when the component's ownership
     changes")
-  (:method((component component))
-    (let ((parent (parent-module this)))
+  (:method((component entity-with-signals))
+    (let ((parent (parent-module component)))
       (setf (slot-value component 'has-ancestor-listeners)
             (map 'bit-vector #'logand
                  (slot-value parent 'has-ancestor-listeners)

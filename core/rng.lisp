@@ -192,7 +192,7 @@ MT-GENRAND function for clarity."
 (defun exponential(mean &optional (rng 0))
   "Returns a random variate from the exponential distribution with the
  given mean (that is, with parameter lambda=1/mean)."
-  (* (- mean) (log (- 1.0d0 (%gendblrand rnd)))))
+  (* (- mean) (log (- 1.0d0 (%gendblrand rng)))))
 
 (defun normal(&optional (mean 0) (stddev 1.0d0) (rng 0))
   "Returns a random variate from the normal distribution with the given mean
@@ -228,7 +228,7 @@ will have a different mean and standard deviation."
   (assert (> a 1))
   (let* ((d (- a 1/3))
          (c (/ 1.0d0 (sqrt (* d 9.0d0))))
-         x v)
+         x u v)
     (loop
         (loop
             :do (setf x (normal 0 1.0d0 rng)
@@ -310,7 +310,7 @@ and mean mean.
  Generation makes use of the fact that exponential distributions
  sum up to Erlang."
   (let ((u 1.0d0))
-    (dotimes(i k) (setf u (* u (- 1.0d0 %gendblrand rng))))
+    (dotimes(i k) (setf u (* u (- 1.0d0 (%gendblrand rng)))))
     (- (* (/ m k) (log u)))))
 
 (defun chi-square(k &optional (rng 0))
@@ -366,7 +366,7 @@ sqrt(Y2/k) has a student-t distribution with k degrees of freedom.
 
 (defun weibull(a b &optional (rng 0))
    "Returns a random variate from the Weibull distribution with parameters
- a, b > 0, where a is the "scale" parameter and b is the shape parameter.
+ a, b > 0, where a is the 'scale' parameter and b is the shape parameter.
  Sometimes Weibull is given with alpha and beta parameters, then alpha=b
  and beta=a.
 

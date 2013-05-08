@@ -166,8 +166,7 @@ any parameter initargs - they aren't inherited."
   t)
 
 (defclass parameter-object()
-  ()
-  (:metaclass parameter-class))
+  ())
 
 (defmethod properties((obj parameter-object))
   (properties (class-of obj)))

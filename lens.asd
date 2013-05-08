@@ -36,9 +36,12 @@
                (:file "trie" :depends-on ("defpackage"))
                (:file "message" :depends-on ("object" "simulation"))
                (:file "compatibility" :depends-on ("defpackage"))
-               (:file "simulation" :depends-on
-                       ("defpackage" "common" "compatibility" "parameters"))
+               (:file "simulation"
+                      :depends-on ("defpackage" "common" "compatibility"
+                                   "parameters"))
                (:file "signals" :depends-on ("object"))
                (:file "model-change" :depends-on ("defpackage"))
                (:file "gate" :depends-on ("object" "model-change"))
-               (:file "component" :depends-on ("signals" "simulation"))))))
+               (:file "component" :depends-on ("signals" "simulation"))
+               (:file "module"
+                      :depends-on ("gate" "component" "parameters"))))))

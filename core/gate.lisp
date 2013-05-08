@@ -29,6 +29,8 @@
 
 (in-package :lens)
 
+(deftype gate-direction() '(member :input :output :inout))
+
 (defclass gate(owned-object)
   ((previous-gate
     :type link :reader previous-gate :initform nil
@@ -54,7 +56,7 @@ the user typically does not want to directly create or destroy cGate
 objects. However, they are important if a simple module algorithm
 needs to know about its surroundings."))
 
-(defclass gate-slot(named-object owned-object)
+(defclass gate-slot(owned-object)
   ((input :reader input :initform nil :reader input-gate-p
           :documentation "Slot for input gate or gates")
    (output :reader output :initform nil :reader output-gate-p
@@ -88,7 +90,7 @@ needs to know about its surroundings."))
         :output)))
 
 (defun gate-index(gate)
-  (let ((gs (owner gate))
+  (let* ((gs (owner gate))
         (ip (input gs))
         (op (output gs)))
     (unless (or (eql gate ip) (eql gate op))
@@ -124,7 +126,7 @@ inout gate-slot)"
 
 (defmethod initialize-instance :after ((gate-slot gate-slot)
                                        &key direction initial-size)
-  (assert (member direction '(:input :output :inout)))
+  (assert (typep  direction 'gate-direction))
   (flet((make-gates()
           (if size
               (progn
@@ -156,7 +158,7 @@ inout gate-slot)"
            (values "<-" pg (when pg (channel pg)))))
         (:output (values "->" (next-gate gate) (channel gate))))
     (if g
-        (format nil "~A ~A.~A ~@[,~A ~A~]"
+        (format nil "~A ~A.~A ~:[~;,~A ~A~]"
                 arrow
                 (if (eq (owner g) (parent-module (owner gate)))
                     "<parent>"
@@ -242,19 +244,13 @@ to disconnect a gate; use disconnect() for that.")
           (emit end-module 'post-model-change notification))))
     channel))
 
-(defmethod (setf channel)((gate gate) channel)
-  (assert (not (channel gate)))
-  (setf (slot-value gate 'channel) channel
-        (slot-value channel 'source-gate) gate)
-  (repair-signal-flags channel))
-
 (defgeneric disconnect(gate)
   (:documentation "Disconnects the gate, and also deletes the
   associated channel object if one has been set. disconnect() must be
   invoked on the source gate (from side) of the connection.
 The method has no effect if the gate is not connected.")
   (:method((gate gate))
-    (unless (next-gate gate) (return))
+    (unless (next-gate gate) (return-from disconnect))
     (let* ((module (parent-module gate))
            (start-gate (path-start-gate from))
            (end-gate (path-end-gate to))
@@ -301,7 +297,7 @@ The method has no effect if the gate is not connected.")
     (repair-signal-flags channel)))
 
 (defmethod (setf deliver-on-reception-start) :before ((gate gate) value)
-  (assert (typep (parent-module gate)) 'simple-module)
+  (assert (typep (parent-module gate) 'simple-module))
   (assert (eql (gate-direction gate) :input)))
 
 (defgeneric transmission-channel(gate &optional incoming-p)
