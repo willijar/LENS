@@ -7,11 +7,11 @@
   (:documentation "Build submodules inside a compound module"))
 
 (defgeneric build-connections(instance)
-  (:documentation "Buildc connectiuons between submodules and gates in a compound module"))
+  (:documentation "Buildc connectiuons between submodules and gates in
+  a compound module"))
 
 (defgeneric build-inside(instance)
   (:documentation "create submodules and connect them"))
-
 
 (defgeneric arrived(module message gate time)
   (:documentation "Called when a message arrives at a gate which is not further
@@ -107,11 +107,16 @@ function."
                             (function (funcall size module))))))))
 
 (defun for-each-gate(module operator)
-  (maphash
+  (labels((over(slot direction)
+            (let ((v (funcall direction slot)))
+              (when v
+                (if (vectorp v) (map nil operator v) (funcall operator v))))))
+    (maphash
    #'(lambda(k v)
        (declare (ignore k))
-       (for-each-child operator v))
-   (gate-slots module)))
+       (over v #'input)
+       (over v #'output))
+   (gate-slots module))))
 
 (defmethod gate((module module) (name symbol) &key direction index)
    (let ((slot (gethash name (gate-slots module))))
@@ -154,10 +159,13 @@ function."
                       (if (or (numberp v) (functionp v)
                               (member v (class-slots class)
                                       :key #'slot-definition-name)
-                              (member v (slot-value class '%gatespec) :key #'first))
+                              (member v (slot-value class '%gatespec)
+                                      :key #'first))
                           (values v (cddr spec))
                           (values nil (cdr spec))))
-                  (cons name (cons sizespec (merge-local-typespec typespec class 'module))))))
+                  (cons name
+                        (cons sizespec
+                              (merge-local-typespec typespec class 'module))))))
           submodules)
          direct-superclasses
          'compound-module-class
@@ -181,7 +189,8 @@ return the gate given by spec. Validates spec based on class definitions"
           (error "Invalid module name ~A in gate address ~A" modulename spec))
         (when (or (and moduleindex (not (second modulespec)))
                   (and (not moduleindex) (second modulespec)))
-          (error "Invalide module index ~A in gate address ~A" moduleindex spec))
+          (error "Invalide module index ~A in gate address ~A"
+                 moduleindex spec))
         ;; since module specified need to check gates in suibmodule class
         (setf class (find-class (third modulespec)))))
     (let ((gatespec (find name (slot-value class '%gatespec) :key #'first)))
@@ -251,6 +260,11 @@ return the gate given by spec. Validates spec based on class definitions"
     (channels :type list :initform nil :reader channels))
    (:metaclass compound-module-class))
 
+(defmethod index((module module))
+  (let ((v (gethash (name module) (submodules (owner module)))))
+    (when (vectorp v)
+      (position module v))))
+
 (defmethod initialize-instance :after ((module compound-module)
                                        &key &allow-other-keys)
   (build-submodules module)
@@ -264,12 +278,13 @@ return the gate given by spec. Validates spec based on class definitions"
   "Attempt to add a submodule to instance - throw error if submodule
 already exists."
   (let ((sm (gethash name (submodules instance)))
-        (initargs `(,(first initargs) :owner ,instance ,@(rest initargs))))
+        (initargs `(,(first initargs) :name name :owner ,instance
+                     ,@(rest initargs))))
     (assert (or (arrayp sm) (null sm))
             ()
             "Submodule ~A of ~A already exists." name instance)
     (let ((submodule (apply #'make-instance initargs)))
-      (if (arrayp sm)
+      (if (vectorp sm)
           (vector-push-extend sm submodule)
           (setf (gethash name (submodules instance)) submodule))
       submodule)))
@@ -306,7 +321,7 @@ already exists."
   (maphash
    #'(lambda(k v)
        (declare (ignore k))
-       (if (arrayp v) (map nil operator v) (funcall operator v)))
+       (if (vectorp v) (map nil operator v) (funcall operator v)))
    (submodules module)))
 
 (defun for-each-channel(module operator)
@@ -321,10 +336,10 @@ already exists."
    (for-each-submodule component #'repair-signal-flags)
    (for-each-channel component #'repair-signal-flags))
 
-(defmethod initialize((module compound-module) &optional (stage 0))
-   (flet ((init(c) (initialize c stage)))
-     (or (some #'init (channels module))
-         (some #'init (submodules module)))))
+(defmethod initialize((module compound-module) &optional stage)
+  (flet ((init(c) (or (initialized-p c) (initialize c stage))))
+     (or (every #'init (channels module))
+         (every #'init (submodules module)))))
 
 
 

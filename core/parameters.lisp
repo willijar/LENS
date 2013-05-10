@@ -23,31 +23,26 @@
 
 (in-package :lens)
 
-(defvar *simulation-configuration*)
-
-(defgeneric parameter-source(instance)
+(defgeneric configuration(instance)
   (:documentation "Return the parameter source associated with an instance"))
 
 (defgeneric read-parameter(full-path source format)
   (:documentation "Actually read a fully named parameter from source
   using specified format")
-  (:method(full-path source format)
+  (:method((full-path list) source format)
     (case (first (last full-path))
       (b
        (values (format nil "Debug-read ~A ~A" format full-path) t))
       (d (values '(random 10.0) t))))
-  (:method(full-path (source trie) format)
+  (:method((full-path list) (trie trie) format)
     (multiple-value-bind(txt found-p) (trie-match full-path trie)
       (values (when found-p (dfv:parse-input format txt)) found-p))))
-
-(defgeneric parameter-slot-read(slot instance config)
-  (:documentation "Read a parameter slot for a parameter-class
-  instance from a configuration"))
 
 (defgeneric format-from-type(type)
   (:documentation "Given a type declaration return a format declaration")
   (:method((type list)) (first type))
-  (:method(type) type))
+  (:method(type) type)
+  (:method((type (eql 'time-type))) 'time-period))
 
 (defgeneric finalize-parameters(entity)
   (:documentation "May be overwridden to perform additional checks")
@@ -58,7 +53,8 @@
 ;; i.e. :initform for paramaters should be default value.
 
 (defclass parameter-slot()
-  ((properties :initarg :properties :reader slot-definition-properties
+  ((properties :initform nil
+               :initarg :properties :reader slot-definition-properties
                :documentation "plist of properties for this parameter")))
 
 (defmethod initialize-instance :after
@@ -74,7 +70,8 @@
           (let ((units  (getf (slot-definition-properties slot) :units)))
             (when (and units (not format))
               `(dfv:eng :units units))))
-       format))))
+       format
+       (format-from-type (slot-definition-type slot))))))
 
 (defun property-union(list1 list2)
   "Returns a merged property list combining properties from list1 and
@@ -111,19 +108,11 @@ appended onto end of list1 value"
     (parameter-effective-slot-definition)
   ())
 
-;; (defclass volatile-reader(closer-mop::standard-reader-method)
-;; ()
-
 (defclass parameter-class(standard-class)
   ((properties :type list :reader properties
                :documentation "The properties for this class"))
   (:documentation "Metaclass for classes which have slots initialised
   from an external source"))
-
-;; (defmethod reader-method-class((class parameter-class) (slot parameter-direct-slot-definition) &rest initargs)
-;;   (if (slot-definition-volatile slot)
-;;       (find-class 'volatile-reader)
-;;       (call-next-method)))
 
 (defmethod direct-slot-definition-class ((class parameter-class)
                                          &rest initargs)
@@ -174,6 +163,16 @@ any parameter initargs - they aren't inherited."
 (defmethod properties((obj parameter-object))
   (properties (class-of obj)))
 
+(defmethod read-parameter((obj parameter-object) name format)
+  (read-parameter (nconc (full-path obj) (list name))
+                  (configuration obj)
+                  format))
+
+(defmethod read-parameter((obj parameter-object) (path list) format)
+  (read-parameter (nconc (full-path obj) path)
+                  (configuration obj)
+                  format))
+
 ;; as per Pascal Constanza ensure parameter-object is default direct superclass
 (defmethod initialize-instance :around
     ((class parameter-class) &rest initargs
@@ -187,27 +186,6 @@ any parameter initargs - they aren't inherited."
              (append direct-superclasses
                      (list (find-class 'parameter-object)))
              initargs)))
-
-(defmethod initalize-instance :after ((class parameter-class)
-                                      &key direct-superclasses
-                                      properties
-                                      &allow-other-keys)
-  (dolist(slot (class-direct-slots class))
-    (when (slot-definition-volatile slot)
-      (dolist(gf (slot-definition-readers slot-definition))
-        ;; not ideal but MOP use of add-method etc not well documented
-        (eval
-         `(defmethod :around ,(generic-function-name gf)
-            ((entity ,(class-name class)))
-            (funcall (call-next-method)))))))
-  ;; deal with property inheritance
-  (setf (slot-value class 'properties)
-        (reduce #'property-union
-                (cons properties
-                      (mapcan #'(lambda(super)
-                                  (when (typep super parameter-class)
-                                    (list (properties class))))
-                              direct-superclasses)))))
 
 (defmethod reinitialize-instance :around
     ((class parameter-class) &rest initargs
@@ -224,24 +202,54 @@ any parameter initargs - they aren't inherited."
                  initargs))
       (call-next-method)))
 
-(defgeneric configure(entity  config &optional slot-names all-keys)
+(defmethod initalize-instance :after ((class parameter-class)
+                                      &key direct-superclasses
+                                      properties
+                                      &allow-other-keys)
+  (dolist(slot (class-direct-slots class))
+    (when (slot-definition-volatile slot)
+      (dolist(gf (slot-definition-readers slot))
+        ;; not ideal but MOP use of add-method etc not well documented
+        (eval
+         `(defmethod :around ,(generic-function-name gf)
+            ((entity ,(class-name class)))
+            (funcall (call-next-method)))))))
+  ;; deal with property inheritance
+  (setf (slot-value class 'properties)
+        (reduce #'property-union
+                (cons properties
+                      (mapcan #'(lambda(super)
+                                  (when (typep super class)
+                                    (list (properties class))))
+                              direct-superclasses)))))
+
+(defgeneric configure(entity config &optional slot-names all-keys)
+  (:documentation "Configure an objects slots from configuration data")
   (:method((object parameter-object)  config
            &optional (slot-names t) (all-keys nil))
+    (let* ((full-path (full-path object))
+           (full-path-last (last full-path)))
     (dolist(slot (class-slots (class-of object)))
       (when (typep slot 'parameter-slot)
         (let ((slot-initargs (slot-definition-initargs slot))
               (slot-name (slot-definition-name slot)))
           (when (and (or (eql slot-names 't) (member slot-name slot-names))
                      (not (get-properties all-keys slot-initargs)))
+            (rplacd full-path-last slot-name)
             (multiple-value-bind(value read-p)
-                (parameter-slot-read slot object config)
+                (read-parameter full-path (configuration object)
+                                (slot-definition-format slot))
               (cond
                 (read-p
-                 (setf (parameter object slot) value))
+                 (setf (slot-value object slot-name)
+                   (if (and (not (functionp value))
+                            (typep slot 'parameter-volatile-effective-slot-definition))
+                       #'(lambda() (eval value))
+                       value)))
                 ((and (typep slot 'parameter-volatile-effective-slot-definition)
                       (slot-definition-initfunction slot))
                  (setf (slot-value object slot-name)
-                       (slot-definition-initfunction slot)))))))))))
+                       (slot-definition-initfunction slot))))))))))))
 
 (defmethod shared-initialize :before ((object parameter-object) slot-names
                                       &rest all-keys &key config)
@@ -253,29 +261,6 @@ any parameter initargs - they aren't inherited."
 (defmethod initialize-instance :after ((object parameter-object)
                                        &key &allow-other-keys)
   (finalize-parameters object))
-
-;; (defgeneric volatile-slot-value(entity alot-name)
-;;   (:documentation "slot-value for volatile slots - ensure context is object")
-;;   (:method((entity parameter-object) (slot-name symbol))
-;;     (let ((*context* entity))
-;;       (funcall (slot-value entity slot-name)))))
-
-;; (defgeneric (setf parameter)(entity slot-name value)
-;;   (:documentation "Should be used to change parameter values dynamically")
-;;   (:method((entity parameter-object)
-;;            (slot parameter-volatile-effective-slot-definition)
-;;            value)
-;;     (setf (slot-value entity (slot-definition-name slot))
-;;           (if (functionp value) value (eval `(lambda() ,value)))))
-;;   (:method((entity parameter-object)
-;;            (slot parameter-effective-slot-definition)
-;;            value)
-;;     (setf (slot-value entity (slot-definition-name slot)) value))
-;;   (:method((entity parameter-object) (slot-name symbol) value)
-;;     (setf (parameter entity
-;;                      (find slot-name (class-slots (class-of entity))
-;;                            :key #'sot-definition-name))
-;;           value)))
 
 
 ;; this would be semantically what shared-intialize does
@@ -308,29 +293,4 @@ any parameter initargs - they aren't inherited."
 ;;                (funcall slot-initfunction)))))
 ;;   object)
 
-(defmethod parameter-slot-read((slot parameter-effective-slot-definition)
-                               instance config)
-;; need to change between class allocation using class names and instance names
-;; using instance name!!
-  (multiple-value-bind(value read-p)
-      (read-parameter
-       (append (full-path instance) (list (slot-definition-name slot)))
-       (parameter-source instance)
-       (slot-definition-format slot))
-  (when read-p
-    (values
-     (if (and (not (functionp value))
-              (typep slot 'parameter-volatile-effective-slot-definition))
-         #'(lambda() (eval value))
-        value)
-    t))))
 
-;; (defclass property-object()
-;;   ((properties :initform nil :initarg :properties
-;;                :documentation "plist of plists"))
-;;   (:documentation "An object which can properties associated with them"))
-
-;; (defgeneric property(key instance)
-;;   (:documentation "Return a named property list for instance")
-;;   (:method((key symbol) (instance property-object))
-;;     (getf key (slot-value instance 'properties))))

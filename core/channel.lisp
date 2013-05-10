@@ -2,21 +2,24 @@
 
 (defclass channel(component)
   ((source-gate :initarg :source-gate :accessor source-gate))
+  (:metaclass parameter-class)
   (:documentation "Base class for channels"))
 
 (defclass ideal-channel(channel)
   ()
+  (:metaclass parameter-class)
   (:documentation "Channel with zero propagation delay, zero
   transmission delay (infinite datarate), and always enabled."))
 
 (defclass transmission-channel(channel)
   ()
+  (:metaclass parameter-class)
   (:documentation "base classe for all transmission channels"))
 
 (defstruct channel-result
   (delay 0 :type time-type)
   (duration 0 :type time-type)
-  (discard nil :type :bool))
+  (discard nil :type boolean))
 
 (defgeneric process-message(channel message time)
   (:documentation "This method encapsulates the channel's
@@ -41,7 +44,7 @@ channel.
 The method does not need to throw error on overlapping transmissions,
 or if the packet's duration field is already set; these checks are
 done by the simulation kernel before processMessage() is called.")
-  (:method(channel) nil))
+  (:method(channel message time) nil))
 
 (defgeneric nominal-datarate(channel)
   (:documentation "For transmission channels: Returns the nominal data
@@ -122,15 +125,16 @@ producing output - else we are connected an iput gate to something and
 our parent is the gate parent."
   (let ((gate (source-gate channel)))
     (when gate
-      (if (eql (gate-direction gate :input)
+      (if (eql (gate-direction gate) :input)
           (owner gate) ;; parent is source
-          (owner (owner gate)))))))
+          (owner (owner gate))))))
 
-(defmethod delay-channel(channel)
+(defclass delay-channel(channel)
   ((delay :type double :initform 0 :accessor delay :parameter t
           :initarg :delay :documentation "Delay in seconds")
    (disabled :type bool :initform nil :accessor disabled :parameter t
              :initarg :disabled :documention "If true packets are discarded"))
+  (:metaclass parameter-class)
   (:documentation "Channel with propagation delay."))
 
 (register-signal 'message-sent)
@@ -141,15 +145,15 @@ our parent is the gate parent."
   message
   (result (make-channel-result) :type channel-result))
 
-
 (defmethod process-message((channel delay-channel) message time)
   (cond
     ((disabled channel)
-     (emit channel 'message-discarded (make-timestamped-value :value message))
+     (emit channel 'message-discarded (make-timestamped :value message))
      (make-channel-result :discard t))
     (t
-     (if (may-have-listeners channel)
+     (if (may-have-listeners channel 'message-sent)
          (let ((result (make-channel-result :delay (delay channel))))
            (emit channel 'message-sent
-                 (make-message-sent-signal-value  message result))
+                 (make-message-sent-signal-value
+                  :message  message :result result))
            result)))))

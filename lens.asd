@@ -32,16 +32,17 @@
               ((:file "defpackage")
                (:file "common" :depends-on ("defpackage"))
                (:file "object" :depends-on ("common"))
-               (:file "parameters" :depends-on ("object" "trie"))
-               (:file "trie" :depends-on ("defpackage"))
+               (:file "parameters" :depends-on ("object" "configuration"))
+               (:file "configuration" :depends-on ("defpackage"))
                (:file "message" :depends-on ("object" "simulation"))
                (:file "compatibility" :depends-on ("defpackage"))
+               (:file "component" :depends-on ("signals" "simulation"))
                (:file "simulation"
                       :depends-on ("defpackage" "common" "compatibility"
-                                   "parameters"))
+                                    "configuration"))
                (:file "signals" :depends-on ("object"))
                (:file "model-change" :depends-on ("defpackage"))
                (:file "gate" :depends-on ("object" "model-change"))
-               (:file "component" :depends-on ("signals" "simulation"))
+               (:file "channel" :depends-on ("signals" "component"))
                (:file "module"
                       :depends-on ("gate" "component" "parameters"))))))

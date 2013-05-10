@@ -65,7 +65,7 @@
   matching pattern and whether match was found"))
 
 (defgeneric trie-delete(pattern structure)
-  (:documentaton "Delete branch from a trie matching pattern"))
+  (:documentation "Delete branch from a trie matching pattern"))
 
 (defmethod make-trie((pattern list) value)
   (if (rest pattern)
@@ -210,13 +210,16 @@ representing a value, a pathname for an extension file or nil if no
         (current-section "General"))
     (labels((do-read-file(pathname)
               (with-open-file(is pathname :direction :input)
-                (let ((saved-section current-section))
+                (let ((saved-section current-section)
+                      (*default-pathname-defaults* (merge-pathnames pathname)))
+
                   (handler-case
                       (loop
                          (let ((v (read-ini-line is)))
                            (etypecase v
                              (string (setf current-section v))
-                             (pathname (do-read-file (merge-pathnames v pathname)))
+                             (pathname
+                              (do-read-file (merge-pathnames v)))
                              (trie
                               (let ((s (gethash current-section sections)))
                                 (setf (gethash current-section sections)
@@ -250,3 +253,4 @@ representing a value, a pathname for an extension file or nil if no
         (do-merge-section key))
       the-section)))
 
+;; TODO looping constructs representing multiple simulations in config file

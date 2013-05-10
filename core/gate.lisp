@@ -70,7 +70,7 @@ needs to know about its surroundings."))
   (when (channel gate) (funcall operator (channel gate))))
 
 (defmethod parent-module((link gate))
-  (parent-module (owner link)))
+  (owner (owner link)))
 
 (defmethod parent-module((g gate-slot))
   (owner g))
@@ -80,7 +80,7 @@ needs to know about its surroundings."))
 
 (defmethod full-name((gate gate))
   (let ((d (gate-direction gate))
-        (i (gate-index gate)))
+        (i (index gate)))
     `(,name ,d ,@(when i (list i)))))
 
 (defun gate-direction(gate)
@@ -89,10 +89,10 @@ needs to know about its surroundings."))
         :input
         :output)))
 
-(defun gate-index(gate)
+(defmethod index((gate gate))
   (let* ((gs (owner gate))
-        (ip (input gs))
-        (op (output gs)))
+         (ip (input gs))
+         (op (output gs)))
     (unless (or (eql gate ip) (eql gate op))
       (or
        (and (arrayp ip) (position gate ip))

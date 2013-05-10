@@ -12,73 +12,12 @@
   ((owner :initarg :owner :type named-object :initform nil
           :accessor owner)))
 
-(defclass object-array(named-object)
-  ((vec :type array :reader vec
-        :documentation "Underlying storage")
-   (element-type :type symbol :reader element-type :initarg :element-type
-                  :initform 'lens-object
-                 :documentation "All elements must be of this type")
-   (element-spec :type list :reader element-spec
-                 :initform nil
-         :documentation "Arguments used to create a new instance in
-         this array"))
-  (:documentation "An array of lens objects of same type - can specify
-arguments for make-instance for new elements"))
-
-(defmethod initialize-instance :after
-    ((array object-array) &key (initial-size 0) name element-spec
-     &allow-other-keys)
-  (assert (or (zerop initial-size) element-spec))
-  (when element-spec
-    (assert (subtypep (first element-spec) (element-type array)))
-    (setf (slot-value array 'element-spec)
-          `(,(first element-spec) :name ,name :owner array
-             ,@(rest element-spec))))
-  (let ((vec (setf (slot-value array 'vec)
-                   (make-array initial-size
-                               :element-type (or nil (element-type array))
-                               :adjustable t
-                               :initial-element nil
-                               :fill-pointer initial-size))))
-    (dotimes(x initial-size)
-      (setf (aref vec x) (apply #'make-instance element-spec)))))
-
-(defun array-extend(array)
-  "Add a new element to the end of an array using new element arguments,
-returning the new object"
-  (assert (element-spec array))
-  (let ((new (apply #'make-instance (element-spec array))))
-    (vector-push-extend new (vec array))
-    new))
-
-(defgeneric insert(object sequence)
-  (:documentation "Fnd first empty slot in sequence and insert object there
-extending sequence if necessary. Returns position in sequence of object")
-  (:method(entity (array array))
-    (let ((p (position nil array)))
-      (if p
-          (progn (setf (aref array p) entity) p)
-          (vector-push-extend obj array))))
-  (:method((entity owned-object) (array object-array))
-    (let ((vec (vec array)))
-      (assert (and (not (eql entity sequence)) (not (member entity vec))))
-      (assert (typep object (element-type array)))
-      (setf (owner entity) array
-            (name entity) (name array))
-      (insert entity vec))))
-
-(defun index(owned-object)
-  (let ((p (parent-object owned-object)))
-    (when (typep p 'object-array)
-      (position owned-object (slot-value p 'vec)))))
+(defgeneric index(owned-object)
+  (:documentation "In in an array of objects return the index"))
 
 (defgeneric parent-module(object)
   (:documentation "Return the parent module of this object - not always owner")
-  (:method((entity owned-object))
-    (let ((owner (owner entity)))
-      (if (typep owner 'object-array)
-          (owner owner)
-          owner))))
+  (:method((entity owned-object)) (owner entity)))
 
 (defgeneric full-name(o)
   (:documentation "When this object is part of a vector (like a
@@ -87,8 +26,7 @@ gate vector), this method returns the object's name with the index in
 brackets;")
   (:method((o named-object))
     (cons (name o)
-          (when (typep (parent o) 'object-array)
-            (list (position o (vec (owner o))))))))
+          (let ((i (index o))) (when i (list i))))))
 
 (defgeneric full-path(o)
   (:documentation "Returns the full path of the object in the object
@@ -97,7 +35,7 @@ hierarchy, like '(net host 2 tcp winsize)'.")
     "if there is an owner object, this method returns the owner's fullPath
      plus this object's fullName, separated by a dot; otherwise it simply
      returns full-name."
-    (append (full-path (parent-module o)) (full-name o))))
+    (nconc (full-path (parent-module o)) (full-name o))))
 
 (defgeneric for-each-child(parent operator)
   (:documentation "Enables traversing the object tree, performing some

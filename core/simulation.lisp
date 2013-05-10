@@ -16,13 +16,22 @@
 
 (defvar *simulation* nil "The global simulation instance")
 (defvar *context* nil "The current context for evaluation")
-(defvar *reset-hooks* nil "List of hooks to call to reset simulation -
-called after all entities created before running simulation")
+(defvar *simulation-init-hooks* nil
+  "A list of functions which take the simulation as an argument which
+  are called after simulation etc is created. Can be used to add in
+  layers which use signals such as statistical reporting or graphical
+  presentation.")
+
 (defvar *time-format* "~6,3f"  "Time output format control")
 
 (deftype time-type() 'double-float)
 
-(defclass simulation ()
+(defmethod configuration(object)
+  "Default to simulation configuration for all objects"
+  (declare (ignore object))
+  (configuration *simulation*))
+
+(defclass simulation (named-object parameter-object)
   ((clock :type time-type :initform 0.0d0
 	  :accessor clock :initarg :start-time
 	  :documentation "simulation virtual time")
@@ -39,16 +48,25 @@ called after all entities created before running simulation")
      :element-type 'event
      :comp-fn #'event<
      :index #'event-rank))
-   (config :reader config :initarg :config
+   (configuration :reader configuration :initarg :configuration
            :documentation "Configuration data used for simulation")
+   (initialized-p
+    :initform nil :reader initialized-p
+    :documentation "True if this component has been initialized.")
    (rng-map :type array :reader rng-map
             :documentation "Top level rng-map.")
    (num-rngs :parameter t :type fixnum :initform 1 :reader num-rngs
              :documentation "Total number of rngs for this simulation")
-   (rng-class  :parameter t :type symbol :initform mt-random-state
+   (rng-class  :parameter t :type symbol :initform 'mt-random-state
               :documentation "Class for rng's")
-   (warmup-period :parameter t :initform 0 :reader warmup-period
+   (warmup-period :parameter t :type time-type :initform 0 :reader warmup-period
                   :documentation "Warmup period for statistics collection")
+   (cpu-time-limit
+    :parameter t :type time-type :initform 300 :reader cpu-time-limit
+    :documentation "Max cpu time for run")
+   (sim-time-limit :parameter t :type time-type :initform (* 100 60 60 60)
+                   :documentation "Maximum simulation run time"
+                   :reader sim-time-limit)
    (network :parameter t :type symbol
             :documentation "Specified Network type parameter")
    (network-instance
@@ -63,11 +81,14 @@ called after all entities created before running simulation")
 	     (clock simulation) (halted simulation)
        (alg:size (slot-value simulation 'event-queue)))))
 
-(defmethod full-path((sim simulation)) nil)
+(defmethod full-path((sim simulation)) (list nil))
 
 (defmethod initialize-instance :around ((sim simulation) &key &allow-other-keys)
   (let ((*simulation* sim))
     (call-next-method)))
+
+(defmethod configuration((instance owned-object))
+  (configuration *simulation*))
 
 (defmethod initialize-instance :after
     ((sim simulation) &key config run-number &allow-other-keys)
@@ -190,12 +211,6 @@ called after all entities created before running simulation")
       (ignore-errors (kill-thread (slot-value simulation 'thread)))
       (setf (slot-value simulation 'thread) nil))))
 
-(defmethod reset((simulation simulation))
-  (stop simulation :abort t)
-  (setf (clock simulation) 0.0d0)
-  (let ((q  (slot-value simulation 'event-queue)))
-    (while (not (empty-p q)) (dequeue q))))
-
 (defun run(simulation &key (granularity 10000) step )
   "Execute the simulation returning the running
 thread. granularity is the number of event to dispatch before
@@ -203,19 +218,30 @@ yielding the thread (default 10000). If granularity is nil all events
 are dispatched in current thread"
   (flet((run(simulation)
           (setf (halted simulation) nil)
-          (let ((*context* simulation))
-          (loop
-           :with count = 1
-           :with q =  (slot-value simulation 'event-queue)
-           :while (not (or (empty-p q) (halted simulation)))
-           :for event = (dequeue q)
-           :do (progn
-                 (setf (clock simulation) (event-time event))
-                 (when step (funcall step event))
-                 (handle event))
-           :when (and granularity
+          (let ((*context* simulation)
+                (cpu-end-time
+                 (when (cpu-time-limit simulation)
+                   (+ (get-internal-run-time)
+                      (* (cpu-time-limit simulation)
+                         internal-time-units-per-second))))
+                (sim-time-limit (sim-time-limit simulation)))
+            (loop
+               :with count = 1
+               :with q =  (slot-value simulation 'event-queue)
+               :until (or (halted simulation)
+                          (and sim-time-limit
+                               (> (clock simulation) sim-time-limit))
+                          (and cpu-end-time
+                               (> (get-internal-run-time) cpu-end-time))
+                          (empty-p q))
+               :for event = (dequeue q)
+               :do (progn
+                     (setf (clock simulation) (event-time event))
+                     (when step (funcall step event))
+                     (handle event))
+               :when (and granularity
                       (= (setf count (mod (1+ count) granularity)) 0))
-           :do (yield-thread))
+               :do (yield-thread))
           (setf (halted simulation) t))))
     (stop simulation :abort t)
     (if granularity
@@ -227,13 +253,46 @@ are dispatched in current thread"
                "LENS Simulation"))
         (funcall #'run simulation))))
 
+(defgeneric initialize(component &optional stage)
+  (:documentation "Allowed depth-first staged initialization. Return
+  true on final stage")
+  (:method :around(component &optional stage)
+    (declare (ignore stage))
+    (let ((*context* component))
+       (unless (initialized-p component)
+         (setf (slot-value component 'initialized-p)
+               (call-next-method)))))
+  (:method(instance &optional stage)
+    (declare (ignore instance stage))
+    t)
+  (:method((simulation simulation) &optional stage)
+    (assert (not stage))
+    (dolist(hook *simulation-init-hooks*) (funcall hook simulation))
+    (let ((stage -1))
+      (loop
+         (when (initialize (network simulation) (incf stage))
+           (return t))))))
+
+(defgeneric initialized-p(entity)
+  (:documentation "Return true if an entity has finished its initialization")
+  (:method((simulation simulation)) (initialized-p (network simulation))))
+
 (defgeneric finish(entity)
   (:documentation "Called depth first at end of simulation")
-  (:method((sim simulation)) (finish (network simulation))))
+  (:method((simulation simulation))
+    (stop simulation)
+    (finish (network simulation))))
 
 (defstruct timestamped
   (time (simulation-time) :type time-type)
   value)
 
-;;interactive scheduling commands
-
+(defun run-simulation(pathname &optional (key "General"))
+  (let ((simulation
+         (setf *simulation*
+               (make-instance
+                'simulation
+                :configuration (read-configuration pathname key)))))
+  (initialize simulation)
+  (run simulation)
+  (finish simulation)))
