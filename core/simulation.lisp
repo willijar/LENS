@@ -27,6 +27,7 @@ called after all entities created before running simulation")
 	  :accessor clock :initarg :start-time
 	  :documentation "simulation virtual time")
    (halted :type boolean :initform t :accessor halted)
+
    (thread :initform nil :reader simulation-thread
 	    :documentation "Thread running simulation")
    (last-schedule-id :type integer :initform 0)
@@ -46,6 +47,8 @@ called after all entities created before running simulation")
              :documentation "Total number of rngs for this simulation")
    (rng-class  :parameter t :type symbol :initform mt-random-state
               :documentation "Class for rng's")
+   (warmup-period :parameter t :initform 0 :reader warmup-period
+                  :documentation "Warmup period for statistics collection")
    (network :parameter t :type symbol
             :documentation "Specified Network type parameter")
    (network-instance
@@ -61,6 +64,10 @@ called after all entities created before running simulation")
        (alg:size (slot-value simulation 'event-queue)))))
 
 (defmethod full-path((sim simulation)) nil)
+
+(defmethod initialize-instance :around ((sim simulation) &key &allow-other-keys)
+  (let ((*simulation* sim))
+    (call-next-method)))
 
 (defmethod initialize-instance :after
     ((sim simulation) &key config run-number &allow-other-keys)
@@ -225,7 +232,7 @@ are dispatched in current thread"
   (:method((sim simulation)) (finish (network simulation))))
 
 (defstruct timestamped
-  (timestamp (simulation-time) :type time-type)
+  (time (simulation-time) :type time-type)
   value)
 
 ;;interactive scheduling commands

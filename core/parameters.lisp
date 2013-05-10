@@ -49,6 +49,9 @@
   (:method((type list)) (first type))
   (:method(type) type))
 
+(defgeneric finalize-parameters(entity)
+  (:documentation "May be overwridden to perform additional checks")
+  (:method(entity) (declare (ignore entity))))
 ;; TODO - diferentiate between default values and initvalues for parameter slots
 ;; ensure do not initialise parameter slots from default values before checking
 ;; parameter source - then if not inited from parameter source reinit from slot
@@ -246,6 +249,10 @@ any parameter initargs - they aren't inherited."
   ;; read parameters first if no key specified to initialise parameter
   ;; if no key specified for parameter read it from config file
   (configure object config slot-names all-keys))
+
+(defmethod initialize-instance :after ((object parameter-object)
+                                       &key &allow-other-keys)
+  (finalize-parameters object))
 
 ;; (defgeneric volatile-slot-value(entity alot-name)
 ;;   (:documentation "slot-value for volatile slots - ensure context is object")

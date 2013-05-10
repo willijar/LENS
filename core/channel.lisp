@@ -82,7 +82,7 @@ the current simulation time.")
 
 (defgeneric busy-p(channel)
   (:documentation "For transmission channels: Returns whether the sender gate
-is currently transmitting, ie. whether getTransmissionFinishTime()
+is currently transmitting, ie. whether transmission-finish-time
 is greater than the current simulation time.")
    (:method((channel ideal-channel)) nil)
    (:method(channel) (< (simulation-time) (transmission-finish-time channel))))
@@ -124,7 +124,7 @@ our parent is the gate parent."
     (when gate
       (if (eql (gate-direction gate :input)
           (owner gate) ;; parent is source
-          (owner (owner gate))))))
+          (owner (owner gate)))))))
 
 (defmethod delay-channel(channel)
   ((delay :type double :initform 0 :accessor delay :parameter t
@@ -150,5 +150,6 @@ our parent is the gate parent."
     (t
      (if (may-have-listeners channel)
          (let ((result (make-channel-result :delay (delay channel))))
-           (emit channel 'message-sent (make-message-sent-signal-value  message result))
+           (emit channel 'message-sent
+                 (make-message-sent-signal-value  message result))
            result)))))

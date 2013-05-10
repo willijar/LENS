@@ -1,5 +1,5 @@
-;; Trie (prefix tree) based pattern matching
-;; Copyright (C) 2011 Dr. John A.R. Williams
+;; Trie (prefix tree) based pattern matching for configuration file
+;; Copyright (C) 2013 Dr. John A.R. Williams
 
 ;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
 ;; Keywords:
@@ -24,7 +24,8 @@
 ;;; Commentary:
 
 ;; We start with a generic trie structure which includes glob style
-;; pattern matching - '* matches a single element and '** any sequence
+;; pattern matching - '* matches a single element and '** any subsequence
+;; We use string-equal so package names are not needed in config file.
 
 ;;; Code:
 
@@ -63,6 +64,9 @@
   (:documentation "Matching function returns value from structure
   matching pattern and whether match was found"))
 
+(defgeneric trie-delete(pattern structure)
+  (:documentaton "Delete branch from a trie matching pattern"))
+
 (defmethod make-trie((pattern list) value)
   (if (rest pattern)
       (make-instance 'trie
@@ -75,7 +79,7 @@
 (define-condition trie-condition(serious-condition)
   ((trie :initarg :trie :reader trie))
   (:report (lambda(condition stream)
-               (format stream "Trie problem with ~A" (trie condition)))))
+             (format stream "Trie problem with ~A" (trie condition)))))
 
 (define-condition trie-merge-condition(trie-condition)
   ((trie2 :initarg :trie2 :reader trie2))
@@ -92,7 +96,7 @@
              (nmerge-child trie1 child))
            trie1))
     (restart-case
-        (if (or (not (eql (trie-prefix trie1) (trie-prefix trie2)))
+        (if (or (not (string-equal (trie-prefix trie1) (trie-prefix trie2)))
                 (and (slot-boundp trie2 'trie-value)
                      (slot-boundp trie1 'trie-value)))
             (error 'trie-merge-condition :trie trie1 :trie2 trie2)
@@ -101,7 +105,7 @@
 
 (defmethod nmerge-child(trie1 child)
   (let ((m (find (trie-prefix child) (trie-children trie1)
-                  :key #'trie-prefix)))
+                  :key #'trie-prefix :test #'string-equal)))
     (if m
         (nmerge-trie m child)
         (setf (trie-children trie1)
@@ -110,7 +114,7 @@
 
 (defun match-range(value range)
   (labels((do-match(range)
-          (if (eql (first range) '|:|)
+          (if (string-equal (first range) '|:|)
               (when (and (or (not (second range)) (>= value (second range)))
                         (or (not (third range)) (<= value (third range))))
                 (return-from match-range t))
@@ -123,9 +127,9 @@
   nil)
 
 (defmethod trie-match((pattern list) (trie trie))
-  (when (or (eql (first pattern) (trie-prefix trie))
-         (eql (trie-prefix trie) '*)
-         (eql (trie-prefix trie) '**)
+  (when (or (string-equal (first pattern) (trie-prefix trie))
+         (string-equal (trie-prefix trie) '*)
+         (string-equal (trie-prefix trie) '**)
          (match-range (first pattern) (trie-prefix trie)))
      (let ((more (rest pattern))
            (any-child nil)
@@ -138,8 +142,8 @@
         ;; look an exact suffix match first
        (dolist(child (trie-children trie))
          (cond
-           ((eql (trie-prefix child) '*) (setf any-child child))
-           ((eql (trie-prefix child) '**) (setf any-suffix child))
+           ((string-equal (trie-prefix child) '*) (setf any-child child))
+           ((string-equal (trie-prefix child) '**) (setf any-suffix child))
            (t
             (multiple-value-bind(value found-p)
                 (trie-match more child)
@@ -156,4 +160,93 @@
                 (when found-p (return-from trie-match (values value found-p)))))
           more))))
     (values nil nil))
+
+(defmethod trie-delete((pattern list) (trie trie))
+  (let ((child (find (first pattern) (trie-children trie) :test #'string-equal
+                     :key #'trie-prefix)))
+    (when child
+      (if (rest pattern)
+          (trie-delete (rest pattern) child)
+          (progn
+            (setf (trie-children trie)
+                  (delete child (trie-children trie)))
+            child)))))
+
+(defun wstrim(string) (string-trim '(#\space #\tab) string))
+
+(defun read-ini-line(is)
+    "Returns either a string representing a section title, a trie
+representing a value, a pathname for an extension file or nil if no
+ ((more data"
+    (let ((line ;; read continuation lines - ignore comments
+           (wstrim
+            (with-output-to-string(os)
+              (loop
+                (let* ((s (read-line is))
+                       (end (1- (length s))))
+                  (unless (or (< end 0)(char= (char s 0) #\#))
+                    (when (char/=  (char s end) #\\)
+                      (write-string s os)
+                      (return))
+                    (write-string s os :end end))))))))
+      (cond
+        ((and (char= (char line 0) #\[)
+              (char= (char line (1- (length line))) #\]))
+         (subseq line 1 (1- (length line))))
+        ((let ((p (position #\= line)))
+           (when p
+             (make-trie
+              (cons nil (split-sequence:split-sequence
+                         #\.(wstrim (subseq line 0 p))))
+              (subseq line (1+ p))))))
+        ((zerop (search "include" line :test #'char-equal))
+         (parse-namestring (wstrim (subseq line 7))))
+        (t
+         (error "Parse error in configuration file at ~A" line)))))
+
+(defun read-configuration(pathname &optional (key "General"))
+  "Read a configuration file"
+  (let ((sections (make-hash-table :test #'equal))
+        (current-section "General"))
+    (labels((do-read-file(pathname)
+              (with-open-file(is pathname :direction :input)
+                (let ((saved-section current-section))
+                  (handler-case
+                      (loop
+                         (let ((v (read-ini-line is)))
+                           (etypecase v
+                             (string (setf current-section v))
+                             (pathname (do-read-file (merge-pathnames v pathname)))
+                             (trie
+                              (let ((s (gethash current-section sections)))
+                                (setf (gethash current-section sections)
+                                      (if s (nmerge-trie s v) v)))))))
+                    (end-of-file(e)
+                        (declare (ignore e))
+                        (setf current-section saved-section)))))))
+      (do-read-file pathname))
+    ;; deal with extends (section inheritence)
+    (when (string-equal key "General")
+      (return-from read-configuration (gethash "General" sections)))
+    (let ((merged nil)
+          (the-section nil))
+      (labels ((do-merge-section(name)
+                 (unless (member name merged :test #'string-equal)
+                   (push name merged)
+                   (let ((section (gethash name sections)))
+                     (unless section
+                       (error "No configuration section ~A found" name))
+                     (let ((extends (trie-match '(nil "extends") section)))
+                       (trie-delete '(nil "extends") section)
+                       (setf the-section
+                             (if the-section
+                                 (nmerge-trie the-section section)
+                                 section))
+                       (if extends
+                           (map 'nil #'do-merge-section
+                                (map 'list #'wstrim
+                                     (split-sequence::split-sequence #\, extends)))
+                         (do-merge-section "General")))))))
+        (do-merge-section key))
+      the-section)))
 
