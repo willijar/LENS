@@ -49,14 +49,9 @@ hierarchy, like '(net host 2 tcp winsize)'.")
             (when (slot-boundp o n)
               (let ((v (slot-value o n)))
                 (typecase v
-                  (object-array (for-each-child v operator))
+                  (sequence (for-each-child v operator))
                   (owned-object (funcall operator v)))))))
-     (class-slots o)))
-  (:method((o object-array) (operator function))
-    (map 'nil
-         #'(lambda(v)
-             (when v (funcall operator v)))
-         (slot-value o 'vec))))
+     (class-slots o))))
 
 (defgeneric info(o)
   (:documentation "Produce a one-line description of object.
@@ -76,15 +71,6 @@ description of the object. The string appears in the graphical
 user interface (Tkenv) together with other object data (e.g. class name)
 wherever it is feasible to display a multi-line string.")
   (:method(o) (info o)))
-
-(defun copy-slots(slots source destination)
-  "Copies anemd slot values shallowly from source to destination
-returning the modifed destination object."
-  (dolist(slot slots)
-    (if (slot-boundp source slot)
-        (setf (slot-value destination slot) (slot-value source slot))
-        (slot-makunbound destination slot)))
-  destination)
 
 (defgeneric duplicate(object &optional duplicate)
   (:documentation "Should be redefined in subclasses to create an
@@ -109,8 +95,8 @@ returning the modifed destination object."
   (:method(o (os stream))
     (write o :stream os :readably t)))
 
-(defmethod info((sequence object-array))
-  (format nil "n=~D" (length (vec sequence))))
+(defmethod info((sequence sequence))
+  (format nil "n=~D" (length sequence)))
 
 (defgeneric find-object(parent name &optional deep)
   (:documentation "Finds the object with the given name. This function

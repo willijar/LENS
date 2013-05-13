@@ -21,6 +21,10 @@
   contain the cModuleType object, and the arguments of the create()
   method call."))
 
+(def-change-notification post-module-add-notification()
+  (module)
+  (:documentation "Fired at end of module add"))
+
 (def-change-notification pre-module-delete-notification()
   (module)
   (:documentation "Fired at the top of cModule::deleteModule(). The module still exists at this point."))

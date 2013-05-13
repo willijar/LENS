@@ -27,7 +27,7 @@
 (defclass entity-with-signals(owned-object)
   ((signal-table
     :type hash-table :initform (make-hash-table)
-    :reader registered-listeners
+    :reader signal-table
     :documentation "Hash by signal of lists of registered listeners
     for this entity")
    (has-local-listeners
@@ -47,13 +47,13 @@
   (:documentation "Return list of listeners for a particular signal -
   or all listeners in entity if signal is 't")
   (:method((entity entity-with-signals) (signal symbol))
-    (gethash signal (slot-value entity 'signal-table)))
+    (gethash signal (signal-table entity)))
   (:method((entity  entity-with-signals) (signal (eql t)))
     (let ((listeners nil))
       (maphash #'(lambda(k v)
                    (declare (ignore k))
                    (setf listeners (union listeners v)))
-           signal-table)
+           (signal-table entity))
       listeners)))
 
 (defun may-have-listeners(entity signal-id)
@@ -95,14 +95,15 @@
     overhead (linear to the number of hierarchy levels in the
     network).")
   (:method((entity entity-with-signals) (signal symbol))
-    (if (< (signal-id signal) +SIGNAL-CACHE-SIZE+)
+    (let ((signal-id (signal-id signal)))
+      (if (< signal-id +SIGNAL-CACHE-SIZE+)
         (labels((compute-has-listeners(entity)
                   (if (gethash signal (slot-value entity 'signal-table))
                       (return-from has-listeners t)
                       (compute-has-listeners (parent-module entity)))))
           (compute-has-listeners entity))
         (or (= 1 (bit (slot-value entity 'has-local-listeners) signal-id))
-            (= 1 (bit (slot-value entity 'has-ancestor-listeners) signal-id))))))
+            (= 1 (bit (slot-value entity 'has-ancestor-listeners) signal-id)))))))
 
 (defgeneric subscribe(entity signal listener)
   (:documentation "Adds a listener (callback object) that will be

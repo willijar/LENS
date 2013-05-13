@@ -81,7 +81,7 @@ needs to know about its surroundings."))
 (defmethod full-name((gate gate))
   (let ((d (gate-direction gate))
         (i (index gate)))
-    `(,name ,d ,@(when i (list i)))))
+    `(,(name gate) ,d ,@(when i (list i)))))
 
 (defun gate-direction(gate)
   (let ((input (input (owner gate))))
@@ -128,13 +128,13 @@ inout gate-slot)"
                                        &key direction initial-size)
   (assert (typep  direction 'gate-direction))
   (flet((make-gates()
-          (if size
+          (if initial-size
               (progn
                 (let ((a (make-array initial-size
                                      :element-type 'gate
                                      :adjustable t
                                      :fill-pointer 0)))
-                  (dotimes(x size)
+                  (dotimes(x initial-size)
                     (vector-push (make-instance 'gate :owner gate-slot) a))
                   a))
               (make-instance 'gate))))
@@ -170,8 +170,8 @@ inout gate-slot)"
         "not connected")))
 
 (defun path-start-gate(gate)
-  (do((gate gate (prev-gate gate)))
-     ((not (prev-gate gate)) gate)))
+  (do((gate gate (previous-gate gate)))
+     ((not (previous-gate gate)) gate)))
 
 (defun path-end-gate(gate)
   (do((gate gate (next-gate gate)))
@@ -182,7 +182,7 @@ inout gate-slot)"
        (end-gate (path-end-gate gate))
         (n 0))
       (end-gate)
-    (when (transmission-channel-p (channel gate))
+    (when (typep (channel gate) 'transmission-channel)
       (incf n))
     (assert (<= n 1) () "More More than one channel with data rate
     found in the connection path between gates ~A and
@@ -201,10 +201,10 @@ channel uninitialized, specify true for the leave-uninitialized
 parameter.
 
 If the gate is already connected, an error will occur. The gate
-argument cannot be NULL, that is, you cannot use this function
+argument cannot be nil, that is, you cannot use this function
 to disconnect a gate; use disconnect() for that.")
   (:method((from gate) (to gate)  &key channel leave-uninitialized)
-    (assert (and (not (next-gate from)) (not (prev-gate to))))
+    (assert (and (not (next-gate from)) (not (previous-gate to))))
     (let* ((module (parent-module from))
            (start-gate (path-start-gate from))
            (end-gate (path-end-gate to))
@@ -222,12 +222,12 @@ to disconnect a gate; use disconnect() for that.")
                  :changed-gate from)))
           (emit start-module 'pre-model-change notification)
           (emit end-module 'pre-model-change notification)))
-    (setf (slot-value from-gate 'next-gate) to-gate
-          (slot-value to-gate 'prev-gate) from-gate)
+    (setf (slot-value from 'next-gate) to
+          (slot-value to 'previous-gate) from)
     (when channel
-      (setf (channel from-gate) channel)
-      (check-channels from-gate)
-      (configure channel (config *simulation*))
+      (setf (channel from) channel)
+      (check-channels from)
+      (configure channel (configuration *simulation*) t)
       (when (and (not leave-uninitialized) (parent-module channel)
                  (not (initialized-p (parent-module channel))))
         (initialize channel)))
@@ -252,8 +252,8 @@ The method has no effect if the gate is not connected.")
   (:method((gate gate))
     (unless (next-gate gate) (return-from disconnect))
     (let* ((module (parent-module gate))
-           (start-gate (path-start-gate from))
-           (end-gate (path-end-gate to))
+           (start-gate (path-start-gate gate))
+           (end-gate (path-end-gate gate))
            (start-module (parent-module start-gate))
            (end-module (parent-module end-gate)))
       (when (has-listeners module 'pre-model-change)
@@ -270,9 +270,9 @@ The method has no effect if the gate is not connected.")
           (emit end-module 'pre-model-change notification)))
       (let ((next-gate (next-gate gate))
             (channel (channel gate)))
-        (setf (slot-value gate 'channel) null
-              (slot-value gate 'next-gate) null
-              (slot-value next-gate 'previous-gate) null)
+        (setf (slot-value gate 'channel) nil
+              (slot-value gate 'next-gate) nil
+              (slot-value next-gate 'previous-gate) nil)
         (when (has-listeners module 'post-model-change)
           (emit module 'post-model-change
               (make-instance 'post-gate-disconnect-notification
@@ -290,14 +290,14 @@ The method has no effect if the gate is not connected.")
 
 (defgeneric (setf channel)(source-gate channel)
   (:method((gate gate) channel)
-    (assert (nullp (channel gate)))
+    (assert (null (channel gate)))
     (setf (slot-value channel 'source-gate) gate
           (slot-value gate 'channel) channel)
-    (check-channels source-gate)
+    (check-channels gate)
     (repair-signal-flags channel)))
 
 (defmethod (setf deliver-on-reception-start) :before ((gate gate) value)
-  (assert (typep (parent-module gate) 'simple-module))
+  (assert (typep (parent-module gate) 'module))
   (assert (eql (gate-direction gate) :input)))
 
 (defgeneric transmission-channel(gate &optional incoming-p)
@@ -334,7 +334,7 @@ The method has no effect if the gate is not connected.")
                    ()
                    "Error sending message ~A on gate ~A: channel is currently busy with an ongoing transmission -- please rewrite the sender simple module to only send when the previous transmission has  already finished, using cGate::getTransmissionFinishTime(), scheduleAt(), and possibly a cQueue for storing messages waiting to be transmitted" message gate)
            (assert (or (not (typep message 'packet))
-                       (zerop (duration packet)))
+                       (zerop (duration message)))
                     ()
                     "Packet ~A already has a duration set; there may be more than one channel with data rate in the connection path, or it was sent with a sendDirect() call that specified duration as well" message))
          (let ((result (process-message channel message time)))

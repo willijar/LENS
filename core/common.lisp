@@ -66,3 +66,30 @@ Returns:
       ((>= ,var ,gstop))
       ,@body)))
 
+(defun copy-slots(slots source destination)
+  "Copies anemd slot values shallowly from source to destination
+returning the modifed destination object."
+  (dolist(slot slots)
+    (if (slot-boundp source slot)
+        (setf (slot-value destination slot) (slot-value source slot))
+        (slot-makunbound destination slot)))
+  destination)
+
+(defun wstrim(string) (string-trim '(#\space #\tab) string))
+
+(defun property-union(list1 list2)
+  "Returns a merged property list combining properties from list1 and
+list2. list1 property will have priority excepti if the property
+values are themselves a list in which case the result is list2 value
+appended onto end of list1 value"
+  (let ((result (copy-list list2)))
+    (loop :for a :on list1 :by #'cddr
+       :for k = (car a)
+       :for v1 = (cadr a)
+       :for v2 = (getf list2 k)
+       :when v1
+       :do (setf (getf result k)
+                 (if (and (listp v1) (listp v2))
+                     (append v1 v2)
+                     v1)))
+    result))

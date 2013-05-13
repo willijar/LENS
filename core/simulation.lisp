@@ -15,7 +15,6 @@
 (in-package :lens)
 
 (defvar *simulation* nil "The global simulation instance")
-(defvar *context* nil "The current context for evaluation")
 (defvar *simulation-init-hooks* nil
   "A list of functions which take the simulation as an argument which
   are called after simulation etc is created. Can be used to add in

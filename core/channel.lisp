@@ -132,7 +132,7 @@ our parent is the gate parent."
 (defclass delay-channel(channel)
   ((delay :type double :initform 0 :accessor delay :parameter t
           :initarg :delay :documentation "Delay in seconds")
-   (disabled :type bool :initform nil :accessor disabled :parameter t
+   (disabled-p :type bool :initform nil :accessor disabled-p :parameter t
              :initarg :disabled :documention "If true packets are discarded"))
   (:metaclass parameter-class)
   (:documentation "Channel with propagation delay."))
@@ -147,7 +147,7 @@ our parent is the gate parent."
 
 (defmethod process-message((channel delay-channel) message time)
   (cond
-    ((disabled channel)
+    ((disabled-p channel)
      (emit channel 'message-discarded (make-timestamped :value message))
      (make-channel-result :discard t))
     (t

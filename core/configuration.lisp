@@ -172,8 +172,6 @@
                   (delete child (trie-children trie)))
             child)))))
 
-(defun wstrim(string) (string-trim '(#\space #\tab) string))
-
 (defun read-ini-line(is)
     "Returns either a string representing a section title, a trie
 representing a value, a pathname for an extension file or nil if no
