@@ -290,6 +290,15 @@ are dispatched in current thread"
     (stop simulation)
     (finish (network simulation))))
 
+(defvar *simulation-trace-stream* *standard-output*)
+
+(defun simtrace(&rest args)
+  (when *simulation-trace-stream*
+    (format *simulation-trace-stream* *time-format* (simulation-time))
+    (write-char #\space *simulation-trace-stream*)
+    (apply #'format *simulation-trace-stream* args)
+    (write-char #\newline *simulation-trace-stream*)))
+
 (defstruct timestamped
   (time (simulation-time) :type time-type)
   value)
@@ -302,12 +311,15 @@ are dispatched in current thread"
                 :configuration (read-configuration pathname key)))))
   (initialize simulation)
   (run simulation)
-  (finish simulation)))
+  (finish simulation)
+  simulation))
 
 #|
 (setf *simulation*
                (make-instance
                 'simulation
                 :configuration (read-configuration *tictoc* "TicToc1")))
+
+(run-simulation *tictoc* "TicToc1")
 
 |#

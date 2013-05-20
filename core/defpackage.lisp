@@ -36,7 +36,7 @@
    *simulation* *simulation-init-hooks* *time-format* time-type
    configuration simulation network sim-time-limit cpu-time-limit
    simulation-time schedule scheduled-p cancel stop run-simulation timestamped
-   sent-time arrival-time root-event
+   sent-time arrival-time root-event *simulation-trace-stream* simtrace
    ;; signals and listeners
    register-signal signal-id receive-signal entity-with-signals
    listeners may-have-listeners has-listeners emit subscribe unsubscribe

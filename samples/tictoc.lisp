@@ -116,3 +116,39 @@
   ()
   (:metaclass module-class))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defclass Txc6(Txc1)
+  ((event :type message :initform nil
+          :documentation "Event object used for timing")
+   (tictocmsg :initform nil
+    :type message :documentation "To remeber message until we send it again"))
+  (:metaclass module-class))
+
+(defmethod initialize((instance Txc6)  &optional stage)
+  (declare (ignore stage))
+  (with-slots(event tictocmsg) instance
+    (setf event (make-instance 'message :name 'event))
+    (when (eql (name instance) 'tic)
+      (simtrace "Scheduling first send to t=5.0s")
+      (setf tictocmsg (make-instance 'message :name 'TicTocMsg))
+      (schedule-at instance event :time 5.0)))
+  t)
+
+(defmethod handle-message((instance Txc6) msg)
+  (with-slots(event tictocmsg) instance
+    (cond
+      ((eql msg event)
+        ;; self message arrived so sent out tictocmsg and null it out
+        ;; so no confusion later
+       (simtrace "Wait period is over, sending back message")
+       (send instance tictocmsg 'out)
+       (setf event nil))
+      (event
+       ;; Not self message so must be tictoc message from partner.
+       ;;  save it and schedule our self message to send it back later"
+       (simtrace "Message arrived, starting to wait 1 sec")
+       (setf tictocmsg msg)
+       (schedule-at instance event :time (+ (simulation-time) 1.0))))))
+
+
