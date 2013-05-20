@@ -24,6 +24,8 @@
 (defgeneric receive-signal(listener signal source-component value)
   (:documentation "All listeners must implement this to carry out work"))
 
+(defmethod finish((listener listener)))
+
 (defclass entity-with-signals(owned-object)
   ((signal-table
     :type hash-table :initform (make-hash-table)
@@ -180,6 +182,9 @@
               (map 'bit-vector #'logand
                    (slot-value parent 'has-ancestor-listeners)
                    (slot-value parent 'has-local-listeners)))))))
+
+(defmethod finish((instance entity-with-signals))
+  (map nil #'finish (listeners instance t)))
 
 ;; TODO finish methods???
 

@@ -42,17 +42,7 @@ hierarchy, like '(net host 2 tcp winsize)'.")
   (:documentation "Enables traversing the object tree, performing some
   operation on each object.")
   (:method((parent sequence) (operator function))
-    (map 'nil operator parent))
-  (:method((o lens-object) (operator function))
-    (mapcan
-     #'(lambda(slot)
-          (let ((n (slot-definition-name slot)))
-            (when (slot-boundp o n)
-              (let ((v (slot-value o n)))
-                (typecase v
-                  (sequence (for-each-child v operator))
-                  (owned-object (funcall operator v)))))))
-     (class-slots o))))
+    (map 'nil operator parent)))
 
 (defgeneric info(o)
   (:documentation "Produce a one-line description of object.

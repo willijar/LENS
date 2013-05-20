@@ -29,6 +29,6 @@
                         (aref (rng-map *simulation*) (if found-p m 0))))))
             (rng-map *simulation*))))
 
-(defmethod finish((component component))
+(defmethod finish :around ((component component))
   (let ((*context* component))
-    (for-each-child component #'finish)))
+    (call-next-method)))

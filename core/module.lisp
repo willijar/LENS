@@ -224,12 +224,13 @@ function."
             (let ((v (funcall direction slot)))
               (when v
                 (if (vectorp v) (map nil operator v) (funcall operator v))))))
-    (maphash
-   #'(lambda(k v)
-       (declare (ignore k))
-       (over v #'input)
-       (over v #'output))
-   (gate-slots module))))
+    (when (gate-slots module)
+      (maphash
+     #'(lambda(k v)
+         (declare (ignore k))
+         (over v #'input)
+         (over v #'output))
+     (gate-slots module)))))
 
 (defmethod gate((module module) (name symbol) &key direction index)
    (let ((slot (gethash name (gate-slots module))))
@@ -242,7 +243,6 @@ function."
      (when slot (gate slot direction :index index))))
 
 (defmethod for-each-child((module module) (operator function))
-  (call-next-method)
   (for-each-gate module operator))
 
 (defmethod arrived ((module module) (message message) (gate gate) time)
@@ -360,7 +360,7 @@ initialization list"
                               (functionp v)
                               (and (third spec)
                                    (symbolp (third spec))
-                                   (not (eql (symbol-package (third v))
+                                   (not (eql (symbol-package (third spec))
                                              (find-package :keyword))))
                               (member v (slot-value class '%gatespec)
                                       :key #'first))
@@ -471,6 +471,11 @@ return the gate given by spec. Validates spec based on class definitions"
     (when (vectorp v)
       (position module v))))
 
+(defmethod finish((module compound-module))
+  (for-each-channel module #'finish)
+  (for-each-submodule module #'finish)
+  (call-next-method))
+
 (defmethod initialize-instance :after ((module compound-module)
                                        &key &allow-other-keys)
   (build-submodules module)
@@ -482,18 +487,31 @@ return the gate given by spec. Validates spec based on class definitions"
                 (cddr (find name (slot-value (class-of instance) '%submodules)
                             :key #'first))))
   "Attempt to add a submodule to instance - throw error if submodule
-already exists."
+already exists. Checks for a typename configuration parameter to allow
+specification of a specific subclass."
   (let ((sm (gethash name (submodules instance)))
-        (initargs `(,(first initargs) :name ,name :owner ,instance
-                     ,@(rest initargs))))
+        (basetype (first initargs))
+        (initargs `(:name ,name :owner ,instance ,@(rest initargs))))
     (assert (or (arrayp sm) (null sm))
             ()
             "Submodule ~A of ~A already exists." name instance)
-    (let ((submodule (apply #'make-instance initargs)))
-      (if (vectorp sm)
-          (vector-push-extend sm submodule)
-          (setf (gethash name (submodules instance)) submodule))
-      submodule)))
+    (let ((typename
+           (or
+            (read-parameter instance
+                            (if (vectorp sm)
+                                (list name (length sm) 'typename)
+                                (list name 'typename))
+                            'read)
+            basetype)))
+      (assert (subtypep typename basetype)
+              ()
+              "Configuration specified type ~A is not a subtype of ~A"
+              typename basetype)
+      (let ((submodule (apply #'make-instance typename initargs)))
+        (if (vectorp sm)
+            (vector-push-extend sm submodule)
+            (setf (gethash name (submodules instance)) submodule))
+      submodule))))
 
 (defmethod build-submodules((module compound-module))
   (dolist(spec (slot-value (class-of module) '%submodules))

@@ -106,10 +106,22 @@
   ())
 
 (defclass parameter-class(standard-class)
-  ((properties :initform nil :type list :reader properties :initarg :properties
+  ((properties :initform nil :type list :reader properties
                :documentation "The properties for this class"))
   (:documentation "Metaclass for classes which have slots initialised
   from an external source"))
+
+(defmethod shared-initialize :after((class parameter-class) slot-names
+                                    &key properties
+                                    direct-superclasses &allow-other-keys)
+  (setf (slot-value class 'properties)
+        (reduce #'property-union
+                (cons properties
+                      (mapcar
+                       #'(lambda(superclass)
+                           (when (typep superclass 'parameter-class)
+                             (properties superclass)))
+                       direct-superclasses)))))
 
 (defmethod direct-slot-definition-class ((class parameter-class)
                                          &rest initargs)
@@ -154,12 +166,15 @@ any parameter initargs - they aren't inherited."
                                        (superclass standard-class))
   t)
 
+;; TODO add per instance properties
+
 (defclass parameter-object()
-  ()
+  ((properties :initarg :properties :initform nil
+               :documentation "Per instance property list"))
   (:metaclass parameter-class))
 
 (defmethod properties((obj parameter-object))
-  (properties (class-of obj)))
+  (append (slot-value obj 'properties) (properties (class-of obj))))
 
 (defmethod read-parameter((obj parameter-object) name format)
   (read-parameter (nconc (full-path obj) (list name))
