@@ -23,7 +23,11 @@
 
 (defvar *time-format* "~6,3f"  "Time output format control")
 
+;; time requires double precision - set this as default for reader too
 (deftype time-type() 'double-float)
+(eval-when(:compile-toplevel :load-toplevel :execute)
+  (setf *read-default-float-format* 'double-float))
+
 
 (defclass simulation (named-object parameter-object)
   ((clock :type time-type :initform 0.0d0
@@ -261,10 +265,10 @@ are dispatched in current thread"
   true on final stage")
   (:method :around(component &optional stage)
     (declare (ignore stage))
-    (let ((*context* component))
-       (unless (initialized-p component)
-         (setf (slot-value component 'initialized-p)
-               (call-next-method)))))
+    (or (initialized-p component)
+        (let ((*context* component))
+          (setf (slot-value component 'initialized-p)
+                (call-next-method)))))
   (:method(instance &optional stage)
     (declare (ignore instance stage))
     t)

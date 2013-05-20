@@ -45,7 +45,7 @@ retransmissions and/or segmentation/reassembly.")
        :documentation  "Module or Gate to receive message after delay")
    (sent-time :type time-type :accessor sent-time)
    (event-time :accessor arrival-time)
-   (time-stamp :type time-type :initarg :time-xstamp :initform 0
+   (time-stamp :type time-type :initarg :time-xstamp :initform 0.0d0
                :accessor time-stamp
                :documentation "Utility time stamp field fror programmer"))
   (:documentation "Messages objects represent events, packets,

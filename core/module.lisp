@@ -257,12 +257,22 @@ function."
 
 (defmethod send((from-module module) (message message) (outgate gate)
                 &key (delay 0))
-  (assert (next-gate outgate))
-  (assert (not (eql (gate-direction outgate) :input)))
-  (assert (eql (owner message) from-module))
-  (assert (eql (parent-module outgate) from-module))
-  (assert (not (scheduled-p message)))
-  (assert (>= delay 0))
+  (assert (not (eql (gate-direction outgate) :input))
+          ()
+          "Cannot send via input gate ~A" outgate)
+  (assert (next-gate outgate)
+          ()
+          "Output gate ~A not connected" outgate)
+  (assert (or (not (owner message)) (eql (owner message) from-module))
+          ()
+          "~A cannot send message ~A currently owned by ~A."
+          from-module message (owner message))
+  (assert (not (scheduled-p message))
+          ()
+          "Already schedule Message ~A cannot be sent." message)
+  (assert (>= delay 0)
+          ()
+          "Negative delay ~A" delay)
   (when (typep message 'packet) (setf (duration message) 0))
   (let ((delay-end-time (+ (simulation-time) delay)))
     (setf (from message) outgate
@@ -274,11 +284,19 @@ function."
 
 (defmethod send-direct(from-module (to-gate gate) (message message)
                        &key (propagation-delay 0) (duration 0))
-  (assert (not (previous-gate to-gate)))
-  (assert (not (eql (gate-direction to-gate) :output)))
-  (assert (and (>= propagation-delay 0) (>= duration 0)))
-  (assert (eql (owner message) from-module))
-  (assert (not (scheduled-p message)))
+  (assert (not (previous-gate to-gate))
+          ()
+          "Module must have dedicated gates for receiving vai send-direct. from side of ~A must not be connected" to-gate)
+  (assert (and (>= propagation-delay 0) (>= duration 0))
+          ()
+          "Propagation and duration parameters cannot be negative.")
+  (assert (or (not (owner message)) (eql (owner message) from-module))
+          ()
+          "~A cannot send message ~A currently owned by ~A."
+          from-module message (owner message))
+  (assert (not (scheduled-p message))
+          ()
+          "Already scheduled Message ~A cannot be sent." message)
   (setf (from message) from-module
         (sent-time message) (simulation-time))
   (if (typep message 'packet)
@@ -288,6 +306,13 @@ function."
 
 (defmethod schedule-at((module module) (message message) &key time)
   "Schedule a self message"
+  (assert (not (scheduled-p message))
+          ()
+          "Already schedule Message ~A cannot be rescheduled." message)
+  (assert (or (not (owner message)) (eql (owner message) module))
+          ()
+          "~A cannot schedule message ~A currently owned by ~A."
+          module message (owner message))
   (setf (from message) module
         (sent-time message) (simulation-time)
         (to message) module
@@ -521,9 +546,13 @@ already exists."
    (for-each-channel component #'repair-signal-flags))
 
 (defmethod initialize((module compound-module) &optional stage)
-  (flet ((init(c) (or (initialized-p c) (initialize c stage))))
-     (or (every #'init (channels module))
-         (every #'init (submodules module)))))
+  (let ((initialized-p t))
+    (flet ((init(c)
+             (unless (initialize c stage)
+               (setf initialized-p nil))))
+      (for-each-channel module #'init)
+      (for-each-submodule module #'init))
+    initialized-p))
 
 (defclass network(compound-module)
   ((gate-slots :initform nil))

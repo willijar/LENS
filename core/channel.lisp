@@ -17,8 +17,8 @@
   (:documentation "base classe for all transmission channels"))
 
 (defstruct channel-result
-  (delay 0 :type time-type)
-  (duration 0 :type time-type)
+  (delay 0.0 :type time-type)
+  (duration 0.0 :type time-type)
   (discard nil :type boolean))
 
 (defgeneric process-message(channel message time)
@@ -132,7 +132,7 @@ receiver has to understand."))
   ;;         (owner (owner gate))))))
 
 (defclass delay-channel(channel)
-  ((delay :type double :initform 0 :accessor delay :parameter t
+  ((delay :type time-type :initform 0.0d0 :accessor delay :parameter t
           :initarg :delay :documentation "Delay in seconds")
    (disabled-p :type bool :initform nil :accessor disabled-p :parameter t
              :initarg :disabled :documention "If true packets are discarded"))
@@ -153,9 +153,9 @@ receiver has to understand."))
      (emit channel 'message-discarded (make-timestamped :value message))
      (make-channel-result :discard t))
     (t
-     (if (may-have-listeners channel 'message-sent)
-         (let ((result (make-channel-result :delay (delay channel))))
-           (emit channel 'message-sent
-                 (make-message-sent-signal-value
-                  :message  message :result result))
-           result)))))
+     (let ((result (make-channel-result :delay (delay channel))))
+       (when (may-have-listeners channel (signal-id 'message-sent))
+         (emit channel 'message-sent
+               (make-message-sent-signal-value
+                :message  message :result result)))
+       result))))

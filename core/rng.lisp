@@ -26,7 +26,7 @@ random source to seed")
     (seed stream (urandom 4))))
 
 (defconstant +mt-k2^32+ (expt 2 32))
-(defconstant +mt-k-inverse-2^32f+ (expt 2.0 -32.0)
+(defconstant +mt-k-inverse-2^32f+ (expt 2.0f0 -32.0f0)
   "1/(2^32), as a floating-point number")
 
 (defconstant +mt-n+ 624)
