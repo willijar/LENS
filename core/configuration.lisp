@@ -190,13 +190,13 @@ representing a value, a pathname for an extension file or nil if no
       (cond
         ((and (char= (char line 0) #\[)
               (char= (char line (1- (length line))) #\]))
-         (subseq line 1 (1- (length line))))
+         (wstrim (subseq line 1 (1- (length line)))))
         ((let ((p (position #\= line)))
            (when p
              (make-trie
               (cons nil (split-sequence:split-sequence
                          #\.(wstrim (subseq line 0 p))))
-              (subseq line (1+ p))))))
+              (wstrim (subseq line (1+ p)))))))
         ((zerop (search "include" line :test #'char-equal))
          (parse-namestring (wstrim (subseq line 7))))
         (t
@@ -210,12 +210,14 @@ representing a value, a pathname for an extension file or nil if no
               (with-open-file(is pathname :direction :input)
                 (let ((saved-section current-section)
                       (*default-pathname-defaults* (merge-pathnames pathname)))
-
                   (handler-case
                       (loop
                          (let ((v (read-ini-line is)))
                            (etypecase v
-                             (string (setf current-section v))
+                             (string (setf current-section v)
+                                     (unless (gethash v sections)
+                                       (setf (gethash v sections)
+                                             (make-instance 'trie :prefix nil))))
                              (pathname
                               (do-read-file (merge-pathnames v)))
                              (trie
@@ -250,5 +252,7 @@ representing a value, a pathname for an extension file or nil if no
                          (do-merge-section "General")))))))
         (do-merge-section key))
       the-section)))
+
+(defparameter *tictoc* #p"/home/willijar/dev/lisp/src/lens/samples/tictoc.ini")
 
 ;; TODO looping constructs representing multiple simulations in config file

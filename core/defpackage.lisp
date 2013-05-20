@@ -19,9 +19,10 @@
 
 (defpackage :lens
   (:documentation "LENS Simulator Base")
-  (:use :closer-common-lisp :closer-common-lisp-user)
+  (:use :closer-common-lisp :closer-common-lisp-user :data-format-validation)
   (:import-from :alg
                  #:enqueue #:dequeue #:make-binary-heap #:empty-p #:size)
+  (:shadow duration)
   (:export
    ;; common object
    +c+ *context* simulation-condition while until filter for copy-slots
@@ -34,7 +35,8 @@
    ;; simulation kernel
    *simulation* *simulation-init-hooks* *time-format* time-type
    configuration simulation network sim-time-limit cpu-time-limit
-   simulation-time schedule scheduled-p cancel run-simulation timestamped
+   simulation-time schedule scheduled-p cancel stop run-simulation timestamped
+   sent-time arrival-time root-event
    ;; signals and listeners
    register-signal signal-id receive-signal entity-with-signals
    listeners may-have-listeners has-listeners emit subscribe unsubscribe
@@ -72,7 +74,7 @@
    pre-path-cut-notification post-path-cut-notification
    pre-parameter-change-notification post-parameter-change-notification
    ;; messages and packets
-   message creation-time source destination time-stamp
+   message creation-time to-gate from-gate to-module from-module time-stamp
    handle-message send-message self-message-p
    packet bit-length byte-length
    duration control-info bit-error-p header-specification

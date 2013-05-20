@@ -237,7 +237,7 @@ will have a different mean and standard deviation."
        (setf v (* v v v)
              u (%gendblrand rng))
        (when (or (< u (- 1.0 (* 0.0331 x x x x)))
-                 (log u) (+ (* 0.5 x x) (* d (+ (- 1.0 v) (log v)))))
+                 (< (log u) (+ (* 0.5 x x) (* d (+ (- 1.0 v) (log v))))))
          (return (* d v))))))
 
 (defun %gamma-MarsagliaTransf(alpha rng)
@@ -404,3 +404,91 @@ sqrt(Y2/k) has a student-t distribution with k degrees of freedom.
                   (t (1+ (floor (/ (- v min) w))))))))
      values)
     buckets))
+
+;; discrete
+
+(defun intuniform(a b &optional (rng 0))
+  "Returns a random integer with uniform distribution in the range [a,b],
+  inclusive. (Note that the function can also return b.)"
+  (+ a (%genintrand (1+ (- b a)) rng)))
+
+(defun bernoulli(p &optional (rng 0))
+  "Returns the result of a Bernoulli trial with probability p,
+ that is, 1 with probability p and 0 with probability (1-p)."
+  (assert (<= 0 p 1))
+  (if (> p (%gendblrand rng)) 1 0))
+
+(defun binomial(n p  &optional (rng 0))
+  "Returns a random integer from the binomial distribution with
+parameters n and p, that is, the number of successes in n independent
+trials with probability p.
+
+Generation is using the relationship to Bernoulli
+distribution (runtime is proportional to n)."
+  (let ((x 0))
+    (dotimes(i n)
+      (let ((u (%gendblrand rng)))
+        (if (> p u) (incf x))))
+    x))
+
+(defun geometric(p  &optional (rng 0))
+ "Returns a random integer from the geometric distribution with parameter p,
+that is, the number of independent trials with probability p until the
+first success.
+
+This is the n=1 special case of the negative binomial distribution.
+
+Generation uses inverse transform."
+ (assert (and (>= p 0) (< p 1)))
+ (let ((a (/ 1 (log (- 1 p)))))
+   (floor (* a (log (- 1 (%gendblrand rng)))))))
+
+
+(defun negbinomial(n p  &optional (rng 0))
+"Returns a random integer from the negative binomial distribution with
+parameters n and p, that is, the number of failures occurring before
+n successes in independent trials with probability p of success.
+
+Generation is using the relationship to geometric distribution (runtime is
+proportional to n)."
+ (let ((x 0))
+    (dotimes(i n)
+      (incf x (geometric p rng)))
+    x))
+
+(defun poisson(lambda &optional (rng 0))
+"Returns a random integer from the Poisson distribution with parameter lambda,
+that is, the number of arrivals over unit time where the time between
+successive arrivals follow exponential distribution with parameter
+lambda.
+
+Lambda is also the mean (and variance) of the distribution.
+
+Generation method depends on value of lambda:
+
+  - 0<lambda<=30: count number of events lambda>30:
+  - Acceptance-Rejection due to Atkinson (see Banks, page 166)"
+  (if (> lambda 30.0)
+      (loop
+         :with a = (* pi (sqrt (/ lambda 3.0)))
+         :with b = (/ a lambda)
+         :with c = (- 0.767 (/ 3.36 lambda))
+         :with d = (- (log c) (log b) lambda)
+         :for y =
+         (loop
+            :for u = (%gendblrand rng)
+            :for y = (/ (- a (log (/ (- 1.0 u) y))) b)
+            :when (> y 0.5)
+            :do (return y))
+         :for x = (floor (+ y 0.5))
+         :for v = (%gendblrand rng)
+         :when (<= (+ (- a (* b y))
+                      (log (/ v (+ 1 (expt (exp (- a (* b y))) 2)))))
+                   (+ d (* x (log lambda)) (- (log x))))
+         :do (return x))
+      (loop
+         :with a = (exp (- lambda))
+         :for x = -1 :then (1+ x)
+         :for p = 1.0 :then (* p (%gendblrand rng))
+         :when (<= p a) :do (return x))))
+

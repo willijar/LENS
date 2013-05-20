@@ -19,5 +19,6 @@
 
 (defpackage :lens.samples
   (:documentation "LENS Simulator Base")
-  (:use :cl-user :lens :data-format-validation))
+  (:use :cl-user :lens)
+  (:shadowing-import-from :lens #:duration))
 

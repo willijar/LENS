@@ -119,15 +119,17 @@ receiver has to understand."))
                      (list name (slot-value channel name))))))
            (class-slots (class-of channel)))))
 
-(defmethod parent-module((channel channel))
-  "For channels - if source is an output then parent is module
-producing output - else we are connected an iput gate to something and
-our parent is the gate parent."
-  (let ((gate (source-gate channel)))
-    (when gate
-      (if (eql (gate-direction gate) :input)
-          (owner gate) ;; parent is source
-          (owner (owner gate))))))
+;; this is actually wrong (parent-module is needed before connection) and in
+;; addition owner is parent module for  all cases so default is fine.
+;; (defmethod parent-module((channel channel))
+;;   "For channels - if source is an output then parent is module
+;; producing output - else we are connected an iput gate to something and
+;; our parent is the gate parent."
+  ;; (let ((gate (source-gate channel)))
+  ;;   (when gate
+  ;;     (if (eql (gate-direction gate) :input)
+  ;;         (owner gate) ;; parent is source
+  ;;         (owner (owner gate))))))
 
 (defclass delay-channel(channel)
   ((delay :type double :initform 0 :accessor delay :parameter t

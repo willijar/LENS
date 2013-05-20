@@ -1,6 +1,6 @@
 (in-package :lens)
 
-(defclass component(entity-with-signals parameter-object)
+(defclass component(parameter-object entity-with-signals)
   ((rng-map :type array :reader rng-map
             :documentation "RNG map for this component")
    (initialized-p

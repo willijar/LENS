@@ -12,7 +12,7 @@ Lisp Educational Network Simulator (LENS)
 :copyright: ©2010 Dr. J.A.R. Williams
 
 :abstract: The Lisp Educational Network Simulator (LENS) project is an
-  attempt to develop a Packet Network Simulator using good design
+  attempt to develop a Network Simulator using good design
   principles and appropriate abstractions to make it easy to
   understand and extend and more suitable for educational use.
 
@@ -24,7 +24,10 @@ Lisp Educational Network Simulator (LENS)
   specific language - something needed in a simulation environment. As
   a programming language it does not limit design choices and
   paradigms as many other languages do and so supports whatever
-  abstractions best suit the problem space. 
+  abstractions best suit the problem space.
+
+  The design abstractions have been largely inspired by the OMNET++
+  simulator written in C++.
 
 .. |LENS| replace:: LENS
 
@@ -40,6 +43,7 @@ please email <J.A.R.Williams@jarw.org.uk>.
 Abstractions
 ============
 
+
 ----------
 Addressing
 ----------
@@ -47,6 +51,4 @@ Addressing
 Acknowledgements
 ================
 
-NS2
-
-GTNetS
+OMNET++

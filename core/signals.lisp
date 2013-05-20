@@ -85,7 +85,8 @@
                    (unless (member listener notification-stack)
                      (push listener notification-stack)
                      (receive-signal source signal value))))
-               (when (may-have-ancestor-listeners source signal)
+               (when (and (may-have-ancestor-listeners source signal)
+                          (parent-module source))
                  (fire (parent-module source)))))
           (fire entity))))))
 
@@ -98,9 +99,10 @@
     (let ((signal-id (signal-id signal)))
       (if (< signal-id +SIGNAL-CACHE-SIZE+)
         (labels((compute-has-listeners(entity)
-                  (if (gethash signal (slot-value entity 'signal-table))
-                      (return-from has-listeners t)
-                      (compute-has-listeners (parent-module entity)))))
+                  (when entity
+                    (if (gethash signal (slot-value entity 'signal-table))
+                        (return-from has-listeners t)
+                        (compute-has-listeners (parent-module entity))))))
           (compute-has-listeners entity))
         (or (= 1 (bit (slot-value entity 'has-local-listeners) signal-id))
             (= 1 (bit (slot-value entity 'has-ancestor-listeners) signal-id)))))))
@@ -173,10 +175,11 @@
     changes")
   (:method((component entity-with-signals))
     (let ((parent (parent-module component)))
-      (setf (slot-value component 'has-ancestor-listeners)
-            (map 'bit-vector #'logand
-                 (slot-value parent 'has-ancestor-listeners)
-                 (slot-value parent 'has-local-listeners))))))
+      (when parent
+        (setf (slot-value component 'has-ancestor-listeners)
+              (map 'bit-vector #'logand
+                   (slot-value parent 'has-ancestor-listeners)
+                   (slot-value parent 'has-local-listeners)))))))
 
 ;; TODO finish methods???
 

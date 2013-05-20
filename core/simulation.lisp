@@ -25,17 +25,11 @@
 
 (deftype time-type() 'double-float)
 
-(defmethod configuration(object)
-  "Default to simulation configuration for all objects"
-  (declare (ignore object))
-  (configuration *simulation*))
-
 (defclass simulation (named-object parameter-object)
   ((clock :type time-type :initform 0.0d0
 	  :accessor clock :initarg :start-time
 	  :documentation "simulation virtual time")
    (halted :type boolean :initform t :accessor halted)
-
    (thread :initform nil :reader simulation-thread
 	    :documentation "Thread running simulation")
    (last-schedule-id :type integer :initform 0)
@@ -48,7 +42,8 @@
      :comp-fn #'event<
      :index #'event-rank))
    (configuration :reader configuration :initarg :configuration
-           :documentation "Configuration data used for simulation")
+                  :initform nil
+                  :documentation "Configuration data used for simulation")
    (initialized-p
     :initform nil :reader initialized-p
     :documentation "True if this component has been initialized.")
@@ -67,18 +62,20 @@
                    :documentation "Maximum simulation run time"
                    :reader sim-time-limit)
    (network :parameter t :type symbol
+            :properties (:format (read :type symbol))
             :documentation "Specified Network type parameter")
    (network-instance
     :reader network
     :documentation "Actual network instance in this simulation"))
   (:metaclass parameter-class)
+  (:default-initargs :name nil :owner nil :configuration-path (list nil))
   (:documentation "The simulation object"))
 
 (defmethod print-object((simulation simulation) stream)
   (print-unreadable-object (simulation stream :type t :identity t)
-     (format stream "time:~f~:[~; HALTED~] ~D pending events"
-	     (clock simulation) (halted simulation)
-       (alg:size (slot-value simulation 'event-queue)))))
+    (format stream "t=~f~:[~; HALTED~] ~D pending events"
+	    (clock simulation) (halted simulation)
+      (alg:size (slot-value simulation 'event-queue)))))
 
 (defmethod full-path((sim simulation)) (list nil))
 
@@ -90,7 +87,7 @@
   (configuration *simulation*))
 
 (defmethod initialize-instance :after
-    ((sim simulation) &key config run-number &allow-other-keys)
+    ((sim simulation) &key configuration run-number &allow-other-keys)
   ;; initialise global rng-map - use either seed-n or run-number
   (with-slots(rng-map num-rngs rng-class ) sim
     (setf (slot-value sim 'rng-map) (make-array num-rngs))
@@ -98,7 +95,7 @@
       (multiple-value-bind(seed found-p)
           (read-parameter
            (list (intern (format nil "SEED-~D" i)))
-           config
+           configuration
            `(integer :min 0 :max ,(1- num-rngs) ))
         (setf (aref rng-map i)
               (make-instance
@@ -107,7 +104,9 @@
                            (run-number (* (1+ run-number) num-rngs))
                            (t t)))))))
   (setf (slot-value sim 'network-instance)
-        (make-instance (slot-value sim 'network) :config config)))
+        (make-instance (slot-value sim 'network)
+                       :name (slot-value sim 'network)
+                       :owner sim)))
 
 (declaim (inline simulation-time))
 (defun simulation-time(&optional (simulation *simulation*)) (clock simulation))
@@ -116,13 +115,13 @@
   ((rank :type fixnum :initform -1
          :documentation "Rank in priority queue - used internally for
          efficient removal from queue.")
-   (schedule-time :type time-type :reader schedule-time
+   (sent-time :type time-type :reader sent-time
                   :documentation "Time event was scheduled")
-   (event-time
-    :initarg :time :type time-type :accessor event-time :initform -1.0d0
+   (arrival-time
+    :initarg :time :type time-type :accessor arrival-time :initform -1.0d0
     :documentation "simulation time at which event is to be handled")
    (priority
-    :type fixnum :initform 0 :initarg :priority :reader priority
+    :type fixnum :initform 0 :initarg :priority :accessor priority
     :documentation "Determines delivery of messages with same arrival time")
    (schedule-id
     :initform -1 :type integer
@@ -132,24 +131,12 @@
                :documentation "Top level root for cloned messages"))
   (:documentation "Class representing a scheduled event"))
 
-(defmethod initialize-instance :after ((event event) &key &allow-other-keys)
-  (setf (slot-value event 'root-event) event))
-
-(defmethod duplicate((event event) &optional (duplicate (make-instance 'event)))
-  (call-next-method)
-  (copy-slots '(schedule-time priority root-event) event duplicate))
-
-(defclass simple-event(event)
-  ((handler :reader handler :initarg :handler
-            :documentation "The handler function for this event"))
-  (:documentation "Class for simple events where handler is invoked"))
-
-(defun event-rank(a &optional b)
-  (if b (setf (slot-value a 'rank) b) (slot-value a 'rank)))
+(declaim (inline scheduled-p))
+(defun scheduled-p(event) (>= (slot-value event 'rank) 0))
 
 (defun event<(a b)
-  (let ((ta (event-time a))
-        (tb (event-time b)))
+  (let ((ta (arrival-time a))
+        (tb (arrival-time b)))
     (cond
       ((< ta tb))
       ((= ta tb)
@@ -160,11 +147,30 @@
            ((= pa pb)
             (< (slot-value a 'event-id) (slot-value b 'event-id)))))))))
 
-(defun scheduled-p(event) (>= (slot-value event 'rank) 0))
+(defmethod (setf arrival-time) :before ((event event) time)
+  (assert (not (scheduled-p event))))
+
+(defmethod (setf priority) :before ((event event) time)
+  (assert (not (scheduled-p event))))
+
+(defmethod initialize-instance :after ((event event) &key &allow-other-keys)
+  (setf (slot-value event 'root-event) event))
+
+(defmethod duplicate((event event) &optional (duplicate (make-instance 'event)))
+  (call-next-method)
+  (copy-slots '(sent-time arrival-time priority root-event) event duplicate))
+
+(defclass simple-event(event)
+  ((handler :reader handler :initarg :handler
+            :documentation "The handler function for this event"))
+  (:documentation "Class for simple events where handler is invoked"))
+
+(defun event-rank(a &optional b)
+  (if b (setf (slot-value a 'rank) b) (slot-value a 'rank)))
 
 (defmethod print-object((event event) stream)
   (print-unreadable-object (event stream :type t :identity nil)
-    (format stream "T=~,5f ~D"(event-time event)  (uid event) )))
+    (format stream "T=~,5f ~D"(arrival-time event)  (uid event) )))
 
 (defgeneric handle(entity)
   (:documentation "Method called by simulation on a scheduled entity")
@@ -172,43 +178,41 @@
   (:method((form list)) (apply (first form) (rest form)))
   (:method((event simple-event)) (handle (handler event))))
 
-(defgeneric schedule(delay handler)
-  (:documentation "Schedule event on current simulation withy delay")
-  (:method((delay number) (event event))
-    (when (scheduled-p event)
-      (error "Attempt to schedule an already active event ~A" event))
-    (when (< delay 0)
-      (error  "Attempt to schedule ~S ~D seconds in the past"
-              event delay))
-    (let ((simulation *simulation*))
-      (setf (slot-value event 'event-time) (+ delay (simulation-time))
-            (slot-value event 'schedule-time) (simulation-time)
-            (slot-value event 'schedule-id)
-            (incf (slot-value simulation 'last-schedule-id)))
-      (enqueue event (slot-value simulation 'event-queue)))
+(defgeneric schedule(event &key delay time)
+  (:documentation "Schedule event for given time")
+  (:method((event event) &key delay time)
+    (assert (not (scheduled-p event)))
+    (when delay (setf time (+ delay (simulation-time))))
+    (when time (setf (slot-value event 'arrival-time) time))
+    (assert (>= (arrival-time event) (simulation-time)))
+    (setf (slot-value event 'schedule-id)
+          (incf (slot-value *simulation* 'last-schedule-id)))
+    (enqueue event (slot-value *simulation* 'event-queue))
     event)
-  (:method ((delay number) handler)
-    (schedule delay (make-instance 'simple-event :handler handler))))
+  (:method(handler &key (delay 0) (time (+ delay (simulation-time))))
+    (schedule (make-instance 'simple-event :handler handler) :time time)))
 
-(defgeneric cancel(event simulation)
+(defgeneric cancel(event)
   (:documentation "Cancel an event")
-  (:method((event event) (simulation simulation))
+  (:method((event event))
     (when (>= (slot-value event 'rank) 0)
-      (alg:delete event (slot-value simulation 'event-queue))
-      (setf (slot-value event 'rank) -1))))
+      (alg:delete event (slot-value *simulation* 'event-queue))
+      (setf (slot-value event 'rank) -1)))
+  (:method(handler)
+    (alg:delete-if
+     #'(lambda(event)
+         (and (typep event 'simple-event) (eql handler (handler event))))
+     (slot-value *simulation* 'event-queue))))
 
-(defmethod stop((event event) &key &allow-other-keys)
-  (cancel event *simulation*))
-
-(defmethod reset((event event))
-  (stop event))
-
-(defmethod stop ((simulation simulation) &key abort)
-  (setf (slot-value simulation 'halted) t)
-  (when abort
+(defgeneric stop(entity &key abort)
+  (:documentation "Stop a process entity - optional agument abort will
+abort current activity too.")
+  (:method((simulation simulation) &key abort)
+    (setf (slot-value simulation 'halted) t)
+    (when abort
     (when (slot-value simulation 'thread)
       (ignore-errors (kill-thread (slot-value simulation 'thread)))
-      (setf (slot-value simulation 'thread) nil))))
+      (setf (slot-value simulation 'thread) nil)))))
 
 (defun run(simulation &key (granularity 10000) step )
   "Execute the simulation returning the running
@@ -235,7 +239,7 @@ are dispatched in current thread"
                           (empty-p q))
                :for event = (dequeue q)
                :do (progn
-                     (setf (clock simulation) (event-time event))
+                     (setf (clock simulation) (arrival-time event))
                      (when step (funcall step event))
                      (handle event))
                :when (and granularity
@@ -295,3 +299,11 @@ are dispatched in current thread"
   (initialize simulation)
   (run simulation)
   (finish simulation)))
+
+#|
+(setf *simulation*
+               (make-instance
+                'simulation
+                :configuration (read-configuration *tictoc* "TicToc1")))
+
+|#

@@ -4,7 +4,7 @@
   ()
   (:documentation "Lightweight base class."))
 
-(defclass named-object()
+(defclass named-object(lens-object)
   ((name :type symbol :initarg :name :accessor name
          :documentation "Name of this object")))
 
@@ -13,7 +13,8 @@
           :accessor owner)))
 
 (defgeneric index(owned-object)
-  (:documentation "In in an array of objects return the index"))
+  (:documentation "In in an array of objects return the index")
+  (:method((o owned-object)) nil))
 
 (defgeneric parent-module(object)
   (:documentation "Return the parent module of this object - not always owner")
@@ -59,11 +60,12 @@ The string appears in the graphical user interface (Tkenv) e.g. when
 the object is displayed in a listbox. The returned string should
 possibly be at most 80-100 characters long, and must not contain
 newline.")
-  (:method(o) (format nil "~{~A~^.~}" (full-path o))))
+  (:method((o named-object)) (format nil "~{~A~^.~}" (rest (full-path o)))))
 
-(defmethod print-object((obj lens-object) stream)
+(defmethod print-object((obj named-object) stream)
   (print-unreadable-object(obj stream :identity t :type t)
-    (format stream "~A ~A" (full-name obj) (info obj))))
+    (format stream "~A~@[[~A]~]" (first (full-name obj))
+            (second (full-name obj)) )))
 
 (defgeneric detailed-info(o)
   (:documentation  "Return detailed, multi-line, arbitrarily long

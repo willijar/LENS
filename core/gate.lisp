@@ -85,9 +85,10 @@ needs to know about its surroundings."))
 
 (defun gate-direction(gate)
   (let ((input (input (owner gate))))
-    (if (or (eql gate input) (find gate input))
-        :input
-        :output)))
+    (cond  ((eql gate input) :input)
+           ((eql gate (output (owner gate))) :output)
+           ((find gate input) :input)
+           (:output))))
 
 (defmethod index((gate gate))
   (let* ((gs (owner gate))
@@ -137,7 +138,7 @@ inout gate-slot)"
                   (dotimes(x initial-size)
                     (vector-push (make-instance 'gate :owner gate-slot) a))
                   a))
-              (make-instance 'gate))))
+              (make-instance 'gate :owner gate-slot))))
   (when (member direction '(:input :inout))
     (setf (slot-value gate-slot 'input) (make-gates)))
   (when (member direction '(:output :inout))
@@ -179,7 +180,7 @@ inout gate-slot)"
 
 (defun check-channels(gate)
   (do* ((gate (path-start-gate gate) (next-gate gate))
-       (end-gate (path-end-gate gate))
+        (end-gate (path-end-gate gate))
         (n 0))
       (end-gate)
     (when (typep (channel gate) 'transmission-channel)
@@ -225,9 +226,9 @@ to disconnect a gate; use disconnect() for that.")
     (setf (slot-value from 'next-gate) to
           (slot-value to 'previous-gate) from)
     (when channel
+      (break "from=~A channel=~A" from channel)
       (setf (channel from) channel)
-      (check-channels from)
-      (configure channel (configuration *simulation*) t)
+      (configure channel)
       (when (and (not leave-uninitialized) (parent-module channel)
                  (not (initialized-p (parent-module channel))))
         (initialize channel)))
@@ -288,15 +289,16 @@ The method has no effect if the gate is not connected.")
           (emit start-module 'post-model-change notification)
           (emit end-module 'post-model-change notification)))))))
 
-(defgeneric (setf channel)(source-gate channel)
-  (:method((gate gate) channel)
+(defgeneric (setf channel)(channel source-gate)
+  (:method(channel (gate gate))
     (assert (null (channel gate)))
     (setf (slot-value channel 'source-gate) gate
           (slot-value gate 'channel) channel)
     (check-channels gate)
-    (repair-signal-flags channel)))
+    (repair-signal-flags channel)
+    channel))
 
-(defmethod (setf deliver-on-reception-start) :before ((gate gate) value)
+(defmethod (setf deliver-on-reception-start) :before (value (gate gate))
   (assert (typep (parent-module gate) 'module))
   (assert (eql (gate-direction gate) :input)))
 
@@ -342,7 +344,6 @@ The method has no effect if the gate is not connected.")
              (when (and transmission-p (typep message 'packet))
                (setf (duration message) (channel-result-duration result)))
              (deliver (next-gate gate) message (+ time (channel-result-delay result))))))))))
-
 
 (defun connected-outside-p(gate)
   (if (eql (gate-direction gate) :input)

@@ -11,12 +11,12 @@
 
 ;;; Commentary:
 
-;; Parameters are read at point of objecvt creation - object must
+;; Parameters are read at point of objecvt creation - instance must
 ;; therefore have full-path available at this point to know its
 ;; address in heirarchy.
 
 ;; Note properties are also covered in ths base
-;; class as parameters can have properties as can all objects which
+;; class as parameters can have properties as can all instances which
 ;; can take parameters.
 
 ;;; Code:
@@ -41,8 +41,22 @@
 (defgeneric format-from-type(type)
   (:documentation "Given a type declaration return a format declaration")
   (:method((type list)) (first type))
-  (:method(type) type)
-  (:method((type (eql 'time-type))) 'time-period))
+  (:method(type) type))
+
+(defmethod parse-input((spec (eql 'time-type)) value &key &allow-other-keys)
+  (multiple-value-bind(n p) (parse-integer value :junk-allowed t)
+    (cond
+      ((and n (= p (length value))) n)
+      ((and n (= p (1- (length value))))
+       (let ((lc (char value (1- (length value)))))
+         (case lc
+           (#\s n)
+           (#\m (* n 60))
+           (#\h (* n 60 60))
+           (#\d (* n 24 60 60))
+           (t (dfv::invalid-format-error spec value
+                                         "~A is not a recognized time unit" lc)))))
+      (t (parse-input 'time-period value)))))
 
 (defgeneric finalize-parameters(entity)
   (:documentation "May be overwridden to perform additional checks")
@@ -92,7 +106,7 @@
   ())
 
 (defclass parameter-class(standard-class)
-  ((properties :type list :reader properties
+  ((properties :initform nil :type list :reader properties :initarg :properties
                :documentation "The properties for this class"))
   (:documentation "Metaclass for classes which have slots initialised
   from an external source"))
@@ -141,7 +155,8 @@ any parameter initargs - they aren't inherited."
   t)
 
 (defclass parameter-object()
-  ())
+  ()
+  (:metaclass parameter-class))
 
 (defmethod properties((obj parameter-object))
   (properties (class-of obj)))
@@ -156,39 +171,56 @@ any parameter initargs - they aren't inherited."
                   (configuration obj)
                   format))
 
-;; as per Pascal Constanza ensure parameter-object is default direct superclass
-(defmethod initialize-instance :around
-    ((class parameter-class) &rest initargs
-     &key direct-superclasses)
-  (declare (dynamic-extent initargs))
-  (if (loop for superclass in direct-superclasses
-         thereis (subtypep superclass 'parameter-object))
-      (call-next-method)
-      (apply #'call-next-method class
-             :direct-superclasses
-             (append direct-superclasses
-                     (list (find-class 'parameter-object)))
-             initargs)))
+;; (defmacro ensure-superclass(superclassname
+;;                             classvar initargsvar direct-superclassesvar)
+;;   `(if (loop :for superclass :in ,direct-superclassesvar
+;;          :thereis (subtypep superclass ',superclassname))
+;;       (call-next-method)
+;;       (apply #'call-next-method ,classvar
+;;              :direct-superclasses
+;;              (append ,direct-superclassesvar
+;;                      (list (find-class ',superclassname)))
+;;              ,initargsvar)))
 
-(defmethod reinitialize-instance :around
-    ((class parameter-class) &rest initargs
-     &key (direct-superclasses () direct-superclasses-p))
-  (declare (dynamic-extent initargs))
-  (if direct-superclasses-p
-      (if (loop for superclass in direct-superclasses
-             thereis (subtypep superclass 'parameter-object))
-          (call-next-method)
-          (apply #'call-next-method class
-                 :direct-superclasses
-                 (append direct-superclasses
-                         (list (find-class 'parameter-object)))
-                 initargs))
-      (call-next-method)))
+;; (defmacro ensure-superclass(superclassname
+;;                             classvar initargsvar direct-superclassesvar)
+;;   `(if (loop :for superclass :in ,direct-superclassesvar
+;;          :thereis (subtypep superclass ',superclassname))
+;;       (call-next-method)
+;;       (apply #'call-next-method ,classvar
+;;              :direct-superclasses
+;;              (append (list (find-class ',superclassname))
+;;                      ,direct-superclassesvar)
+;;              ,initargsvar)))
 
-(defmethod initalize-instance :after ((class parameter-class)
+;; ;; as per Pascal Constanza ensure parameter-object is default direct superclass
+;; (defmethod initialize-instance :around
+;;     ((class parameter-class) &rest initargs
+;;      &key direct-superclasses)
+;;   (declare (dynamic-extent initargs))
+;;   (ensure-superclass parameter-object class initargs direct-superclasses))
+
+;; (defmethod reinitialize-instance :around
+;;     ((class parameter-class) &rest initargs
+;;      &key (direct-superclasses () direct-superclasses-p))
+;;   (declare (dynamic-extent initargs))
+;;   (if direct-superclasses-p
+;;       (ensure-superclass parameter-object class initargs direct-superclasses)
+;;       (call-next-method)))
+
+  ;; (if (loop for superclass in direct-superclasses
+  ;;        thereis (subtypep superclass 'parameter-object))
+  ;;     (call-next-method)
+  ;;     (apply #'call-next-method class
+  ;;            :direct-superclasses
+  ;;            (append direct-superclasses
+  ;;                    (list (find-class 'parameter-object)))
+  ;;            initargs)))
+
+(defmethod shared-instance :after ((class parameter-class)
                                       &key direct-superclasses
                                       properties
-                                      &allow-other-keys)
+                                   &allow-other-keys)
   (dolist(slot (class-direct-slots class))
     (when (slot-definition-volatile slot)
       (dolist(gf (slot-definition-readers slot))
@@ -206,51 +238,77 @@ any parameter initargs - they aren't inherited."
                                     (list (properties class))))
                               direct-superclasses)))))
 
-(defgeneric configure(entity config &optional slot-names all-keys)
-  (:documentation "Configure an objects slots from configuration data")
-  (:method((object parameter-object)  config
-           &optional (slot-names t) (all-keys nil))
-    (let* ((full-path (full-path object))
+;; (defgeneric configure(entity config &optional slot-names all-keys)
+;;   (:documentation "Configure an instances slots from configuration data")
+;;   (:method((instance parameter-object)  configuration
+;;            &optional (slot-names t) (all-keys nil))
+;;     (let* ((full-path (full-path instance))
+;;            (full-path-last (last full-path)))
+;;     (dolist(slot (class-slots (class-of instance)))
+;;       (when (typep slot 'parameter-slot)
+;;         (let ((slot-initargs (slot-definition-initargs slot))
+;;               (slot-name (slot-definition-name slot)))
+;;           (when (and (or (eql slot-names 't) (member slot-name slot-names))
+;;                      (not (get-properties all-keys slot-initargs)))
+;;             (rplacd full-path-last (list slot-name))
+;;             (multiple-value-bind(value read-p)
+;;                 (read-parameter full-path configuration
+;;                                 (slot-definition-format slot))
+;;               (cond
+;;                 (read-p
+;;                  (setf (slot-value instance slot-name)
+;;                    (if (and (not (functionp value))
+;;                             (typep slot 'parameter-volatile-effective-slot-definition))
+;;                        #'(lambda() (eval value))
+;;                        value)))
+;;                 ((and (typep slot 'parameter-volatile-effective-slot-definition)
+;;                       (slot-definition-initfunction slot))
+;;                  (setf (slot-value instance slot-name)
+;;                        (slot-definition-initfunction slot))))))))))))
+
+(defgeneric configure(instance)
+  (:documentation "Configure an instances unbound parameter slots from
+  configuration data")
+  (:method((instance parameter-object))
+    (let* ((full-path (copy-list (full-path instance)))
            (full-path-last (last full-path)))
-    (dolist(slot (class-slots (class-of object)))
+    (dolist(slot (class-slots (class-of instance)))
       (when (typep slot 'parameter-slot)
-        (let ((slot-initargs (slot-definition-initargs slot))
-              (slot-name (slot-definition-name slot)))
-          (when (and (or (eql slot-names 't) (member slot-name slot-names))
-                     (not (get-properties all-keys slot-initargs)))
-            (rplacd full-path-last slot-name)
+        (let ((slot-name (slot-definition-name slot)))
+          (when (not (slot-boundp instance slot-name))
+            (setf (cdr full-path-last) (list slot-name))
             (multiple-value-bind(value read-p)
-                (read-parameter full-path (configuration object)
+                (read-parameter full-path (configuration instance)
                                 (slot-definition-format slot))
               (cond
                 (read-p
-                 (setf (slot-value object slot-name)
+                 (setf (slot-value instance slot-name)
                    (if (and (not (functionp value))
                             (typep slot 'parameter-volatile-effective-slot-definition))
                        #'(lambda() (eval value))
                        value)))
                 ((and (typep slot 'parameter-volatile-effective-slot-definition)
                       (slot-definition-initfunction slot))
-                 (setf (slot-value object slot-name)
+                 (setf (slot-value instance slot-name)
                        (slot-definition-initfunction slot))))))))))))
 
-(defmethod shared-initialize :before ((object parameter-object) slot-names
-                                      &rest all-keys &key config)
-  (declare (dynamic-extent all-keys config))
-  ;; read parameters first if no key specified to initialise parameter
-  ;; if no key specified for parameter read it from config file
-  (configure object config slot-names all-keys))
+(defmethod shared-initialize((instance parameter-object) slotnames
+                             &rest initargs &key &allow-other-keys)
+  (declare (dynamic-extent initargs))
+  (apply #'call-next-method instance (cons nil initargs))
+  (configure instance)
+  (call-next-method instance t))
 
-(defmethod initialize-instance :after ((object parameter-object)
+(defmethod initialize-instance :after ((instance parameter-object)
                                        &key &allow-other-keys)
-  (finalize-parameters object))
+  (finalize-parameters instance))
 
 
 ;; this would be semantically what shared-intialize does
 ;; (defmethod shared-initialize
 ;;   (declare (dynamic-extent all-keys))
 ;;   (loop
-;;      :for slot :in (class-slots (class-of object))
+;;      :for slot :in (class-slots (class-of instance))
 ;;      :for slot-initargs = (slot-definition-initargs slot)
 ;;      :for slot-name = (slot-definition-name slot)
 ;;      ;; first we initalise using initargs if specified
@@ -259,21 +317,21 @@ any parameter initargs - they aren't inherited."
 ;;            (indicator value)
 ;;          (get-properties all-keys slot-initargs)
 ;;        (when indicator
-;;          (setf (slot-value object slot-name)
+;;          (setf (slot-value instance slot-name)
 ;;                value)))
 ;;      ;; then we check for initforms and use them if
-;;      :when (and (not (slot-boundp object slot-name))
+;;      :when (and (not (slot-boundp instance slot-name))
 ;;                 (or (eq slot-names 't) (member slot-name slot-names))) :do
 ;;      (let ((slot-initfunction (slot-definition-initfunction slot)))
 ;;        (when (typep slot 'parameter-slot) ;; look up value in parameter slot
 ;;          (multiple-value-bind(value found-p)
-;;              (parameter-slot-read slot object)
+;;              (parameter-slot-read slot instance)
 ;;            (when found-p
-;;              (setf (slot-value object slot-name) value))))
+;;              (setf (slot-value instance slot-name) value))))
 ;;        ;; default if ordinary slot or no parameter
-;;        (when (and slot-initfunction  (not (slot-boundp object slot-name)))
-;;          (setf (slot-value object slot-name)
+;;        (when (and slot-initfunction  (not (slot-boundp instance slot-name)))
+;;          (setf (slot-value instance slot-name)
 ;;                (funcall slot-initfunction)))))
-;;   object)
+;;   instance)
 
 
