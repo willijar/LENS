@@ -1,4 +1,4 @@
-(in-package :lens)
+(in-package :lens.samples)
 
 (defclass Txc1(module)
   ()
@@ -71,16 +71,6 @@
                 module (counter module))
         (call-next-method))))
 
-(defclass TicToc3(network)
-  ()
-  (:submodules
-   (tic Txc3)
-   (toc Txc3))
-  (:connections
-   (=> (delay-channel :delay 0.1) (tic out) (toc in))
-   (=> (delay-channel :delay 0.1) (toc out) (tic in)))
-  (:metaclass compound-module-class))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defclass Txc4(Txc3)
@@ -90,14 +80,12 @@
     :documentation "Whether module should send message on initialization"))
   (:metaclass module-class))
 
-(defmethod finalize-parameters((instance Txc4))
+(defmethod initialize((instance Txc4) &optional (stage 0))
   (let ((limit (read-parameter instance "limit" 'integer)))
-    (when limit (setf (counter instance) limit))))
-
-(defmethod initialize((module Txc4) &optional (stage 0))
-  (when (and (zerop stage) (send-msg-on-init module))
+    (when limit (setf (counter instance) limit)))
+  (when (and (zerop stage) (send-msg-on-init instance))
     (write-line "Sending initial message" *trace-output*)
-    (send module (make-instance 'message :name 'TicTocMsg) 'out))
+    (send instance (make-instance 'message :name 'TicTocMsg) 'out))
   t)
 
 (defclass TicToc4(network)
@@ -126,13 +114,13 @@
   (:metaclass module-class))
 
 (defmethod initialize((instance Txc6)  &optional stage)
-  (declare (ignore stage))
-  (with-slots(event tictocmsg) instance
-    (setf event (make-instance 'message :name 'event))
-    (when (eql (name instance) 'tic)
-      (simtrace "Scheduling first send to t=5.0s")
-      (setf tictocmsg (make-instance 'message :name 'TicTocMsg))
-      (schedule-at instance event :time 5.0)))
+  (when (zerop stage)
+    (with-slots(event tictocmsg) instance
+      (setf event (make-instance 'message :name 'event))
+      (when (eql (name instance) 'tic)
+        (simtrace "Scheduling first send to t=5.0s")
+        (setf tictocmsg (make-instance 'message :name 'TicTocMsg))
+        (schedule-at instance event :time 5.0))))
   t)
 
 (defmethod handle-message((instance Txc6) msg)
@@ -143,12 +131,35 @@
         ;; so no confusion later
        (simtrace "Wait period is over, sending back message")
        (send instance tictocmsg 'out)
-       (setf event nil))
-      (event
+       (setf tictocmsg nil))
+      (t
        ;; Not self message so must be tictoc message from partner.
        ;;  save it and schedule our self message to send it back later"
        (simtrace "Message arrived, starting to wait 1 sec")
        (setf tictocmsg msg)
        (schedule-at instance event :time (+ (simulation-time) 1.0))))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defclass Txc7(Txc6)
+  ((delay-time :parameter t :volatile t :type time-type :reader delay-time))
+  (:metaclass module-class))
+
+(defmethod handle-message((instance Txc7) msg)
+  (with-slots(event tictocmsg) instance
+    (cond
+      ((eql msg event)
+        ;; self message arrived so sent out tictocmsg and null it out
+        ;; so no confusion later
+       (simtrace "Wait period is over, sending back message")
+       (send instance tictocmsg 'out)
+       (setf tictocmsg nil))
+      ((< (uniform 0 1) 0.1) ;; lose message with 0.1 probability
+       (simtrace "Losing Message"))
+      (t ;;The "delayTime" module parameter can be set to values like
+            ;; "exponential(5)" and then here
+            ;; we'll get a different delay every time.
+       (let ((delay (delay-time instance)))
+         (simtrace "Message arrived, starting to wait ~A seconds" delay)
+         (setf tictocmsg msg)
+         (schedule-at instance event :time (+ (simulation-time) delay)))))))

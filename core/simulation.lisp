@@ -66,7 +66,6 @@
                    :documentation "Maximum simulation run time"
                    :reader sim-time-limit)
    (network :parameter t :type symbol
-            :properties (:format (read :type symbol))
             :documentation "Specified Network type parameter")
    (network-instance
     :reader network

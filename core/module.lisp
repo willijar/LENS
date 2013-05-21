@@ -247,7 +247,7 @@ function."
 
 (defmethod arrived ((module module) (message message) (gate gate) time)
   (setf (to message) gate)
-  (let ((onstart (deliver-on-reception-start gate)))
+  (let ((onstart (deliver-on-reception-start-p gate)))
     (if (typep message 'packet)
         (setf (reception-start-p message) onstart
               (arrival-time message)
@@ -594,6 +594,14 @@ nil)
 
 (defmethod index((network network))
   nil)
+
+(defmacro defmodule(name (&rest superclasses) (&rest vars) &rest args)
+  (unless (member 'module superclasses)
+    (setf superclasses (cons 'module superclasses)))
+  `(defclass ,name(,@superclasses)
+     (,@vars)
+     ,@args
+     (:metaclass module-class)))
 
 ;; #|
 ;; Syntax wanted

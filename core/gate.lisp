@@ -41,8 +41,8 @@
    (channel
     :type channel :reader channel :initform nil
     :documentation "Channel object (if exists) to next link")
-   (deliver-on-reception-start
-    :initform nil :accessor deliver-on-reception-start
+   (deliver-on-reception-start-p
+    :initform nil :accessor deliver-on-reception-start-p
     :documentation "Messages with nonzero length then have a nonzero
     transmission duration (and thus, reception duration on the other
     side of the connection). By default, the delivery of the message
@@ -299,7 +299,7 @@ The method has no effect if the gate is not connected.")
     (repair-signal-flags channel)
     channel))
 
-(defmethod (setf deliver-on-reception-start) :before (value (gate gate))
+(defmethod (setf deliver-on-reception-start-p) :before (value (gate gate))
   (assert (typep (parent-module gate) 'module))
   (assert (eql (gate-direction gate) :input)))
 
