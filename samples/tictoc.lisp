@@ -154,7 +154,7 @@
        (simtrace "Wait period is over, sending back message")
        (send instance tictocmsg 'out)
        (setf tictocmsg nil))
-      ((< (uniform 0 1) 0.1) ;; lose message with 0.1 probability
+      ((< (uniform 0 1) 0.1) ;; lose message ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;with 0.1 probability
        (simtrace "Losing Message"))
       (t ;;The "delayTime" module parameter can be set to values like
             ;; "exponential(5)" and then here
@@ -163,3 +163,171 @@
          (simtrace "Message arrived, starting to wait ~A seconds" delay)
          (setf tictocmsg msg)
          (schedule-at instance event :time (+ (simulation-time) delay)))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defclass Tic8(module)
+  ((timeout :type time-type :initform 1.0 :reader timeout)
+   (timeout-event :type message :reader timeout-event
+                  :initform (make-instance 'message :name 'timeout-event)))
+  (:gates
+   (in :input)
+   (out :output))
+  (:properties :display (:icon "block/routing"))
+  (:metaclass module-class))
+
+(defclass Toc8(module)
+  ()
+  (:gates
+   (in :input)
+   (out :output))
+  (:properties :display (:icon "block/process"))
+  (:metaclass module-class))
+
+(defclass TicToc8(network)
+  ()
+  (:submodules
+   (tic Tic8 :properties (:display (:color "cyan")))
+   (toc Toc8 :properties (:display (:color "gold"))))
+  (:connections
+   (=> (delay-channel :delay 0.1) (tic out) (toc in))
+   (=> (delay-channel :delay 0.1) (toc out) (tic in)))
+  (:metaclass compound-module-class))
+
+(defmethod initialize((instance Tic8) &optional stage)
+  (when (zerop stage)
+    (simtrace "Sending initial message")
+    (send instance (make-instance 'message :name 'tictoc) 'out)
+    (schedule-at instance (timeout-event instance)
+                 :time (+ (simulation-time) (timeout instance))))
+  t)
+
+(defmethod handle-message((instance Tic8) message)
+  (cond
+    ((eql message (timeout-event instance))
+     ;; if receive timeout event packet didn't arrive so resent
+     (simtrace "Timeout expired, resending message and restarting time")
+     (send instance (make-instance 'message :name 'tictoc) 'out)
+     (schedule-at instance (timeout-event instance)
+                  :time (+ (simulation-time) (timeout instance))))
+    (t ;; message arrived - cancel timer and send new one
+     (simtrace "Timer Cancelled")
+     (cancel (timeout-event instance))
+     (send instance (make-instance 'message :name 'tictoc) 'out)
+     (schedule-at instance (timeout-event instance)
+                  :time (+ (simulation-time) (timeout instance))))))
+
+(defmethod handle-message((instance Toc8) message)
+  (cond
+    ((< (uniform 0 1) 0.1)
+     (simtrace "Losing message"))
+    (t
+     (simtrace "Sending back same message as acknowledgement.")
+     (send instance message 'out))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defclass Tic9(Tic8)
+  ((message :type message
+            :documentation "Message that has to be resent on timeout"))
+  (:metaclass module-class))
+
+(defclass Toc9(Toc8)
+  ()
+  (:metaclass module-class))
+
+(defun generate-new-message()
+  (make-instance 'message :name (gensym "tic")))
+
+(defun send-message-copy(instance)
+  (send instance (duplicate (slot-value instance 'message)) 'out))
+
+(defmethod initialize((instance Tic9) &optional stage)
+  (when (zerop stage)
+    (simtrace "Sending initial message")
+    (with-slots(message) instance
+      (setf message (generate-new-message))
+      (send-message-copy instance)
+      (schedule-at instance (timeout-event instance)
+                   :time (+ (simulation-time) (timeout instance)))))
+  t)
+
+(defmethod handle-message((instance Tic9) message)
+  (cond
+    ((eql message (timeout-event instance))
+     ;; if receive timeout event packet didn't arrive so resent
+     (simtrace "Timeout expired, resending message and restarting time")
+     (send-message-copy instance)
+     (schedule-at instance (timeout-event instance)
+                  :time (+ (simulation-time) (timeout instance))))
+    (t ;; message arrived - cancel timer and send new one
+     (simtrace "Ack received: ~A" message)
+     (simtrace "Timer Cancelled")
+     (cancel (timeout-event instance))
+     (setf (slot-value instance 'message) (generate-new-message))
+     (send-message-copy instance)
+     (schedule-at instance (timeout-event instance)
+                  :time (+ (simulation-time) (timeout instance))))))
+
+(defmethod handle-message((instance Toc9) message)
+  (cond
+    ((< (uniform 0 1) 0.1)
+     (simtrace "Losing message"))
+    (t
+     (simtrace "~A received, sending back acknowledgement." message)
+     (send instance (make-instance 'message :name 'ack) 'out))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defclass Tic10(module)
+  ()
+  (:gates ;; declare in and out to be vector gates
+   (in :input 0)
+   (out :output 0))
+  (:properties :display (:icon "block/routing"))
+  (:metaclass module-class))
+
+(defclass Tictoc10(network)
+  ()
+  (:types
+   (C delay-channel :delay 0.1))
+  (:submodules
+   (tic 6 Tic10))
+  (:connections
+   (=> C (tic 0 out ++) (tic 1 in ++))
+   (<= C (tic 0 in ++) (tic 1 out ++))
+
+   (=> C (tic 1 out ++) (tic 2 in ++))
+   (<= C (tic 1 in ++) (tic 2 out ++))
+
+   (=> C (tic 1 out ++) (tic 4 in ++))
+   (<= C (tic 1 in ++) (tic 4 out ++))
+
+   (=> C (tic 3 out ++) (tic 4 in ++))
+   (<= C (tic 3 in ++) (tic 4 out ++))
+
+   (=> C (tic 5 out ++) (tic 4 in ++))
+   (<= C (tic 5 in ++) (tic 4 out ++)))
+  (:metaclass compound-module-class))
+
+(defmethod initialize((instance Tic10) &optional stage)
+  (when (and (zerop stage) (zerop (index instance)))
+    ;; boot process with initial self message
+    (schedule-at instance
+                 (make-instance 'message
+                                :name (format nil "tic-~D" (index instance)))
+                 :time 0.0d0))
+  t)
+
+(defmethod handle-message((instance Tic10) message)
+  ;; pick a random gate to sent it on unless we are node 3
+  (if (= (index instance) 3)
+      (simtrace "Message ~A arrived" message)
+      (let* ((n (gate-size instance 'out))
+             (k (intuniform 0 (1- n))))
+        (simtrace "~A Forwarding message ~A on port out[~D]"
+                  instance message k)
+        (send instance message `(out ,k)))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

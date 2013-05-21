@@ -130,12 +130,13 @@ function."
     specs))
 
 (defun merge-local-typespec(spec class required-type)
+  (unless (listp spec) (setf spec (list spec)))
   (let ((type (first spec))
         (args (rest spec)))
     (let ((classspec (find type (slot-value class '%localtypes) :key #'first)))
       (when classspec
-        (setf type (first classspec)
-              args (append args (rest classspec)))))
+        (setf type (second classspec)
+              args (append args (cddr classspec)))))
     (assert (subtypep type required-type)
             ()
             "Specified type ~A is not a ~A as required." type required-type)
@@ -234,7 +235,12 @@ function."
 
 (defmethod gate((module module) (name symbol) &key direction index)
    (let ((slot (gethash name (gate-slots module))))
-     (when slot (gate slot direction :index index))))
+     (when slot
+           (gate slot direction :index index))))
+
+(defun gate-size(module name)
+  (let ((slot (gethash name (gate-slots module))))
+    (when slot (length (or (input slot) (output slot))))))
 
 (defmethod gate((module module) (gateid list)
                 &key direction (index (second gateid)))
@@ -343,7 +349,7 @@ initialization list"
     ((class compound-module-class) slot-names
      &key types submodules connections direct-superclasses &allow-other-keys)
   (dolist(spec types)
-    (assert (and (symbolp (first spec)) (symbolp (second spec)) (cddr types))
+    (assert (and (symbolp (first spec)) (symbolp (second spec)))
             ()
             "Invalid local type specification ~A" spec))
   (setf (slot-value class '%submodules)
@@ -384,7 +390,9 @@ return the gate given by spec. Validates spec based on class definitions"
         (symbol (values nil nil spec nil))
         (list (if (= (length spec) 4)
                   (values-list spec)
-                  (values (first spec) nil (second spec) (third spec)))))
+                  (if (numberp (second spec))
+                      (values (first spec) (second spec) (third spec))
+                      (values (first spec) nil (second spec) (third spec))))))
     (when modulename
       (let ((modulespec
              (find modulename (slot-value class '%submodules) :key #'first)))
@@ -392,7 +400,7 @@ return the gate given by spec. Validates spec based on class definitions"
           (error "Invalid module name ~A in gate address ~A" modulename spec))
         (when (or (and moduleindex (not (second modulespec)))
                   (and (not moduleindex) (second modulespec)))
-          (error "Invalide module index ~A in gate address ~A"
+          (error "Invalid module index ~A in gate address ~A"
                  moduleindex spec))
         ;; since module specified need to check gates in submodule class
         (setf class (find-class (third modulespec)))))
@@ -508,8 +516,8 @@ specification of a specific subclass."
               "Configuration specified type ~A is not a subtype of ~A"
               typename basetype)
       (let ((submodule (apply #'make-instance typename initargs)))
-        (if (vectorp sm)
-            (vector-push-extend sm submodule)
+        (if (arrayp sm)
+            (vector-push-extend submodule sm)
             (setf (gethash name (submodules instance)) submodule))
       submodule))))
 

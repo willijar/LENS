@@ -110,7 +110,13 @@ needs to know about its surroundings."))
                (:input (input entity))
                (:output (output entity)))))
       (assert s)
-      (if index (aref s index) s))))
+      (if index
+          (if (eql index '++)
+              (let ((new-gate (make-instance 'gate :owner entity)))
+                (vector-push-extend new-gate s)
+                new-gate)
+              (aref s index))
+          s))))
 
 (defun gate-extend(gate-slot)
   "Adds new gate to an gate array returning new gate (or gates if an

@@ -72,12 +72,11 @@ wherever it is feasible to display a multi-line string.")
   duplicated into.")
   (:method(o &optional duplicate)
     (declare (ignore duplicate))
-    (error "The dup method is not defined for class ~S"
+    (error "The duplicate method is not defined for class ~S"
            (class-name (class-of o))))
   (:method((entity named-object) &optional duplicate)
-    (if duplicate
-        (copy-slots '(name) entity duplicate)
-        (call-next-method))))
+    (when duplicate
+      (copy-slots '(name) entity duplicate))))
 
 (defgeneric serialise(o stream)
   (:documentation "Serialise an object into a stream")

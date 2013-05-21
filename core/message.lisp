@@ -54,7 +54,7 @@ model domain."))
 
 (defmethod duplicate((message message)
                       &optional (duplicate (make-instance 'message)))
-  (call-next-method)
+  (call-next-method message duplicate)
   (copy-slots '(creation-time to from sent-time event-time time-stamp)
               message duplicate))
 
@@ -62,7 +62,8 @@ model domain."))
   (:documentation "Must be implemented for protocols to receive messages"))
 
 (defmethod handle((message message))
-  (handle-message (to-module message) message))
+  (let ((*context* (to-module message)))
+    (handle-message *context* message)))
 
 (defgeneric bit-length(entity)
   (:documentation "Return the length in bits of an entity"))

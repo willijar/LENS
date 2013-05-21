@@ -49,6 +49,7 @@
    #:pre-model-change #:post-model-change #:message-sent #:message-discarded
   ;; components: modules,gates and channels
    #:gate #:gate-direction #:gate-slot #:input #:output #:gate-extend
+   #:gate-size
    #:gate-type #:path-start-gate #:path-end-gate #:connect #:disconnect
    #:deliver #:connected-p #:connected-outside-p #:connect-inside-p
    #:deliver-on-reception-start-p
@@ -66,6 +67,7 @@
    #:uniform #:exponential #:normal #:lognormal #:truncnormal #:gamma-d #:beta
    #:erlang-k
    #:chi-square #:student-t #:cauchy #:triang #:weibull #:pareto-shifted
+   #:intuniform #:bernoulli #:binomial #:geometric #:negbinomial #:poisson
    #:do-histogram
    ;; model change notifications
    #:pre-module-add-notification #:post-module-add-notification
