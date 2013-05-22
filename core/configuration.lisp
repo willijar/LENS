@@ -126,8 +126,25 @@
       (do-match range)))
   nil)
 
+(defgeneric trie-equal(pattern trie-prefix)
+  (:documentation "Equality test for input pattern agains a trie-prefix")
+  (:method(pattern (trie-prefix string))
+    (string-equal pattern trie-prefix))
+  (:method(pattern trie)
+    (eql pattern trie))
+  (:method((pattern integer) (trie-prefix string))
+    (let ((p (position #\- trie-prefix)))
+      (if p
+          (let ((min (parse-integer trie-prefix
+                                    :start 0 :end p :junk-allowed t))
+                (max (parse-integer trie-prefix
+                                    :start (1+ p) :junk-allowed t)))
+            (and min max (<= min pattern max)))
+          (let ((v (parse-integer trie-prefix :junk-allowed t)))
+            (and v (= v pattern)))))))
+
 (defmethod trie-match((pattern list) (trie trie))
-  (when (or (string-equal (first pattern) (trie-prefix trie))
+  (when (or (trie-equal (first pattern) (trie-prefix trie))
          (string-equal (trie-prefix trie) '*)
          (string-equal (trie-prefix trie) '**)
          (match-range (first pattern) (trie-prefix trie)))
@@ -162,7 +179,7 @@
     (values nil nil))
 
 (defmethod trie-delete((pattern list) (trie trie))
-  (let ((child (find (first pattern) (trie-children trie) :test #'string-equal
+  (let ((child (find (first pattern) (trie-children trie) :test #'trie-equal
                      :key #'trie-prefix)))
     (when child
       (if (rest pattern)
@@ -252,7 +269,5 @@ representing a value, a pathname for an extension file or nil if no
                          (do-merge-section "General")))))))
         (do-merge-section key))
       the-section)))
-
-(defparameter *tictoc* #p"/home/willijar/dev/lisp/src/lens/samples/tictoc.ini")
 
 ;; TODO looping constructs representing multiple simulations in config file

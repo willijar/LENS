@@ -243,7 +243,7 @@ function."
     (when slot (length (or (input slot) (output slot))))))
 
 (defmethod gate((module module) (gateid list)
-                &key direction (index (second gateid)))
+                &key (direction (third gateid)) (index (second gateid)))
   "Allow gate arrays to be indexed by list of name and index"
    (let ((slot (gethash (first gateid) (gate-slots module))))
      (when slot (gate slot direction :index index))))
@@ -478,6 +478,10 @@ return the gate given by spec. Validates spec based on class definitions"
   (let ((v (gethash (name module) (submodules (owner module)))))
     (when (vectorp v)
       (position module v))))
+
+(defmethod size((module module))
+  (let ((v (gethash (name module) (submodules (owner module)))))
+    (when (vectorp v) (length v))))
 
 (defmethod finish((module compound-module))
   (for-each-channel module #'finish)

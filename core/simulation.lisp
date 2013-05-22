@@ -309,7 +309,7 @@ are dispatched in current thread"
                 'simulation
                 :configuration (read-configuration pathname key)))))
   (initialize simulation)
-  (run simulation)
+  (run simulation :granularity nil)
   (finish simulation)
   simulation))
 

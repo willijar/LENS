@@ -1,5 +1,7 @@
 (in-package :lens.samples)
 
+(defparameter *tictoc* #p"/home/willijar/dev/lisp/src/lens/samples/tictoc.ini")
+
 (defclass Txc1(module)
   ()
   (:gates
@@ -154,7 +156,7 @@
        (simtrace "Wait period is over, sending back message")
        (send instance tictocmsg 'out)
        (setf tictocmsg nil))
-      ((< (uniform 0 1) 0.1) ;; lose message ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;with 0.1 probability
+      ((< (uniform 0 1) 0.1) ;; lose message with 0.1 probability
        (simtrace "Losing Message"))
       (t ;;The "delayTime" module parameter can be set to values like
             ;; "exponential(5)" and then here
@@ -329,5 +331,116 @@
                   instance message k)
         (send instance message `(out ,k)))))
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defclass Tic12(module)
+  ()
+  (:gates ;; declare in and out to be vector gates
+   (gate :inout 0))
+  (:properties :display (:icon "block/routing"))
+  (:metaclass module-class))
+
+(defclass Tictoc12(network)
+  ()
+  (:types
+   (C delay-channel :delay 0.1))
+  (:submodules
+   (tic 6 Tic12))
+  (:connections
+   (<=> C (tic 0 gate ++) (tic 1 gate ++))
+   (<=> C (tic 1 gate ++) (tic 2 gate ++))
+   (<=> C (tic 1 gate ++) (tic 4 gate ++))
+   (<=> C (tic 3 gate ++) (tic 4 gate ++))
+   (<=> C (tic 4 gate ++) (tic 5 gate ++)))
+  (:metaclass compound-module-class))
+
+(defmethod initialize((instance Tic12) &optional stage)
+  (when (and (zerop stage) (zerop (index instance)))
+    ;; boot process with initial self message
+    (schedule-at instance
+                 (make-instance 'message
+                                :name (format nil "tic-~D" (index instance)))
+                 :time 0.0d0))
+  t)
+
+(defmethod handle-message((instance Tic12) message)
+  ;; pick a random gate to sent it on unless we are node 3
+  (if (= (index instance) 3)
+      (simtrace "Message ~A arrived" message)
+      (let* ((n (gate-size instance 'gate))
+             (k (intuniform 0 (1- n))))
+        (simtrace "~A Forwarding message ~A on port out[~D]"
+                  instance message k)
+        (send instance message `(gate ,k)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defclass TicTocMsg(message)
+  ((source :reader source :initarg :source)
+   (destination :reader destination :initarg :destination)
+   (hop-count :initform 0 :accessor hop-count)))
+
+(defclass Tic13(Tic12)
+  ()
+  (:metaclass module-class))
+
+(defmethod initialize((instance Tic13) &optional stage)
+  (when (and (zerop stage) (zerop (index instance)))
+    ;; boot process with initial self message
+    (schedule-at instance
+                 (generate-message instance)
+                 :time 0.0d0))
+  t)
+
+(defmethod handle-message((instance Tic13) message)
+  (cond
+    ((= (index instance) (destination message))
+     (simtrace "Message ~A arrived after ~A hops" message (hop-count message))
+     (forward-message instance (generate-message instance)))
+    (t
+     (forward-message instance message))))
+
+(defgeneric generate-message(instance)
+  (:method ((instance Tic13))
+    (let* ((src (index instance))
+           (n (size instance)) ;; module vector size
+           (dest (intuniform 0 (- n 2))))
+      (when (>= dest src) (incf dest))
+      (make-instance 'TicTocMsg
+                     :name (format nil "tic-~D-to-~D" src dest)
+                     :source src
+                     :destination dest))))
+
+(defgeneric forward-message(instance message)
+  (:method((instance Tic13) message)
+    (incf (hop-count message))
+    (let* ((n (gate-size instance 'gate))
+           (k (intuniform 0 (1- n))))
+        (simtrace "~A Forwarding message ~A on gate[~D]"
+                  instance message k)
+        (send instance message `(gate ,k)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defclass Tic14(Tic13)
+  ((num-sent :initform 0 :accessor num-sent)
+   (num-received :initform 0 :accessor num-received))
+  (:metaclass module-class))
+
+;; note WATCH is unnecessary in common lisp as all data is inspectable
+
+(defmethod handle-message((instance Tic14) message)
+  (cond
+    ((= (index instance) (destination message))
+     (simtrace "Message ~A arrived after ~A hops" message (hop-count message))
+     (incf (num-received instance))
+     (forward-message instance (generate-message instance))
+     (incf (num-sent instance)))
+    (t
+     (forward-message instance message))))
+
+(defmethod finish((instance Tic14))
+  (simtrace "~A rcvd:~A send:~A" instance (num-received instance) (num-sent instance)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

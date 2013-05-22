@@ -180,15 +180,18 @@ any parameter initargs - they aren't inherited."
                                       properties
                                    &allow-other-keys)
   (declare (ignore slot-names))
+  ;; necessary so defmethod can find class
+  (setf (find-class (class-name class)) class)
+  ;; define around methods for volatile parameters that call
+  ;; underlying function to obtain value.
   (dolist(slot (class-direct-slots class))
     (when (and (typep slot 'parameter-slot) (slot-definition-volatile slot))
       (dolist(gf (slot-definition-readers slot))
-        ;; not ideal but MOP use of add-method etc not well documented
         (eval
          `(defmethod ,gf  :around
             ((entity ,(class-name class)))
             (funcall (call-next-method)))))))
-  ;; deal with property inheritance
+  ;; deal with property inheritance from superclasses
   (setf (slot-value class 'properties)
         (reduce #'property-union
                 (cons properties
