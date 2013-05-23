@@ -32,3 +32,13 @@
 (defmethod finish :around ((component component))
   (let ((*context* component))
     (call-next-method)))
+
+(defun scalar-recording(component)
+  (multiple-value-bind(v f-p)
+      (read-parameter component 'scalar-recording 'boolean)
+    (if f-p v t)))
+
+(defun vector-recording(component)
+  (multiple-value-bind(v f-p)
+      (read-parameter component 'vector-recording 'boolean)
+    (if f-p v t)))

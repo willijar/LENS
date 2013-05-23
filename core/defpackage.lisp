@@ -87,11 +87,9 @@
    #:packet #:bit-length #:byte-length
    #:duration #:control-info #:bit-error-p #:header-specification
    ;; statistics layer
-   #:*vector-output* #:*scalar-output*
-   #:result-filter #:delegates #:accept #:report-result
-   #:result-recorder #:scalar-recorder #:vector-recorder #:count-recorder
-   #:last-value-recorder #:sum-recorder #:mean-recorder
-   #:min-recorder #:max-recorder
+   #:define-statistic-filter #:define-result-recorder #:record #:report
+   #:title
+   #:sum #:mean #:constant0 #:constant1 #:last-value #:stddev #:timeavg
    #:time-average-recorder #:stddev-recorder
 ))
 

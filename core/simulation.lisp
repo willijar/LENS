@@ -28,7 +28,6 @@
 (eval-when(:compile-toplevel :load-toplevel :execute)
   (setf *read-default-float-format* 'double-float))
 
-
 (defclass simulation (named-object parameter-object)
   ((clock :type time-type :initform 0.0d0
 	  :accessor clock :initarg :start-time
@@ -69,7 +68,15 @@
             :documentation "Specified Network type parameter")
    (network-instance
     :reader network
-    :documentation "Actual network instance in this simulation"))
+    :documentation "Actual network instance in this simulation")
+   (vector-file :parameter t :type string :reader vector-file
+                :documentation "Destination for vector results")
+   (vector-stream :initform nil :reader vector-stream
+                  :documentation "Destination stream for vector results")
+   (scalar-file :parameter t :type string :reader scalar-file
+                :documentation "Destination for scalar results")
+   (scalar-stream :initform nil :reader scalar-stream
+                  :documentation "Destination stream for scalar results"))
   (:metaclass parameter-class)
   (:default-initargs :name nil :owner nil :configuration-path (list nil))
   (:documentation "The simulation object"))
@@ -287,7 +294,20 @@ are dispatched in current thread"
   (:documentation "Called depth first at end of simulation")
   (:method((simulation simulation))
     (stop simulation)
-    (finish (network simulation))))
+    (handler-case
+        (progn
+          (when (scalar-recording simulation)
+            (setf (slot-value simulation 'scalar-stream)
+                  (open (scalar-file stream)
+                        :direction :output :if-exists :overwrite)))
+          (when (vector-recording simulation)
+            (setf (slot-value simulation 'vector-stream)
+                  (open (scalar-file stream)
+                        :direction :output :if-exists :overwrite)))
+          (finish (network simulation)))
+        (error()
+          (when (scalar-stream simulation) (close (scalar-stream simulation)))
+          (when (vector-stream simulation) (close (vector-stream simulation)))))))
 
 (defvar *simulation-trace-stream* *standard-output*)
 
@@ -307,7 +327,17 @@ are dispatched in current thread"
          (setf *simulation*
                (make-instance
                 'simulation
-                :configuration (read-configuration pathname key)))))
+                :configuration (read-configuration pathname key))))
+        (output-path
+         (merge-pathnames
+          (make-pathname
+           :name (format nil "~A-~A" (pathname-name pathname) key)))))
+    (unless (slot-boundp simulation 'scalar-file)
+      (setf (slot-value simulation 'scalar-file)
+            (merge-pathnames (make-pathname :type "sca") output-path))
+    (unless (slot-boundp simulation 'scalar-file)
+      (setf (slot-value simulation 'vector-file)
+            (merge-pathnames (make-pathname :type "vec") output-path))))
   (initialize simulation)
   (run simulation :granularity nil)
   (finish simulation)

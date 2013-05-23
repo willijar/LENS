@@ -132,10 +132,11 @@
                (for-each-child
                 ancestor
                 #'(lambda(child)
-                    (setf (bit (slot-value child 'has-ancestor-listeners)
-                               signalid)
-                          1)
-                    (ancestor-listener-added child)))))
+                    (when (typep child 'entity-with-signals)
+                      (setf (bit (slot-value child 'has-ancestor-listeners)
+                                 signalid)
+                            1)
+                      (ancestor-listener-added child))))))
           (ancestor-listener-added entity))))))
 
 (defgeneric unsubscribe(entity signal listener)

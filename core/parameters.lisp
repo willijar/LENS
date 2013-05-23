@@ -24,16 +24,12 @@
 (in-package :lens)
 
 (defgeneric configuration(instance)
-  (:documentation "Return the parameter source associated with an instance"))
+  (:documentation "Return the parameter source associated with an instance")
+  (:method(instance) (declare (ignore instance)) (configuration *simulation*)))
 
 (defgeneric read-parameter(full-path source format)
   (:documentation "Actually read a fully named parameter from source
   using specified format")
-  (:method((full-path list) source format)
-    (case (first (last full-path))
-      (b
-       (values (format nil "Debug-read ~A ~A" format full-path) t))
-      (d (values '(random 10.0) t))))
   (:method((full-path list) (trie trie) format)
     (multiple-value-bind(txt found-p) (trie-match full-path trie)
       (values (when found-p (dfv:parse-input format txt)) found-p))))
@@ -208,12 +204,12 @@ any parameter initargs - they aren't inherited."
 (defmethod properties((obj parameter-object))
   (append (slot-value obj 'properties) (properties (class-of obj))))
 
-(defmethod read-parameter((obj parameter-object) name format)
+(defmethod read-parameter((obj owned-object) name format)
   (read-parameter (nconc (full-path obj) (list name))
                   (configuration obj)
                   format))
 
-(defmethod read-parameter((obj parameter-object) (path list) format)
+(defmethod read-parameter((obj owned-object) (path list) format)
   (read-parameter (nconc (full-path obj) path)
                   (configuration obj)
                   format))

@@ -444,3 +444,26 @@
   (simtrace "~A rcvd:~A send:~A" instance (num-received instance) (num-sent instance)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(register-signal 'arrivalSignal)
+
+(defclass Txc16(Tic13)
+  ()
+  (:properties
+   :statistic (hopCount
+               :source arrivalSignal
+               :title "hop count"
+               :default (vector stddev)
+               :optional (timeavg)
+               :interpolation-mode nil))
+  (:metaclass module-class))
+
+(defmethod handle-message((instance Txc16) message)
+   (cond
+    ((= (index instance) (destination message))
+     (emit instance 'arrivalSignal (hop-count message))
+     (simtrace "Message ~A arrived after ~A hops" message (hop-count message))
+     (forward-message instance (generate-message instance)))
+    (t
+     (forward-message instance message))))
+

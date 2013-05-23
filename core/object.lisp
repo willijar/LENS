@@ -29,6 +29,7 @@ brackets;")
     (cons (name o)
           (let ((i (index o))) (when i (list i))))))
 
+
 (defgeneric full-path(o)
   (:documentation "Returns the full path of the object in the object
 hierarchy, like '(net host 2 tcp winsize)'.")
@@ -37,6 +38,9 @@ hierarchy, like '(net host 2 tcp winsize)'.")
      plus this object's fullName, separated by a dot; otherwise it simply
      returns full-name."
     (nconc (full-path (parent-module o)) (full-name o))))
+
+(defun full-path-string(o)
+  (format nil "~{~A~^.~}" (full-path o)))
 
 (defgeneric for-each-child(parent operator)
   (:documentation "Enables traversing the object tree, performing some
