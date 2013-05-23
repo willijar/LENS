@@ -76,21 +76,22 @@
  signal has listeners in this component or in ancestor components,
  their appropriate receive-signal() methods get called.")
   (:method((entity entity-with-signals) (signal symbol) &optional value)
-    (when (may-have-listeners entity (signal-id signal))
-      (let ((notification-stack nil))
+    (let ((signalid (signal-id signal)))
+      (when (may-have-listeners entity signalid)
+        (let ((notification-stack nil))
         ;; ensure listener only receives one notification
         (labels
             ((fire(source)
-               (when (may-have-local-listeners source signal)
+               (when (may-have-local-listeners source signalid)
                  (dolist(listener
                           (gethash signal (slot-value source 'signal-table)))
                    (unless (member listener notification-stack)
                      (push listener notification-stack)
-                     (receive-signal source signal value))))
-               (when (and (may-have-ancestor-listeners source signal)
+                     (receive-signal listener signal entity value))))
+               (when (and (may-have-ancestor-listeners source signalid)
                           (parent-module source))
                  (fire (parent-module source)))))
-          (fire entity))))))
+          (fire entity)))))))
 
 (defgeneric has-listeners(entity signal)
   (:documentation "Return true if the given signal has any

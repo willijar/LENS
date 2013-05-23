@@ -40,5 +40,5 @@
 
 (defun vector-recording(component)
   (multiple-value-bind(v f-p)
-      (read-parameter component 'vector-recording 'boolean)
+      (read-parameter component 'vector-recording  'boolean)
     (if f-p v t)))

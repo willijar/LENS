@@ -294,20 +294,21 @@ are dispatched in current thread"
   (:documentation "Called depth first at end of simulation")
   (:method((simulation simulation))
     (stop simulation)
-    (handler-case
-        (progn
-          (when (scalar-recording simulation)
-            (setf (slot-value simulation 'scalar-stream)
-                  (open (scalar-file stream)
-                        :direction :output :if-exists :overwrite)))
-          (when (vector-recording simulation)
-            (setf (slot-value simulation 'vector-stream)
-                  (open (scalar-file stream)
-                        :direction :output :if-exists :overwrite)))
-          (finish (network simulation)))
-        (error()
-          (when (scalar-stream simulation) (close (scalar-stream simulation)))
-          (when (vector-stream simulation) (close (vector-stream simulation)))))))
+    (when (scalar-recording simulation)
+      (setf (slot-value simulation 'scalar-stream)
+            (open (scalar-file simulation)
+                  :direction :output
+                  :if-exists :supersede
+                  :if-does-not-exist :create)))
+    (when (vector-recording simulation)
+      (setf (slot-value simulation 'vector-stream)
+            (open (vector-file simulation)
+                  :direction :output
+                  :if-exists :supersede
+                  :if-does-not-exist :create)))
+    (finish (network simulation))
+    (when (scalar-stream simulation) (close (scalar-stream simulation)))
+    (when (vector-stream simulation) (close (vector-stream simulation)))))
 
 (defvar *simulation-trace-stream* *standard-output*)
 
@@ -331,11 +332,12 @@ are dispatched in current thread"
         (output-path
          (merge-pathnames
           (make-pathname
-           :name (format nil "~A-~A" (pathname-name pathname) key)))))
+           :name (format nil "~A-~A" (pathname-name pathname) key))
+          pathname)))
     (unless (slot-boundp simulation 'scalar-file)
       (setf (slot-value simulation 'scalar-file)
             (merge-pathnames (make-pathname :type "sca") output-path))
-    (unless (slot-boundp simulation 'scalar-file)
+    (unless (slot-boundp simulation 'vector-file)
       (setf (slot-value simulation 'vector-file)
             (merge-pathnames (make-pathname :type "vec") output-path))))
   (initialize simulation)

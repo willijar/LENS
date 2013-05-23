@@ -204,12 +204,12 @@ any parameter initargs - they aren't inherited."
 (defmethod properties((obj parameter-object))
   (append (slot-value obj 'properties) (properties (class-of obj))))
 
-(defmethod read-parameter((obj owned-object) name format)
+(defmethod read-parameter(obj (name symbol) format)
   (read-parameter (nconc (full-path obj) (list name))
                   (configuration obj)
                   format))
 
-(defmethod read-parameter((obj owned-object) (path list) format)
+(defmethod read-parameter(obj (path list) format)
   (read-parameter (nconc (full-path obj) path)
                   (configuration obj)
                   format))

@@ -29,25 +29,23 @@
   "Define and register a statistic filter function. var is the
 numberic value to be processed, statevars are the state value
 definitions as per let"
-  (setf
-   (gethash name *statistic-filter-generators*)
+  (eval-when(:load-toplevel :execute)
+    (setf
+     (gethash name *statistic-filter-generators*)
     (function (lambda()
       (eval
       `(let (,@statevars)
           (function (lambda(,var)
             (or (progn ,@body)
-                (throw 'filter-abort ,name))))))))))
+                (throw 'filter-abort ,name)))))))))))
 
 (defun make-statistic-filter(name)
   (let ((f (gethash name *statistic-filter-generators*)))
     (when f (funcall f))))
 
-(defmacro define-result-recorder(name &rest rest)
-  (multiple-value-bind(classname name)
-      (if (listp name) (values (first name) (second name)) (values name name))
-    `(eval-when(:compile-toplevel :load-toplevel :execute)
-       (setf (gethash ',name *result-recorders*)
-             (defclass ,classname ,@rest)))))
+(defun define-result-recorder(classname &optional (name classname))
+  (setf (gethash name *result-recorders*)
+        (find-class classname)))
 
 (defun make-result-recorder(spec owner)
   (multiple-value-bind(name args)
@@ -67,6 +65,9 @@ definitions as per let"
    (recorders :initarg :recorder :initform nil :reader recorders
               :documentation "The result recorders for this statistic"))
   (:documentation "Listener for statistics"))
+
+(defmethod finish((instance statistic-listener))
+  (map nil #'finish (recorders instance)))
 
 (defun filter-code-walk(instance expression)
   "Return filter code from a filter expression"
@@ -104,24 +105,25 @@ definitions as per let"
               (read-parameter instance 'result-recording-modes 'read)
             (if f-p v (list :default))))
          (recording-modes
-          (append (when (member :default spec) (getf statistic :default))
+          (append (getf statistic :default)
                   (when (member :all spec) (getf statistic :optional)))))
     (loop :for a :on spec :by #'cdr
-       :when (eql (car a) +)
+       :when (eql (car a) '+)
        :do (pushnew (second a) recording-modes)
-       :when (eql (car a) -)
-       :do (setf recording-modes (delete (second a) recording-modes :test #'equal)))
+       :when (eql (car a) '-)
+       :do (setf recording-modes
+                 (delete (second a) recording-modes :test #'equal)))
     (setf (slot-value instance 'recorders)
             (mapcar
              #'(lambda(recorder-mode)
                  (make-result-recorder recorder-mode instance))
              recording-modes)))
-    (multiple-value-bind(filter signals)
-        (filter-code-walk instance
-                          (or (getf statistic :source) (name instance)))
-      (setf (slot-value instance 'source)  filter)
-      (dolist(signal signals)
-        (subscribe (owner instance) signal instance))))
+  (multiple-value-bind(filter signals)
+      (filter-code-walk instance
+                        (or (getf statistic :source) (name instance)))
+    (setf (slot-value instance 'source)  filter)
+    (dolist(signal signals)
+      (subscribe (owner instance) signal instance))))
 
 (defclass result-recorder(owned-object)
   ()
@@ -134,12 +136,12 @@ definitions as per let"
 
 ;; map listener receive-signal with source onto statistic receive-signal with time
 (defmethod receive-signal((listener statistic-listener) signal
-                          (source component) (value timestamped))
+                          source (value timestamped))
   (receive-signal listener signal
                   (timestamped-time value) (timestamped-value value)))
 
 (defmethod receive-signal((listener statistic-listener) signal
-                          (source component) (value number))
+                          source (value number))
   (receive-signal listener signal (simulation-time) value))
 
 (defmethod receive-signal((listener statistic-listener) signal (time real)
@@ -167,15 +169,17 @@ definitions as per let"
       (report r os))))
 
 (defmethod report((r scalar-recorder) stream)
-  (format stream "scalar ~A ~A ~e~%"
+  (format stream "scalar ~A ~A ~A~%"
           (full-path-string (owner r)) (title r) (recorded-value r)))
 
-(define-result-recorder (vector-recorder vector)(result-recorder)
+(defclass vector-recorder(result-recorder)
   ((last-time :initform -1 :type time-type :accessor last-time
               :documentation "to ensure increasing timestamp order")
    (recorded-vector :initform (make-array 1024 :element-type 'timestamped
                                  :adjustable t :fill-pointer 0)
                     :reader recorded-vector)))
+
+(define-result-recorder 'vector-recorder 'vector)
 
 (defmethod record((recorder vector-recorder) time (value real))
   (with-slots(last-time recorded-vector) recorder
@@ -196,7 +200,7 @@ definitions as per let"
   (format stream "vector ~A ~A~%" (full-path-string (owner r)) (title r))
   (map nil
        #'(lambda(v)
-           (format stream "~e~t~e~%" (timestamped-time v) (timestamped-value v)))
+           (format stream "~A~t~A~%" (timestamped-time v) (timestamped-value v)))
        (recorded-vector r)))
 
 (define-statistic-filter count(value (count 0))
@@ -219,23 +223,29 @@ definitions as per let"
 
 (define-statistic-filter constant1(value) 1)
 
-(define-result-recorder (count-recorder count)(scalar-recorder)
+(defclass count-recorder(scalar-recorder)
   ((count :accessor recorded-value :initform 0)))
+
+(define-result-recorder 'count-recorder 'count)
 
 (defmethod record((recorder count-recorder) time value)
   (declare (ignore time value))
   (incf (recorded-value recorder)))
 
-(define-result-recorder sum(scalar-recorder)
+(defclass sum(scalar-recorder)
   ((sum :accessor recorded-value :initform 0)))
+
+(define-result-recorder 'sum)
 
 (defmethod record((recorder sum) time value)
   (declare (ignore time))
   (incf (recorded-value recorder) value))
 
-(define-result-recorder mean(scalar-recorder)
+(defclass mean(scalar-recorder)
   ((sum :initform 0)
    (count :initform 0)))
+
+(define-result-recorder 'mean)
 
 (defmethod record((recorder mean) time value)
   (declare (ignore time))
@@ -248,32 +258,40 @@ definitions as per let"
     (unless (zerop count)
       (/ sum count))))
 
-(define-result-recorder last-value(scalar-recorder)
+(defclass last-value(scalar-recorder)
   ((value :initform nil :accessor recorded-value)))
+
+(define-result-recorder 'last-value)
 
 (defmethod record ((r last-value) time value)
   (declare (ignore time))
   (setf (recorded-value r) value))
 
-(define-result-recorder (min-recorder min)(last-value)())
+(defclass min-recorder(last-value)())
+
+(define-result-recorder 'min-recorder 'min)
 
 (defmethod record ((r min-recorder) time value)
   (declare (ignore time))
   (when (or (not (recorded-value r)) (< value (recorded-value r)))
     (setf (recorded-value r) value)))
 
-(define-result-recorder (max-recorder max)(last-value)())
+(defclass max-recorder(last-value)())
+
+(define-result-recorder 'max-recorder 'max)
 
 (defmethod record ((r max-recorder) time value)
   (declare (ignore time))
   (when (or (not (recorded-value r)) (> value (recorded-value r)))
     (setf (recorded-value r) value)))
 
-(define-result-recorder timeavg(scalar-recorder)
+(defclass timeavg(scalar-recorder)
   ((start-time :initform -1 :type timetype)
    (last-time :type timetype)
    (weighted-sum :type real :initform 0)
    (last-value :type real :initform 0)))
+
+(define-result-recorder 'timeavg)
 
 (defmethod record((r timeavg) time value)
   (with-slots(start-time last-time last-value weighted-sum) r
@@ -291,23 +309,25 @@ definitions as per let"
   (with-slots(weighted-sum start-time last-time) r
     (/ weighted-sum (- last-time start-time))))
 
-(define-result-recorder stddev(scalar-recorder)
+(defclass stddev(scalar-recorder)
   ((count :type integer :initform 0 :reader result-count)
-   (min :type real :initform nil :reader result-min)
-   (max :type real :initform nil :reader result-max)
-   (sum :type real :initform 0 :reader result-sum)
-   (sqrsum :type real :initform 0 :reader result-sqrsum)))
+   (min :type float :initform nil :reader result-min)
+   (max :type float :initform nil :reader result-max)
+   (sum :type float :initform 0 :reader result-sum)
+   (sqrsum :type float :initform 0 :reader result-sqrsum)))
+
+(define-result-recorder 'stddev)
 
 (defgeneric result-mean(r)
   (:method((r stddev))
     (with-slots(sum count) r
-      (unless (zerop count) (/ sum count)))))
+      (unless (zerop count) (coerce (/ sum count)  'float)))))
 
 (defgeneric result-variance(r)
   (:method((r stddev))
     (with-slots(sqrsum sum count) r
       (unless (<= count 1)
-        (/ (- sqrsum (/ (* sum sum) count)) (1- count))))))
+        (coerce (/ (- sqrsum (/ (* sum sum) count)) (1- count)) 'float)))))
 
 (defgeneric result-stddev(r)
   (:method((r stddev))
@@ -326,7 +346,7 @@ definitions as per let"
 (defmethod report((r stddev) stream)
   (format stream "statistic ~A ~A~%" (full-path-string (owner r)) (title r))
   (with-slots(min max sum count sqrsum) r
-    (format stream "field count ~e~%field mean ~e~%field stddev ~e~%field sum ~e~%field sqrsum ~e~%field min ~e~%field max ~e~%"
+    (format stream "field count ~A~%field mean ~A~%field stddev ~A~%field sum ~A~%field sqrsum ~A~%field min ~A~%field max ~A~%"
             (result-count r)
             (result-mean r)
             (result-stddev r)
@@ -335,11 +355,13 @@ definitions as per let"
             (result-min r)
             (result-max r))))
 
-(define-result-recorder weighted-stddev(stddev)
+(defclass weighted-stddev(stddev)
   ((sum-weights :type real :initform 0)
    (sum-weighted-vals :type real :initform 0)
    (sum-squared-weights :type real :initform 0)
    (sum-weights-squared-vals :type real :initform 0)))
+
+(define-result-recorder 'weighted-stddev)
 
 (defmethod result-mean((r weighted-stddev))
   (with-slots(sum-weights sum-weighted-vals) r
@@ -372,7 +394,7 @@ definitions as per let"
   (call-next-method)
   (with-slots(sum-weights sum-weighted-vals sum-squared-weights
                           sum-weights-squared-vals) r
-  (format stream "field weights ~e~% field weightedSum ~e~%field sqrSumWeights ~e~%field weightedSqrSum ~e~%"
+  (format stream "field weights ~A~% field weightedSum ~A~%field sqrSumWeights ~A~%field weightedSqrSum ~A~%"
           sum-weights sum-weighted-vals sum-squared-weights
           sum-weights-squared-vals)))
 
@@ -389,126 +411,122 @@ definitions as per let"
     (do-add-statistics (network sim))))
 
 (eval-when(:load-toplevel :execute)
-  (pushnew #'add-statistics *simulation-init-hooks*))
+  (pushnew 'add-statistics *simulation-init-hooks*))
 
 ;; ;; TODO add densityestbase and then histogram types
 
-;; (defclass density-estimation(stddev)
-;;   ((range-min :initarg :min :initform nil :type real :accessor range-min)
-;;    (range-max :initarg :max :initform nil :type real :accessor range-max)
-;;    (range-ext-factor :initarg :range-exp-factor :initform 2.0
-;;                      :type real :reader range-ext-factor
-;;                      :documentation "Factor to expand range by")
-;;    (num-cells :initarg :num-cells :initform 10 :reader num-cells
-;;               :documentation "How man cells to use.")
-;;    (cell-size :initform nil :reader cell-size
-;;               :reader density-estimation-transformed-p
-;;               :documentation "Cell size once scale determined.")
-;;    (array :type (array real *) :reader firstvals :reader cells
-;;           :documentation "Pre-collected observations or cells")
-;;    (underflow-cell :initform 0 :type integer :accessor underflow-cell
-;;                    :documentation "Number of observations below range-min")
-;;    (overflow-cell :initform 0 :type integer :accessor overflow-cell
-;;                   :documentation "Number of observations above range-max"))
-;;   (:documentation "Base class for density estimation classes.
+(defclass density-estimation(stddev)
+  ((range-min :initarg :min :initform nil :type real :accessor range-min)
+   (range-max :initarg :max :initform nil :type real :accessor range-max)
+   (range-ext-factor :initarg :range-exp-factor :initform 2.0
+                     :type real :reader range-ext-factor
+                     :documentation "Factor to expand range by")
+   (num-cells :initarg :num-cells :initform 10 :reader num-cells
+              :documentation "How man cells to use.")
+   (cell-size :initform nil :reader cell-size
+              :reader density-estimation-transformed-p
+              :documentation "Cell size once scale determined.")
+   (array :type (array real *) :reader firstvals :reader cells
+          :documentation "Pre-collected observations or cells")
+   (underflow-cell :initform 0 :type integer :accessor underflow-cell
+                   :documentation "Number of observations below range-min")
+   (overflow-cell :initform 0 :type integer :accessor overflow-cell
+                  :documentation "Number of observations above range-max"))
+  (:documentation "Base class for density estimation classes.
 
-;;  For the histogram classes, you need to specify the number of cells
-;;  and the range. Range can either be set explicitly or you can choose
-;;  automatic range determination.
+ For the histogram classes, you need to specify the number of cells
+ and the range. Range can either be set explicitly or you can choose
+ automatic range determination.
 
-;;  Automatic range estimation works in the following way:
+ Automatic range estimation works in the following way:
 
-;;  1.  The first num_firstvals observations are stored.
-;;  2.  After having collected a given number of observations, the actual
-;;      histogram is set up. The range (*min*, *max*) of the
-;;      initial values is expanded *range_ext_factor* times, and
-;;      the result will become the histogram's range (*rangemin*,
-;;      *rangemax*). Based on the range, the cells are layed out.
-;;      Then the initial values that have been stored up to this point
-;;      will be transferred into the new histogram structure and their
-;;      store is deleted -- this is done by the transform() function.
+ 1.  The first num_firstvals observations are stored.
+ 2.  After having collected a given number of observations, the actual
+     histogram is set up. The range (*min*, *max*) of the
+     initial values is expanded *range_ext_factor* times, and
+     the result will become the histogram's range (*rangemin*,
+     *rangemax*). Based on the range, the cells are layed out.
+     Then the initial values that have been stored up to this point
+     will be transferred into the new histogram structure and their
+     store is deleted -- this is done by the transform() function.
 
-;;    You may also explicitly specify the lower or upper limit and have
-;;    the other end of the range estimated automatically. The setRange...()
-;;    member functions of cDensityEstBase deal with setting
-;;    up the histogram range. It also provides pure virtual functions
-;;    transform() etc.
+   You may also explicitly specify the lower or upper limit and have
+   the other end of the range estimated automatically. The setRange...()
+   member functions of cDensityEstBase deal with setting
+   up the histogram range. It also provides pure virtual functions
+   transform() etc.
 
-;;    Subsequent observations are placed in the histogram structure.
-;;    If an observation falls out of the histogram range, the *underflow*
-;;    or the *overflow* *cell* is incremented."))
+   Subsequent observations are placed in the histogram structure.
+   If an observation falls out of the histogram range, the *underflow*
+   or the *overflow* *cell* is incremented."))
 
 
 
-;; (defun density-estimation-transform(instance)
-;;   (with-slots(range-min range-max range-ext-factor cell-size array) instance
-;;     (unless (and range-min range-max)
-;;       (let ((min (reduce #'min (firstvals instance)))
-;;             (max (reduce #'max (firstvals instance))))
-;;         (cond
-;;           (range-max ;; only min needs determining
-;;            (setf range-min
-;;                  (if (<= range-max min)
-;;                      (- range-max 1.0)
-;;                      (- range-max (* (- range-max min) range-ext-factor)))))
-;;           (range-min
-;;            (setf range-max
-;;                  (if (>= range-in max)
-;;                      (+ range-min 1.0)
-;;                      (+ range-min (* (- max range-min) range-ext-factor)))))
-;;           (t
-;;            (let ((c (/ (+ max min) 2))
-;;                  (r (* (- max min) range-ext-factor)))
-;;              (when (zerop r) (setf r 1.0))
-;;              (setf range-min (- c (/ r 2))
-;;                    range-max (+ c (/ r 2))))))))
-;;     (let ((firstvals (when (slot-boundp instance 'array) array)))
-;;       (setf array (make-array (num-cells instance) :element-type 'integer
-;;                               :initial-element 0))
-;;       (setf cell-size (/ (- range-max range-min) (num-cells instance)))
-;;       (when firstvals (map nil #'(lambda(v) (record instance 0 v)) firstvals)))))
+(defun density-estimation-transform(instance)
+  (with-slots(range-min range-max range-ext-factor cell-size array) instance
+    (unless (and range-min range-max)
+      (let ((min (reduce #'min (firstvals instance)))
+            (max (reduce #'max (firstvals instance))))
+        (cond
+          (range-max ;; only min needs determining
+           (setf range-min
+                 (if (<= range-max min)
+                     (- range-max 1.0)
+                     (- range-max (* (- range-max min) range-ext-factor)))))
+          (range-min
+           (setf range-max
+                 (if (>= range-min max)
+                     (+ range-min 1.0)
+                     (+ range-min (* (- max range-min) range-ext-factor)))))
+          (t
+           (let ((c (/ (+ max min) 2))
+                 (r (* (- max min) range-ext-factor)))
+             (when (zerop r) (setf r 1.0))
+             (setf range-min (- c (/ r 2))
+                   range-max (+ c (/ r 2))))))))
+    (let ((firstvals (when (slot-boundp instance 'array) array)))
+      (setf array (make-array (num-cells instance) :element-type 'integer
+                              :initial-element 0))
+      (setf cell-size (/ (- range-max range-min) (num-cells instance)))
+      (when firstvals (map nil #'(lambda(v) (record instance 0 v)) firstvals)))))
 
-;; (defmethod initialize-instance :after
-;;     ((instance density-estimation) &key
-;;      (num-firstvals 100) &allow-other-keys)
-;;   (with-slots(range-min range-max array cell-size) instance
-;;     (if (and range-max range-min)
-;;         (density-estimation-transform instance)
-;;         (progn
-;;           (setf array (make-array (num-cells instance) :element-type 'integer))
-;;           (setf cell-size (/ (- range-max range-min) (num-cells instance))))
-;;         (setf array (make-array num-firstvals :element-type 'float-double
-;;                                 :fill-pointer 0)))))
+(defmethod initialize-instance :after
+    ((instance density-estimation) &key (num-firstvals 100) &allow-other-keys)
+  (with-slots(range-min range-max array cell-size) instance
+    (if (and range-max range-min)
+        (density-estimation-transform instance)
+        (setf array (make-array num-firstvals :element-type 'double-float
+                                :fill-pointer 0)))))
 
-;; (defmethod record((instance density-estimation) time value)
-;;   (call-next-method)
-;;   (when (not (density-estimation-transformed-p instance))
-;;     (let ((firstvals (firstvals instance)))
-;;       (if (< (length firstvals) (array-total-size firstvals))
-;;           (progn
-;;             (vector-push value firstvals)
-;;             (return-from record))
-;;           (density-estimation-transform instance))))
-;;   (with-slots(range-min range-max num-cells)
-;;       (let ((k (floor (- val rangemin))))
-;;         (cond
-;;           ((or (< k 0) (< value range-min))
-;;            (incf (underflow-cell instance)))
-;;           ((or (>= k num-cells) (>= value range-max))
-;;            (incf (overflow-cell instance)))
-;;           (t (incf (aref (cell instance) k)))))))
+(defmethod record((instance density-estimation) time value)
+  (call-next-method)
+  (when (not (density-estimation-transformed-p instance))
+    (let ((firstvals (firstvals instance)))
+      (if (< (length firstvals) (array-total-size firstvals))
+          (progn
+            (vector-push value firstvals)
+            (return-from record))
+          (density-estimation-transform instance))))
+  (with-slots(range-min range-max num-cells) instance
+      (let ((k (floor (- value range-min))))
+        (cond
+          ((or (< k 0) (< value range-min))
+           (incf (underflow-cell instance)))
+          ((or (>= k num-cells) (>= value range-max))
+           (incf (overflow-cell instance)))
+          (t (incf (aref (cells instance) k)))))))
 
-;; (defmethod report((r density-estimation) stream)
-;;   (call-next-method)
-;;   (unless (density-estimation-transformed-p r)
-;;     (density-estimation-transform r))
-;;   (format stream "attr unit s~%") ;; TODO sllow specification of attributes in initargs
-;;   (format stream "bin -INF ~D~%" (underflow-cell r))
-;;   (let ((b (range-min r)))
-;;     (dotimes(k (length (cells r)))
-;;       (format stream "bin ~e ~D~%" b (aref (cells r) k))
-;;       (incf b (cell-size r))))
-;;   (format stream "bin +INF ~D~%" (overflow-cell r)))
+(defmethod report((r density-estimation) stream)
+  (call-next-method)
+  (unless (density-estimation-transformed-p r)
+    (density-estimation-transform r))
+  (format stream "attr unit s~%") ;; TODO sllow specification of attributes in initargs
+  (format stream "bin -INF ~D~%" (underflow-cell r))
+  (let ((b (range-min r)))
+    (dotimes(k (length (cells r)))
+      (format stream "bin ~A ~D~%" b (aref (cells r) k))
+      (incf b (cell-size r))))
+  (format stream "bin +INF ~D~%" (overflow-cell r)))
 
 
 ;; ;; TODO getcdf, getpdf random etc from cdensityestbase and chistogram
