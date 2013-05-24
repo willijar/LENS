@@ -1,3 +1,32 @@
+;; Signals and Listeners
+;; Copyright (C) 2013 Dr. John A.R. Williams
+
+;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
+;; Keywords:
+
+;;; Copying:
+
+;; This file is part of LENS
+
+;; This program is free software: you can redistribute it and/or
+;; modify it under the terms of the GNU General Public License as
+;; published by the Free Software Foundation, either version 3 of the
+;; License, or (at your option) any later version.
+
+;; LENS is distributed in the hope that it will be useful, but WITHOUT
+;; ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+;; or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+;; License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+;;; Commentary:
+
+;;
+
+;;; Code:
+
 (in-package :lens)
 
 (defvar *signals* nil)
@@ -187,38 +216,3 @@
 
 (defmethod finish((instance entity-with-signals))
   (map nil #'finish (listeners instance t)))
-
-;; TODO finish methods???
-
-
-;; (defclass component(named-object object-array property-object parameter-object)
-;;   ((signal-table :type (array signal-record *) :initform (make-array)
-;;                  :reader signal-table)
-;;    (signal-has-local-listeners
-;;     :type bit-vector
-;;     :initform (make-array 64 :element-type 'bit)
-;;     :reader signal-has-local-listeners
-;;     :documentation "bit[k]==1: signalID k has local listeners")
-;;    (signal-has-ancestor-listeners
-;;     :type bit-vector
-;;     :initform (make-array 64 :element-type 'bit)
-;;     :reader signal-has-ancestor-listeners
-;;     :documentation "bit[k]==1: signalID k has listener in any ancestor component")
-;;    (signalIDs :type hash-table :initform (make-hash-table :test 'equal)
-;;               :reader signalIDs
-;;               :documentation "Mapping name to signal ids")
-;;    (signalNames :type hash-table :initform (make-hash-table)
-;;                 :reader signalNames
-;;                 :documentation "Mapping signal id to name")
-;;    (lastSignalID :initform 0 :allocation :class)
-;;    (rngMapping :initform #() :paramater t :reader rngMapping
-;;                :documentation "Mapping from module local rng to global rng"))
-;;   (:documentation "Base class for all component types - modules & channels")
-;;   (:metaclass parameter-class))
-
-;; (defun RNG(k instance)
-
-
-
-;; (defmethod parameter-source((instance component))
-;;   *simulation-configuration*)

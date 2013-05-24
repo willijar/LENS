@@ -90,7 +90,8 @@
    #:define-statistic-filter #:define-result-recorder #:record #:report
    #:title
    #:sum #:mean #:constant0 #:constant1 #:last-value #:stddev #:timeavg
-   #:time-average-recorder #:stddev-recorder
+   #:time-average-recorder #:stddev-recorder #:histogram
+   #:probability-density-function #:cumulative-density-function
 ))
 
 

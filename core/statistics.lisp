@@ -129,7 +129,8 @@ definitions as per let"
         (or (getf statistic :title) (string (name instance))))
   (let* ((spec
           (multiple-value-bind(v f-p)
-              (read-parameter instance 'result-recording-modes 'read)
+              (read-parameter instance 'result-recording-modes
+                              '(read :multiplep t))
             (if f-p v (list :default))))
          (recording-modes
           (append (getf statistic :default)

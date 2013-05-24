@@ -269,5 +269,3 @@ representing a value, a pathname for an extension file or nil if no
                          (do-merge-section "General")))))))
         (do-merge-section key))
       the-section)))
-
-;; TODO looping constructs representing multiple simulations in config file

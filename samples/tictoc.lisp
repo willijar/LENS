@@ -454,7 +454,7 @@
                :source arrivalSignal
                :title "hop count"
                :default (vector stddev)
-               :optional (timeavg)
+               :optional (timeavg (histogram :mode integer))
                :interpolation-mode nil))
   (:metaclass module-class))
 

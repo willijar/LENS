@@ -30,6 +30,8 @@
 
 (in-package :lens)
 
+;; TODO numberical indexing of vector recorders and results
+
 (defclass vector-recorder(result-recorder)
   ((last-time :initform -1 :type time-type :accessor last-time
               :documentation "to ensure increasing timestamp order")
@@ -58,7 +60,8 @@
   (format stream "vector ~A ~A~%" (full-path-string (owner r)) (title r))
   (map nil
        #'(lambda(v)
-           (format stream "~A~t~A~%" (timestamped-time v) (timestamped-value v)))
+           (format stream "~A~t~A~%"
+                   (timestamped-time v) (timestamped-value v)))
        (recorded-vector r)))
 
 (define-statistic-filter count(value (count 0))
@@ -256,20 +259,22 @@
           sum-weights sum-weighted-vals sum-squared-weights
           sum-weights-squared-vals)))
 
-;; ;; TODO add densityestbase and then histogram types
-
-(defclass density-estimation(stddev)
-  ((range-min :initarg :min :initform nil :type real :accessor range-min)
-   (range-max :initarg :max :initform nil :type real :accessor range-max)
-   (range-ext-factor :initarg :range-exp-factor :initform 2.0
+(defclass histogram(stddev)
+  ((range-min :initarg :min :initform nil :type real :reader range-min)
+   (range-max :initarg :max :initform nil :type real :reader range-max)
+   (range-ext-factor :initarg :range-ext-factor :initform 2.0
                      :type real :reader range-ext-factor
                      :documentation "Factor to expand range by")
-   (num-cells :initarg :num-cells :initform 10 :reader num-cells
-              :documentation "How man cells to use.")
-   (cell-size :initform nil :reader cell-size
-              :reader density-estimation-transformed-p
+   (mode :type symbol :initarg :mode :initform nil :reader histogram-mode
+         :documentation "integer or float mode for collection.")
+   (rng :type fixnum :initform 0 :initarg :genk
+         :documentation "Index of random number generator to use")
+   (num-cells :initarg :num-cells :initform 30 :reader num-cells :type fixnum
+              :documentation "How many cells to use.")
+   (cell-size :initform nil :reader cell-size :type real
+              :reader histogram-transformed-p
               :documentation "Cell size once scale determined.")
-   (array :type (array real *) :reader firstvals :reader cells
+   (array :type (array real *) :reader cells
           :documentation "Pre-collected observations or cells")
    (underflow-cell :initform 0 :type integer :accessor underflow-cell
                    :documentation "Number of observations below range-min")
@@ -303,55 +308,82 @@
    If an observation falls out of the histogram range, the *underflow*
    or the *overflow* *cell* is incremented."))
 
+(define-result-recorder 'histogram)
 
+;; TODO INTEGER mode - proper ranging
 
-(defun density-estimation-transform(instance)
-  (with-slots(range-min range-max range-ext-factor cell-size array) instance
-    (unless (and range-min range-max)
-      (let ((min (reduce #'min (firstvals instance)))
-            (max (reduce #'max (firstvals instance))))
-        (cond
-          (range-max ;; only min needs determining
-           (setf range-min
-                 (if (<= range-max min)
-                     (- range-max 1.0)
-                     (- range-max (* (- range-max min) range-ext-factor)))))
-          (range-min
-           (setf range-max
-                 (if (>= range-min max)
-                     (+ range-min 1.0)
-                     (+ range-min (* (- max range-min) range-ext-factor)))))
-          (t
-           (let ((c (/ (+ max min) 2))
+(defun histogram-setup-cells(instance)
+  (with-slots(range-min range-max num-cells cell-size array mode) instance
+    (when (eql mode 'integer)
+      (setf range-min (floor range-min)
+            range-max (ceiling range-max)))
+    (setf cell-size (/ (- range-max range-min) num-cells))
+    (when (and (eql mode 'integer) (not (integerp cell-size)))
+      (let  ((c (ceiling cell-size)))
+        (setf range-min (floor range-min)
+              range-max (+ range-min (* num-cells c))
+              cell-size c)))
+    (setf array
+          (make-array num-cells :element-type 'integer
+                            :initial-element 0))))
+
+(defun histogram-transform(instance)
+  (assert (not (histogram-transformed-p instance)))
+  (with-slots(range-min range-max range-ext-factor cell-size array mode)
+      instance
+    (let* ((firstvals array)
+           (min (reduce #'min firstvals))
+           (max (reduce #'max firstvals)))
+      (cond
+        ((not (or range-min range-max))
+         (let ((c (/ (+ max min) 2))
                  (r (* (- max min) range-ext-factor)))
              (when (zerop r) (setf r 1.0))
              (setf range-min (- c (/ r 2))
-                   range-max (+ c (/ r 2))))))))
-    (let ((firstvals (when (slot-boundp instance 'array) array)))
-      (setf array (make-array (num-cells instance) :element-type 'integer
-                              :initial-element 0))
-      (setf cell-size (/ (- range-max range-min) (num-cells instance)))
-      (when firstvals (map nil #'(lambda(v) (record instance 0 v)) firstvals)))))
+                   range-max (+ c (/ r 2)))))
+        (range-max ;; only min needs determining
+         (setf range-min
+               (if (<= range-max min)
+                   (- range-max 1.0)
+                   (- range-max (* (- range-max min) range-ext-factor)))))
+        (range-min
+         (setf range-max
+               (if (>= range-min max)
+                   (+ range-min 1.0)
+                   (+ range-min (* (- max range-min) range-ext-factor))))))
+    (unless mode
+      (setf mode
+            (if (and (every #'integerp firstvals)
+                     (not (every #'zerop firstvals)))
+                'integer
+                'float)))
+      (histogram-setup-cells instance)
+      (map nil #'(lambda(v) (record instance 0 v)) firstvals))))
 
 (defmethod initialize-instance :after
-    ((instance density-estimation) &key (num-firstvals 100) &allow-other-keys)
-  (with-slots(range-min range-max array cell-size) instance
-    (if (and range-max range-min)
-        (density-estimation-transform instance)
-        (setf array (make-array num-firstvals :element-type 'double-float
-                                :fill-pointer 0)))))
+    ((instance histogram) &key (num-firstvals 100) &allow-other-keys)
+    (if (and (range-min instance) (range-max instance))
+        (histogram-setup-cells instance)
+        (setf (slot-value instance 'array)
+              (make-array num-firstvals :element-type 'real
+                          :fill-pointer 0))))
 
-(defmethod record((instance density-estimation) time value)
+(defmethod record :before ((instance histogram) time (value number))
+  (assert (or (integerp value) (not (eql (histogram-mode instance) 'float)))
+          ()
+          "Histogram in INTEGER mode cannot accept a float value"))
+
+(defmethod record((instance histogram) time value)
   (call-next-method)
-  (when (not (density-estimation-transformed-p instance))
-    (let ((firstvals (firstvals instance)))
+  (when (not (histogram-transformed-p instance))
+    (let ((firstvals (slot-value instance 'array)))
       (if (< (length firstvals) (array-total-size firstvals))
           (progn
             (vector-push value firstvals)
             (return-from record))
-          (density-estimation-transform instance))))
-  (with-slots(range-min range-max num-cells) instance
-      (let ((k (floor (- value range-min))))
+          (histogram-transform instance))))
+  (with-slots(range-min range-max num-cells cell-size) instance
+      (let ((k (floor (- value range-min) cell-size)))
         (cond
           ((or (< k 0) (< value range-min))
            (incf (underflow-cell instance)))
@@ -359,10 +391,10 @@
            (incf (overflow-cell instance)))
           (t (incf (aref (cells instance) k)))))))
 
-(defmethod report((r density-estimation) stream)
+(defmethod report((r histogram) stream)
   (call-next-method)
-  (unless (density-estimation-transformed-p r)
-    (density-estimation-transform r))
+  (unless (histogram-transformed-p r)
+    (histogram-transform r))
   (format stream "attr unit s~%") ;; TODO sllow specification of attributes in initargs
   (format stream "bin -INF ~D~%" (underflow-cell r))
   (let ((b (range-min r)))
@@ -371,5 +403,47 @@
       (incf b (cell-size r))))
   (format stream "bin +INF ~D~%" (overflow-cell r)))
 
+(defgeneric probability-density-function(instance x)
+  (:documentation "Returns the estimated value of the Probability
+  Density Function at a given x."))
 
-;; ;; TODO getcdf, getpdf random etc from cdensityestbase and chistogram
+(defgeneric cumulative-density-function(instance x)
+  (:documentation "Returns the estimated value of the Cumulated
+  Density Function at a given x."))
+
+(defmethod probability-density-function((instance histogram) (x number))
+  (unless (histogram-transformed-p instance)
+    (histogram-transform instance))
+  (let ((k (floor (- x (range-min instance)) (cell-size instance))))
+    (if (or (< k 0) (< x (range-min instance))
+            (>= k (num-cells instance)) (>= x (range-max instance)))
+        0.0d0
+        (/ (aref (cells instance) k)
+           (cell-size instance)
+           (result-count instance)))))
+
+(defmethod rand((instance histogram) &optional limit)
+  (assert (null limit)
+          ()
+          "rand on a histogram requires no limit - limits dictated by
+          distribution")
+  (with-slots(rng) instance
+  (cond
+    ((zerop (result-count instance)) 0)
+    ((histogram-transformed-p instance)
+     (let ((k
+        ;;select a random cell (k-1) and return a random number from it
+            (do((k 0 (1+ k))
+                (m (%genintrand
+                    (- (result-count instance)
+                       (underflow-cell instance)
+                       (overflow-cell instance))
+                    rng)
+                   (- m (aref (cells instance) k))))
+               ((< m 0) k))))
+       (+ (range-min instance)
+          (* (1- k) (cell-size instance))
+          (* (%gendblrand rng) (cell-size instance)))))
+    (t ;; simply return sample from stored ones
+     (aref (cells instance)  (%genintrand (result-count instance) rng))))))
+

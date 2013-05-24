@@ -40,7 +40,7 @@ hierarchy, like '(net host 2 tcp winsize)'.")
     (nconc (full-path (parent-module o)) (full-name o))))
 
 (defun full-path-string(o)
-  (format nil "~{~A~^.~}" (full-path o)))
+  (format nil "~{~A~^.~}" (rest (full-path o))))
 
 (defgeneric for-each-child(parent operator)
   (:documentation "Enables traversing the object tree, performing some
