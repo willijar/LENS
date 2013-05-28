@@ -29,22 +29,30 @@
 
 (in-package :lens)
 
-(defvar *signals* nil)
 
 (defconstant +SIGNAL-CACHE-SIZE+ 64
   "Length of bit vectors for caching signal listeners")
 
-(defun register-signal(symbol)
-  (pushnew symbol *signals*)
-  (or (get symbol :signal-id)
-      (setf (get symbol :signal-id)  (1- (length *signals*)))))
+(defvar *signals*
+  (make-array +SIGNAL-CACHE-SIZE+
+              :element-type 'symbol
+              :fill-pointer 0
+              :adjustable t))
+
+(defun register-signal(symbol &optional documentation)
+  (if documentation
+      (setf (get symbol 'signal-doc) documentation)
+      (remprop symbol 'signal-doc))
+  (setf (get symbol 'signal-id)
+        (or (position symbol *signals*)
+            (vector-push-extend symbol *signals*))))
 
 (eval-when(:load-toplevel :execute)
   (register-signal 'PRE-MODEL-CHANGE)
   (register-signal 'POST-MODEL-CHANGE))
 
 (declaim (inline signal-id))
-(defun signal-id(symbol) (get symbol :signal-id))
+(defun signal-id(symbol) (get symbol 'signal-id))
 
 (defclass listener(owned-object)
   ()
@@ -88,17 +96,25 @@
       listeners)))
 
 (defun may-have-listeners(entity signal-id)
+  (declare (fixnum signal-id))
   (or (>= signal-id +SIGNAL-CACHE-SIZE+)
       (= 1 (bit (slot-value entity 'has-local-listeners) signal-id))
       (= 1(bit (slot-value entity 'has-ancestor-listeners) signal-id))))
 
 (defun may-have-local-listeners(entity signal-id)
+  (declare (fixnum signal-id))
   (or (>= signal-id +SIGNAL-CACHE-SIZE+)
       (= 1 (bit (slot-value entity 'has-local-listeners) signal-id))))
 
 (defun may-have-ancestor-listeners(entity signal-id)
+  (declare (fixnum signal-id))
   (or (>= signal-id +SIGNAL-CACHE-SIZE+)
       (= 1 (bit (slot-value entity 'has-ancestor-listeners) signal-id))))
+
+(define-compiler-macro may-have-listeners(&whole form entity arg)
+  (if (and (listp arg) (eql (first arg) 'quote) (symbolp (second arg)))
+      `(may-have-listeners ,entity (load-time-value (symbol-id (second arg))))
+      form))
 
 (defgeneric emit(entity signal &optional value)
   (:documentation "Emit an optional value as a signal. If the given

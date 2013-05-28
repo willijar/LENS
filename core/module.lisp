@@ -11,7 +11,8 @@
   a compound module"))
 
 (defgeneric build-inside(instance)
-  (:documentation "create submodules and connect them"))
+  (:documentation "create submodules and connect them - then build
+  their insides recursively"))
 
 (defgeneric arrived(module message gate time)
   (:documentation "Called when a message arrives at a gate which is not further
@@ -261,6 +262,9 @@ function."
         (setf (arrival-time message) time)))
   (schedule message))
 
+(defmethod build-inside((module module))
+  "DO nothing for simple module")
+
 (defmethod send((from-module module) (message message) (outgate gate)
                 &key (delay 0))
   (assert (not (eql (gate-direction outgate) :input))
@@ -345,6 +349,8 @@ function."
 initialization list"
   (declare (ignore types submodules connections)))
 
+;; TODO allow size to be determined by slot or sizeof a gate in
+;; module instantiation
 (defmethod shared-initialize :after
     ((class compound-module-class) slot-names
      &key types submodules connections direct-superclasses &allow-other-keys)
@@ -354,33 +360,67 @@ initialization list"
             "Invalid local type specification ~A" spec))
   (setf (slot-value class '%submodules)
         (named-specifications-inheritance
-         (mapcar
-          #'(lambda(spec)
-              (let ((name (first spec)))
-                (assert (symbolp name)
-                        ()
-                        "Invalid submodule name ~A" name)
-                (multiple-value-bind(sizespec typespec)
-                    (let ((v (second spec)))
-                      (if (or (numberp v)
-                              (functionp v)
-                              (and (third spec)
-                                   (symbolp (third spec))
-                                   (not (eql (symbol-package (third spec))
-                                             (find-package :keyword))))
-                              (member v (slot-value class '%gatespec)
-                                      :key #'first))
-                          (values v (cddr spec))
-                          (values nil (cdr spec))))
-                  (cons name
-                        (cons sizespec
-                              (merge-local-typespec typespec class 'module))))))
-          submodules)
-         direct-superclasses
-         'compound-module-class
-         '%submodules))
+         (mapcar #'(lambda(spec) (submodule-generators class spec))
+                 submodules)
+         direct-superclasses 'compound-module-class '%submodules))
   (setf (slot-value class '%connections)
         (connection-code-walk class connections)))
+
+(defun submodule-generators(class spec)
+  "Given the module specification form return the sizespecification
+and initargs specification - either nil and a list for a single module
+or two functions - one of the instance to return the size and one of
+the instance and index to return the module initargs for each module
+in a vector. The specification may either be a name and class initargs
+for a single module or a name, a size specification and a classtype
+for a vector followed by either the rest of the initargs if all
+elements or the same or else a range plist with the complete
+initargs (including types)"
+  (let* ((name (first spec))
+         (v (second spec))
+         (sizespec
+           ;; size may be a number, function, (sizeof gatename) or a slot name
+          (cond
+            ((and (symbolp v)
+                  (or (not (third spec)) ;; spec is single classname
+                      (and (symbolp (third spec)) ;; or classname with keywords
+                      (eql (symbol-package (third spec))
+                           (find-package :keyword)))))
+             ;; then it is single module
+             (return-from submodule-generators
+               `(,name nil ,@(merge-local-typespec (cdr spec) class 'module))))
+            ((numberp v)
+             #'(lambda(instance) (declare (ignore instance)) v))
+            ((functionp v)
+             v)
+            ((and (listp v) (eql (car v) 'sizeof))
+             #'(lambda(instance)
+                 (gate-size instance (second v))))
+
+            ((symbolp v) ;; default assume it is a slot name
+             #'(lambda(instance) (slot-value instance v)))
+            (t (error "Unknown size specification ~A for module array." v))))
+         (typespec (cddr spec)))
+    ;; if we get here we have a module vector - determine if typespec is
+    ;; a range plist or the same for each element
+    (list
+     name
+     sizespec
+     (cond
+       ((range-list-p typespec)
+        (let ((typespec (copy-list typespec)))
+          (loop
+             :for a :on typespec :by #'cddr
+             :do (setf (second a)
+                       (merge-local-typespec (second a) class 'module)))
+          #'(lambda(instance index)
+              (declare (ignore instance))
+              (range-getf typespec index))))
+      (t
+       (let ((typespec (merge-local-typespec typespec class 'module)))
+         #'(lambda(instance index)
+             (declare (ignore instance index))
+             typespec)))))))
 
 (defun gate-accessor(class spec direction)
   "Return a closure which when given the instance as an argument will
@@ -403,14 +443,18 @@ return the gate given by spec. Validates spec based on class definitions"
           (error "Invalid module index ~A in gate address ~A"
                  moduleindex spec))
         ;; since module specified need to check gates in submodule class
-        (setf class (find-class (third modulespec)))))
-    (let ((gatespec (find name (slot-value class '%gatespec) :key #'first)))
-      (unless gatespec
-        (error "Invalid gate name ~A in gate address ~A" name spec))
-      (when (or (and index (not (third gatespec)))
-                (and (not index) (third gatespec)))
-        (error "Invalid gate index ~A in gate address ~A" index spec)))
-    (if modulename
+        (setf class
+              (find-class
+               (if moduleindex
+                   (first (funcall (third modulespec) nil moduleindex))
+                   (third modulespec))))))
+      (let ((gatespec (find name (slot-value class '%gatespec) :key #'first)))
+        (unless gatespec
+          (error "Invalid gate name ~A in gate address ~A" name spec))
+        (when (or (and index (not (third gatespec)))
+                  (and (not index) (third gatespec)))
+          (error "Invalid gate index ~A in gate address ~A" index spec)))
+      (if modulename
         #'(lambda(instance)
             (gate (submodule instance modulename :index moduleindex)
                   name :index index :direction direction))
@@ -488,10 +532,10 @@ return the gate given by spec. Validates spec based on class definitions"
   (for-each-submodule module #'finish)
   (call-next-method))
 
-(defmethod initialize-instance :after ((module compound-module)
-                                       &key &allow-other-keys)
+(defmethod build-inside((module compound-module))
   (build-submodules module)
-  (build-connections module))
+  (build-connections module)
+  (for-each-submodule module #'build-inside))
 
 (defun make-submodule
     (instance name
@@ -504,6 +548,9 @@ specification of a specific subclass."
   (let ((sm (gethash name (submodules instance)))
         (basetype (first initargs))
         (initargs `(:name ,name :owner ,instance ,@(rest initargs))))
+    (assert (subtypep basetype 'module)
+              ()
+              "Unrecognised submodule type ~A" basetype)
     (assert (or (arrayp sm) (null sm))
             ()
             "Submodule ~A of ~A already exists." name instance)
@@ -530,20 +577,18 @@ specification of a specific subclass."
     (let ((name (first spec))
           (size (second spec))
           (initargs (cddr spec)))
-      (assert (subtypep (third spec) 'module)
-              ()
-              "Unrecognised submodule type ~A" (third spec))
       (assert (not (gethash name (submodules module)))
               ()
               "Multiple declarations for submodule ~A in ~A" name module)
       (if size
-          (progn
+          (let ((size (funcall size module)))
             (setf (gethash name (submodules module))
-                    (make-array size
-                                :element-type 'module
-                                :adjustable t
-                                :fill-pointer 0))
-              (dotimes(x size) (make-submodule module name initargs)))
+                  (make-array size
+                              :element-type 'module
+                              :adjustable t
+                              :fill-pointer 0))
+              (dotimes(x size)
+                (make-submodule module name (funcall (first initargs) module x))))
           (make-submodule module name initargs)))))
 
 (defmethod build-connections((module compound-module))
@@ -594,7 +639,8 @@ specification of a specific subclass."
 (defmethod initialize-instance :after((network network) &key &allow-other-keys)
   (assert (null (slot-value (class-of network) '%gatespec)))
   (unless (slot-boundp network 'name)
-    (setf (slot-value network 'name) (class-name (class-of network)))))
+    (setf (slot-value network 'name) (class-name (class-of network))))
+  (build-inside network))
 
 (defmethod build-gates((network network)))
 

@@ -24,9 +24,13 @@
                  #:enqueue #:dequeue #:make-binary-heap #:empty-p #:size)
   (:shadow duration)
   (:export
+   ;; common
+   #:coord #:make-coord #:coord-x #:coord-y #:coord-z
+   #:coord+ #:coord- #:coord* #:distance
+   #:while #:until #:filter #:for #:copy-slots
+   #:range-getf #:range-list-p
    ;; common object
-   #:+c+ #:*context* #:simulation-condition #:while #:until #:filter
-   #:for #:copy-slots #:name
+   #:+c+ #:*context* #:simulation-condition #:name
    #:named-object #:owned-object #:index #:parent-module #:full-name #:full-path
    #:for-each-child #:info #:detailed-info #:duplicate #:serialise #:find-object
    #:property-union #:initialize #:initialized-p #:finish
@@ -39,7 +43,7 @@
    #:simulation-time #:schedule #:scheduled-p #:cancel #:stop
    #:run-simulation
    #:sent-time #:arrival-time
-   #:root-event #:*simulation-trace-stream* #:simtrace
+   #:root-event #:*simulation-trace-stream* #:eventlog
    #:timestamped #:timestamped-time #:timestamped-value
    ;; signals and listeners
    #:register-signal #:signal-id #:receive-signal #:entity-with-signals
@@ -86,6 +90,7 @@
    #:time-stamp #: #:handle-message #:send-message #:self-message-p
    #:packet #:bit-length #:byte-length
    #:duration #:control-info #:bit-error-p #:header-specification
+   #:unknown-message
    ;; statistics layer
    #:define-statistic-filter #:define-result-recorder #:record #:report
    #:title

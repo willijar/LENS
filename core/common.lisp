@@ -93,3 +93,49 @@ appended onto end of list1 value"
                      (append v1 v2)
                      v1)))
     result))
+
+(defstruct coord
+  (x 0.0d0 :type double-float)
+  (y 0.0d0 :type double-float)
+  (z 0.0d0 :type double-float))
+
+(defun coord+(a b)
+  (make-location :x (+ (coord-x a) (coord-x b))
+                 :y (+ (coord-y a) (coord-y b))
+                 :z (+ (coord-z a) (coord-z b))))
+
+(defun coord-(a b)
+  (make-location :x (- (coord-x a) (coord-x b))
+                 :y (- (coord-y a) (coord-y b))
+                 :z (- (coord-z a) (coord-z b))))
+
+(defun coord*(a b)
+  (make-location :x (* (coord-x a) b)
+                 :y (* (coord-y a) b)
+                 :z (* (coord-z a) b)))
+
+(defgeneric distance(a b)
+  (:method((a coord) (b coord))
+    (let ((d (coord-subtract a b)))
+      (sqrt (+ (* (coord-x d) (coord-x d))
+               (* (coord-y d) (coord-y d))
+               (* (coord-z d) (coord-z d)))))))
+
+(defun range-getf(spec index)
+  "Helper function allowing range based plists - returns value and lower index"
+  (let ((default nil))
+    (or
+     (loop :for a :on spec :by #'cddr
+        :for key = (car a)
+        :for value = (cadr a)
+        :do
+        (typecase key
+          (number (when (= key index) (return (values value key))))
+          (list (when (<= (car key) index (cadr key))
+                  (return (values value (car key)))))
+          (symbol (when (eql key t) (setf default value)))))
+     (values default 0))))
+
+(defun range-list-p(spec)
+  (let ((first (first spec)))
+    (or (listp first) (numberp first) (eql first t))))

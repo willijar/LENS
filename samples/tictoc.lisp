@@ -120,7 +120,7 @@
     (with-slots(event tictocmsg) instance
       (setf event (make-instance 'message :name 'event))
       (when (eql (name instance) 'tic)
-        (simtrace "Scheduling first send to t=5.0s")
+        (eventlog "Scheduling first send to t=5.0s")
         (setf tictocmsg (make-instance 'message :name 'TicTocMsg))
         (schedule-at instance event :time 5.0))))
   t)
@@ -131,13 +131,13 @@
       ((eql msg event)
         ;; self message arrived so sent out tictocmsg and null it out
         ;; so no confusion later
-       (simtrace "Wait period is over, sending back message")
+       (eventlog "Wait period is over, sending back message")
        (send instance tictocmsg 'out)
        (setf tictocmsg nil))
       (t
        ;; Not self message so must be tictoc message from partner.
        ;;  save it and schedule our self message to send it back later"
-       (simtrace "Message arrived, starting to wait 1 sec")
+       (eventlog "Message arrived, starting to wait 1 sec")
        (setf tictocmsg msg)
        (schedule-at instance event :time (+ (simulation-time) 1.0))))))
 
@@ -153,16 +153,16 @@
       ((eql msg event)
         ;; self message arrived so sent out tictocmsg and null it out
         ;; so no confusion later
-       (simtrace "Wait period is over, sending back message")
+       (eventlog "Wait period is over, sending back message")
        (send instance tictocmsg 'out)
        (setf tictocmsg nil))
       ((< (uniform 0 1) 0.1) ;; lose message with 0.1 probability
-       (simtrace "Losing Message"))
+       (eventlog "Losing Message"))
       (t ;;The "delayTime" module parameter can be set to values like
             ;; "exponential(5)" and then here
             ;; we'll get a different delay every time.
        (let ((delay (delay-time instance)))
-         (simtrace "Message arrived, starting to wait ~A seconds" delay)
+         (eventlog "Message arrived, starting to wait ~A seconds" delay)
          (setf tictocmsg msg)
          (schedule-at instance event :time (+ (simulation-time) delay)))))))
 
@@ -198,7 +198,7 @@
 
 (defmethod initialize((instance Tic8) &optional stage)
   (when (zerop stage)
-    (simtrace "Sending initial message")
+    (eventlog "Sending initial message")
     (send instance (make-instance 'message :name 'tictoc) 'out)
     (schedule-at instance (timeout-event instance)
                  :time (+ (simulation-time) (timeout instance))))
@@ -208,12 +208,12 @@
   (cond
     ((eql message (timeout-event instance))
      ;; if receive timeout event packet didn't arrive so resent
-     (simtrace "Timeout expired, resending message and restarting time")
+     (eventlog "Timeout expired, resending message and restarting time")
      (send instance (make-instance 'message :name 'tictoc) 'out)
      (schedule-at instance (timeout-event instance)
                   :time (+ (simulation-time) (timeout instance))))
     (t ;; message arrived - cancel timer and send new one
-     (simtrace "Timer Cancelled")
+     (eventlog "Timer Cancelled")
      (cancel (timeout-event instance))
      (send instance (make-instance 'message :name 'tictoc) 'out)
      (schedule-at instance (timeout-event instance)
@@ -222,9 +222,9 @@
 (defmethod handle-message((instance Toc8) message)
   (cond
     ((< (uniform 0 1) 0.1)
-     (simtrace "Losing message"))
+     (eventlog "Losing message"))
     (t
-     (simtrace "Sending back same message as acknowledgement.")
+     (eventlog "Sending back same message as acknowledgement.")
      (send instance message 'out))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -246,7 +246,7 @@
 
 (defmethod initialize((instance Tic9) &optional stage)
   (when (zerop stage)
-    (simtrace "Sending initial message")
+    (eventlog "Sending initial message")
     (with-slots(message) instance
       (setf message (generate-new-message))
       (send-message-copy instance)
@@ -258,13 +258,13 @@
   (cond
     ((eql message (timeout-event instance))
      ;; if receive timeout event packet didn't arrive so resent
-     (simtrace "Timeout expired, resending message and restarting time")
+     (eventlog "Timeout expired, resending message and restarting time")
      (send-message-copy instance)
      (schedule-at instance (timeout-event instance)
                   :time (+ (simulation-time) (timeout instance))))
     (t ;; message arrived - cancel timer and send new one
-     (simtrace "Ack received: ~A" message)
-     (simtrace "Timer Cancelled")
+     (eventlog "Ack received: ~A" message)
+     (eventlog "Timer Cancelled")
      (cancel (timeout-event instance))
      (setf (slot-value instance 'message) (generate-new-message))
      (send-message-copy instance)
@@ -274,9 +274,9 @@
 (defmethod handle-message((instance Toc9) message)
   (cond
     ((< (uniform 0 1) 0.1)
-     (simtrace "Losing message"))
+     (eventlog "Losing message"))
     (t
-     (simtrace "~A received, sending back acknowledgement." message)
+     (eventlog "~A received, sending back acknowledgement." message)
      (send instance (make-instance 'message :name 'ack) 'out))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -324,10 +324,10 @@
 (defmethod handle-message((instance Tic10) message)
   ;; pick a random gate to sent it on unless we are node 3
   (if (= (index instance) 3)
-      (simtrace "Message ~A arrived" message)
+      (eventlog "Message ~A arrived" message)
       (let* ((n (gate-size instance 'out))
              (k (intuniform 0 (1- n))))
-        (simtrace "~A Forwarding message ~A on port out[~D]"
+        (eventlog "~A Forwarding message ~A on port out[~D]"
                   instance message k)
         (send instance message `(out ,k)))))
 
@@ -367,10 +367,10 @@
 (defmethod handle-message((instance Tic12) message)
   ;; pick a random gate to sent it on unless we are node 3
   (if (= (index instance) 3)
-      (simtrace "Message ~A arrived" message)
+      (eventlog "Message ~A arrived" message)
       (let* ((n (gate-size instance 'gate))
              (k (intuniform 0 (1- n))))
-        (simtrace "~A Forwarding message ~A on port out[~D]"
+        (eventlog "~A Forwarding message ~A on port out[~D]"
                   instance message k)
         (send instance message `(gate ,k)))))
 
@@ -396,7 +396,7 @@
 (defmethod handle-message((instance Tic13) message)
   (cond
     ((= (index instance) (destination message))
-     (simtrace "Message ~A arrived after ~A hops" message (hop-count message))
+     (eventlog "Message ~A arrived after ~A hops" message (hop-count message))
      (forward-message instance (generate-message instance)))
     (t
      (forward-message instance message))))
@@ -417,7 +417,7 @@
     (incf (hop-count message))
     (let* ((n (gate-size instance 'gate))
            (k (intuniform 0 (1- n))))
-        (simtrace "~A Forwarding message ~A on gate[~D]"
+        (eventlog "~A Forwarding message ~A on gate[~D]"
                   instance message k)
         (send instance message `(gate ,k)))))
 
@@ -433,7 +433,7 @@
 (defmethod handle-message((instance Tic14) message)
   (cond
     ((= (index instance) (destination message))
-     (simtrace "Message ~A arrived after ~A hops" message (hop-count message))
+     (eventlog "Message ~A arrived after ~A hops" message (hop-count message))
      (incf (num-received instance))
      (forward-message instance (generate-message instance))
      (incf (num-sent instance)))
@@ -441,7 +441,7 @@
      (forward-message instance message))))
 
 (defmethod finish((instance Tic14))
-  (simtrace "~A rcvd:~A send:~A" instance (num-received instance) (num-sent instance)))
+  (eventlog "~A rcvd:~A send:~A" instance (num-received instance) (num-sent instance)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -462,7 +462,7 @@
    (cond
     ((= (index instance) (destination message))
      (emit instance 'arrivalSignal (hop-count message))
-     (simtrace "Message ~A arrived after ~A hops" message (hop-count message))
+     (eventlog "Message ~A arrived after ~A hops" message (hop-count message))
      (forward-message instance (generate-message instance)))
     (t
      (forward-message instance message))))

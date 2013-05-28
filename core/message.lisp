@@ -30,6 +30,13 @@
 
 (in-package :lens)
 
+(define-condition unknown-mesage(serious-condition)
+  ((module :reader module :initarg :module)
+   (message :reader message :initarg :message))
+  (:report (lambda(c os)
+             (format os "Unknown message ~A arrived at module ~A" (message c)
+                     (module c)))))
+
 (defclass message(owned-object event)
   ((creation-time
     :type time-type :initform (simulation-time) :reader creation-time

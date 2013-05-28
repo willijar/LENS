@@ -62,6 +62,10 @@
        (t (parse-input 'number-or-expression value)))
      'time-type)))
 
+(defmethod parse-input((spec (eql 'location)) value &key &allow-other-keys)
+  (let ((coords (parse-input 'list value :type 'number :min-length 2 :max-length 3)))
+    (make-location :x (first coords) :y (second coords) :z (or (third coords) 0.0))))
+
 (defmethod parse-input((spec (eql 'number-or-expression)) value
                        &key type &allow-other-keys)
   (let* ((expr (read-from-string value))

@@ -89,6 +89,8 @@
 
 (defmethod full-path((sim simulation)) (list nil))
 
+(defmethod network(instance) (network *simulation*))
+
 (defmethod initialize-instance :around ((sim simulation) &key &allow-other-keys)
   (let ((*simulation* sim))
     (call-next-method)))
@@ -312,7 +314,7 @@ are dispatched in current thread"
 
 (defvar *simulation-trace-stream* *standard-output*)
 
-(defun simtrace(&rest args)
+(defun eventlog(&rest args)
   (when *simulation-trace-stream*
     (format *simulation-trace-stream* *time-format* (simulation-time))
     (write-char #\space *simulation-trace-stream*)
