@@ -24,6 +24,9 @@
     :licence "GPL v3"
     :depends-on (:lens)
     :components
-    ((:file "defpackage")
-     (:file "common" :depends-on ("defpackage"))
-     (:file "mobility" :depends-on ("common"))))
+    ((:module "core"
+              :components
+              ((:file "defpackage")
+               (:file "common" :depends-on ("defpackage"))
+               (:file "physical-process" :depends-on ("defpackage"))
+               #+nil(:file "mobility" :depends-on ("common"))))))

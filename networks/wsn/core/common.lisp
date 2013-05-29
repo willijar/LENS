@@ -18,3 +18,10 @@
  'out-of-energy
  "Emitted as soon as a module is out of energy")
 
+(register-signal
+ 'out-of-memory
+ "Emitted as soon as module is out of memory")
+
+(defclass node-startup(message)
+  ()
+  (:documentation "message sent to all nodes to start them up"))

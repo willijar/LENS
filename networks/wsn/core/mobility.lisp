@@ -16,7 +16,7 @@
   (:documentation "Change location in mobility manager")
   (:method((location coord) (instance mobility))
     (let ((old (location instance)))
-      (sef (slot-value instance 'location) location)
+      (setf (slot-value instance 'location) location)
       (emit instance 'node-move
             (make-instance 'node-move :from old :to location)))))
 
@@ -80,7 +80,7 @@
 (defclass line-mobility(mobility)
   ((start-location :type coord :reader start-location)
    (destination
-    :parameter t :type coord :initform (make-location)
+    :parameter t :type coord :initform #S(coord)
     :initarg :destination-location)
    (delta :type coord :documentation "Vector delta from start to end")
    (distance :type real
@@ -95,7 +95,7 @@
     :initform (make-instance 'message :name 'mobility-periodic-update)))
   (:metaclass module-class))
 
-(defmethod initialize((instance line-mobility) &optional stage)
+(defmethod initialize((instance line-mobility) &optional (stage 0))
   (prog1
       (call-next-method)
     (when (zerop stage)
@@ -115,8 +115,8 @@
              (floor distance-travelled distance)
            (setf (location instance)
                  (coord+ start-location
-                         (coord* vector (if (evenp n) d (1- d)))))))
-      (schedule-at instance (periodic-update-message instance)
-                   :time (+ (simulation-time) (update-interval instance))))
+                         (coord* delta (if (evenp n) d (1- d)))))))
+       (schedule-at instance message
+                    :time (+ (simulation-time) (update-interval instance))))
       (error 'unknown-message :module instance :message message)))
 
