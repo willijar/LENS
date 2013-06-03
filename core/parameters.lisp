@@ -62,9 +62,14 @@
        (t (parse-input 'number-or-expression value)))
      'time-type)))
 
-(defmethod parse-input((spec (eql 'location)) value &key &allow-other-keys)
-  (let ((coords (parse-input 'list value :type 'number :min-length 2 :max-length 3)))
-    (make-location :x (first coords) :y (second coords) :z (or (third coords) 0.0))))
+(defmethod parse-input((spec (eql 'coord)) value &key &allow-other-keys)
+  (let ((coords
+         (parse-input 'list value
+                      :type '(number :coerce-to double-float)
+                      :min-length 2 :max-length 3)))
+    (make-coord :x (first coords)
+                :y (second coords)
+                :z (or (third coords) 0.0d0))))
 
 (defmethod parse-input((spec (eql 'number-or-expression)) value
                        &key type &allow-other-keys)
@@ -93,6 +98,10 @@
        format
        (format-from-type (slot-definition-type slot))))))
 
+(defgeneric slot-definition-parameter-name(slot)
+  (:method((slot parameter-slot))
+    (getf (properties slot) :parameter-name (slot-definition-name slot))))
+
 ;; The directs slot type identifies whether this should be a volatile slot
 (defclass parameter-direct-slot-definition
     (standard-direct-slot-definition parameter-slot)
@@ -119,6 +128,7 @@
                :documentation "The properties for this class"))
   (:documentation "Metaclass for classes which have slots initialised
   from an external source"))
+
 
 (defmethod shared-initialize :after((class parameter-class) slot-names
                                     &key properties
@@ -228,7 +238,8 @@ any parameter initargs - they aren't inherited."
       (when (typep slot 'parameter-slot)
         (let ((slot-name (slot-definition-name slot)))
           (when (not (slot-boundp instance slot-name))
-            (setf (cdr full-path-last) (list slot-name))
+            (setf (cdr full-path-last)
+                  (list (slot-definition-parameter-name slot)))
             (multiple-value-bind(value read-p)
                 (read-parameter full-path (configuration instance)
                                 (slot-definition-format slot))

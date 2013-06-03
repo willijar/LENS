@@ -20,9 +20,13 @@
 
 (defconstant +c+ 299792458d0 "Speed of Light in m/sec")
 
+(defvar *simulation* nil "The global simulation instance")
+
 (defparameter *context* nil
   "Current global context in which evaluation (e.g. random functions)
   is to be done.")
+
+(defvar *time-format* "~6,3f"  "Time output format control")
 
 ;; base class for in simulation errors (not program errors)
 (define-condition simulation-condition(condition)())
@@ -95,28 +99,28 @@ appended onto end of list1 value"
     result))
 
 (defstruct coord
-  (x 0.0d0 :type double-float)
-  (y 0.0d0 :type double-float)
-  (z 0.0d0 :type double-float))
+  (x 0.0d0 :type double-float :read-only t)
+  (y 0.0d0 :type double-float :read-only t)
+  (z 0.0d0 :type double-float :read-only t))
 
 (defun coord+(a b)
-  (make-location :x (+ (coord-x a) (coord-x b))
-                 :y (+ (coord-y a) (coord-y b))
-                 :z (+ (coord-z a) (coord-z b))))
+  (make-coord :x (+ (coord-x a) (coord-x b))
+              :y (+ (coord-y a) (coord-y b))
+              :z (+ (coord-z a) (coord-z b))))
 
 (defun coord-(a b)
-  (make-location :x (- (coord-x a) (coord-x b))
-                 :y (- (coord-y a) (coord-y b))
-                 :z (- (coord-z a) (coord-z b))))
+  (make-coord :x (- (coord-x a) (coord-x b))
+              :y (- (coord-y a) (coord-y b))
+              :z (- (coord-z a) (coord-z b))))
 
 (defun coord*(a b)
-  (make-location :x (* (coord-x a) b)
-                 :y (* (coord-y a) b)
-                 :z (* (coord-z a) b)))
+  (make-coord :x (* (coord-x a) b)
+              :y (* (coord-y a) b)
+              :z (* (coord-z a) b)))
 
 (defgeneric distance(a b)
   (:method((a coord) (b coord))
-    (let ((d (coord-subtract a b)))
+    (let ((d (coord- a b)))
       (sqrt (+ (* (coord-x d) (coord-x d))
                (* (coord-y d) (coord-y d))
                (* (coord-z d) (coord-z d)))))))

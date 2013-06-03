@@ -306,7 +306,6 @@ The method has no effect if the gate is not connected.")
     channel))
 
 (defmethod (setf deliver-on-reception-start-p) :before (value (gate gate))
-  (assert (typep (parent-module gate) 'module))
   (assert (eql (gate-direction gate) :input)))
 
 (defgeneric transmission-channel(gate &optional incoming-p)

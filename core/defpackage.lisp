@@ -1,5 +1,5 @@
 ;; Core Package Definitions
-;; Copyright (C) 2007 Dr. John A.R. Williams
+;; Copyright (C) 2013 Dr. John A.R. Williams
 
 ;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
 ;; Keywords:
@@ -21,7 +21,8 @@
   (:documentation "LENS Simulator Base")
   (:use :closer-common-lisp :closer-common-lisp-user :data-format-validation)
   (:import-from :alg
-                 #:enqueue #:dequeue #:make-binary-heap #:empty-p #:size)
+                 #:enqueue #:dequeue #:make-binary-heap #:empty-p #:size
+                 #:peek)
   (:shadow duration)
   (:export
    ;; common
@@ -29,8 +30,12 @@
    #:coord+ #:coord- #:coord* #:distance
    #:while #:until #:filter #:for #:copy-slots
    #:range-getf #:range-list-p
+   #:queue #:make-queue #:enqueue #:dequeue #:average-queue-time #:size
+   #:timestamped-queue #:packet-buffer
+   #:buffer-size #:buffer-size-bytes #:empty-p
+   #:history-buffer #:duplicate-p
    ;; common object
-   #:+c+ #:*context* #:simulation-condition #:name
+   #:+c+ #:*context* #:simulation-condition #:name #:owner
    #:named-object #:owned-object #:index #:parent-module #:full-name #:full-path
    #:for-each-child #:info #:detailed-info #:duplicate #:serialise #:find-object
    #:property-union #:initialize #:initialized-p #:finish
@@ -44,13 +49,14 @@
    #:run-simulation
    #:sent-time #:arrival-time
    #:root-event #:*simulation-trace-stream* #:eventlog
-   #:timestamped #:timestamped-time #:timestamped-value
+   #:timestamped #:timestamped-time #:timestamped-value #:latency
    ;; signals and listeners
    #:register-signal #:signal-id #:receive-signal #:entity-with-signals
    #:listeners #:may-have-listeners #:has-listeners #:emit
    #:subscribe #:unsubscribe  #:subscribed-p #:repair-signal-flags
    ;; common signals
    #:pre-model-change #:post-model-change #:message-sent #:message-discarded
+   #:drop #:buffer-length #:buffer-time
   ;; components: modules,gates and channels
    #:gate #:gate-direction #:gate-slot #:input #:output #:gate-extend
    #:gate-size #:size
@@ -87,10 +93,10 @@
    #:pre-parameter-change-notification #:post-parameter-change-notification
    ;; messages and packets
    #:message #:creation-time #:to-gate #:from-gate #:to-module #:from-module
-   #:time-stamp #: #:handle-message #:send-message #:self-message-p
+   #:timestamp #: #:handle-message #:send-message #:self-message-p
    #:packet #:bit-length #:byte-length
    #:duration #:control-info #:bit-error-p #:header-specification
-   #:unknown-message
+   #:unknown-message #:encapsulate #:decapsulate
    ;; statistics layer
    #:define-statistic-filter #:define-result-recorder #:record #:report
    #:title

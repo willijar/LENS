@@ -29,4 +29,22 @@
               ((:file "defpackage")
                (:file "common" :depends-on ("defpackage"))
                (:file "physical-process" :depends-on ("defpackage"))
-               #+nil(:file "mobility" :depends-on ("common"))))))
+               (:file "network" :depends-on ("defpackage"))
+               (:file "mobility" :depends-on ("common" "network"))
+               (:file "resources" :depends-on ("defpackage"))
+               (:file "sensor" :depends-on ("physical-process" "mobility"))
+               (:file "node" :depends-on ("common" "communication"))
+               (:file "communication" :depends-on ("defpackage"))
+               (:file "application" :depends-on ("common" "node"))))
+     (:module "communications" :depends-on ("core")
+              :components
+              ((:file "common")))
+     #+nil(:module "application" :depends-on ("core")
+              :components
+              ((:file "value-reporting")))
+      #+nil(:module "physical-process" :depends-on ("core")
+              :components
+              ((:file "scenario")))
+      #+nil(:module "mobility" :depends-on ("core")
+              :components
+              ((:file "line-mobility")))))

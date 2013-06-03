@@ -29,7 +29,6 @@ brackets;")
     (cons (name o)
           (let ((i (index o))) (when i (list i))))))
 
-
 (defgeneric full-path(o)
   (:documentation "Returns the full path of the object in the object
 hierarchy, like '(net host 2 tcp winsize)'.")
@@ -74,6 +73,10 @@ wherever it is feasible to display a multi-line string.")
   error, to indicate that the method was not redefined. The second
   argument, if defined should be the instance that the object is being
   duplicated into.")
+  (:method :around((object standard-object) &optional duplicate)
+      (if duplicate
+          (call-next-method)
+          (call-next-method object (make-instance (class-of object)))))
   (:method(o &optional duplicate)
     (declare (ignore duplicate))
     (error "The duplicate method is not defined for class ~S"

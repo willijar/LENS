@@ -14,14 +14,11 @@
 
 (in-package :lens)
 
-(defvar *simulation* nil "The global simulation instance")
 (defvar *simulation-init-hooks* nil
   "A list of functions which take the simulation as an argument which
   are called after simulation etc is created. Can be used to add in
   layers which use signals such as statistical reporting or graphical
   presentation.")
-
-(defvar *time-format* "~6,3f"  "Time output format control")
 
 ;; time requires double precision - set this as default for reader too
 (deftype time-type() 'double-float)
@@ -36,7 +33,7 @@
    (thread :initform nil :reader simulation-thread
 	    :documentation "Thread running simulation")
    (last-schedule-id :type integer :initform 0)
-   (event-queue
+   (event-queue :reader event-queue
     :initform
     (make-binary-heap
      :initial-size 1024
@@ -199,8 +196,9 @@
     (assert (>= (arrival-time event) (simulation-time)))
     (setf (slot-value event 'schedule-id)
           (incf (slot-value *simulation* 'last-schedule-id)))
-    (enqueue event (slot-value *simulation* 'event-queue))
-    event)
+    ;; we don't enqueue unless we need to
+    ;; return value is event if enqueued or handler return value if not
+    (enqueue event (event-queue *simulation*)))
   (:method(handler &key (delay 0) (time (+ delay (simulation-time))))
     (schedule (make-instance 'simple-event :handler handler) :time time)))
 
@@ -324,6 +322,10 @@ are dispatched in current thread"
 (defstruct timestamped
   (time (simulation-time) :type time-type)
   value)
+
+(defgeneric latency(entity)
+  (:method((entity timestamped))
+    (- (simulation-time) (timestamped-time entity))))
 
 (defun run-simulation(pathname &optional (key "General"))
   (let ((simulation

@@ -32,9 +32,10 @@
               ((:file "defpackage")
                (:file "common" :depends-on ("defpackage"))
                (:file "object" :depends-on ("common"))
+               (:file "queue" :depends-on ("signals" "module"))
                (:file "parameters" :depends-on ("object" "configuration"))
                (:file "configuration" :depends-on ("defpackage"))
-               (:file "message" :depends-on ("object" "simulation" "gate"))
+               (:file "message" :depends-on ("object" "simulation"))
                (:file "compatibility" :depends-on ("defpackage"))
                (:file "component" :depends-on ("signals" "simulation"))
                (:file "rng" :depends-on ("defpackage" "object"))
@@ -43,11 +44,10 @@
                                     "parameters" "rng"))
                (:file "signals" :depends-on ("object"))
                (:file "model-change" :depends-on ("defpackage"))
-               (:file "gate" :depends-on ("object" "model-change" "channel"))
+               (:file "gate" :depends-on
+                      ("object" "model-change" "channel" "message"))
                (:file "channel" :depends-on ("signals" "component"))
-               (:file "module"
-                      :depends-on ("message" "gate" "component"
-                                   "parameters" "simulation"))
-               (:file "statistics"
-                      :depends-on ("simulation" "parameters"))
+               (:file "module" :depends-on
+                      ("message" "gate" "component" "parameters" "simulation"))
+               (:file "statistics" :depends-on ("simulation" "parameters"))
                (:file "statistics-impl" :depends-on ("statistics"))))))

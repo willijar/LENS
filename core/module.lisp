@@ -4,15 +4,22 @@
   (:documentation "Initialise gates on instance using gatespec in class."))
 
 (defgeneric build-submodules(instance)
-  (:documentation "Build submodules inside a compound module"))
+  (:documentation "Build submodules inside a  module. A compound module will do this on the basis of the class definition."))
 
 (defgeneric build-connections(instance)
-  (:documentation "Buildc connectiuons between submodules and gates in
+  (:documentation "Build connectiuons between submodules and gates in
   a compound module"))
 
+(defgeneric for-each-submodule(module operator)
+  (:documentation "Objects with submodules must provide this to
+  iterate over submodules. module and compound module class provide
+  implementations automatically.")
+  (:method(module operator) (declare (ignore module operator))))
+
 (defgeneric build-inside(instance)
-  (:documentation "create submodules and connect them - then build
-  their insides recursively"))
+  (:documentation "create submodules and connect them (in a compound
+  module) - then build their insides recursively")
+  (:method(instance) (for-each-submodule instance #'build-inside)))
 
 (defgeneric arrived(module message gate time)
   (:documentation "Called when a message arrives at a gate which is not further
@@ -63,7 +70,7 @@
  For messages that are not packets (i.e. not subclassed from cPacket),
  the duration parameter must be zero."))
 
-(defgeneric schedule-at(module message &key time)
+(defgeneric schedule-at(module message &key time delay)
   (:documentation
 "Schedules a self-message. It will be delivered back to the module
  via  handle-message() at simulation time. This method
@@ -98,8 +105,7 @@
 
 ;; metaclass inheritance helper functions
 (defun named-specifications-inheritance
-    (localspecs direct-superclasses classtype
-  classslot)
+    (localspecs direct-superclasses classtype classslot)
   "Given a local specification and the direct superclasses and class
 slot names check than we are not overwriting based on name (first
 element of specs). Return merged list of specification. Checks on
@@ -116,7 +122,8 @@ function."
                  ()
                  "~A specification conflict ~A from superclass ~A" classslot
                  i classa)
-         (loop :for remainder :on (rest superclasses)
+         (loop
+            :for remainder :on (rest superclasses)
             :for classb = (car remainder)
             :when (typep classb classtype)
             :do
@@ -130,7 +137,7 @@ function."
          (setf specs (append specs (slot-value classa classslot)))))
     specs))
 
-(defun merge-local-typespec(spec class required-type)
+(defun merge-local-typespec(spec class)
   (unless (listp spec) (setf spec (list spec)))
   (let ((type (first spec))
         (args (rest spec)))
@@ -138,9 +145,6 @@ function."
       (when classspec
         (setf type (second classspec)
               args (append args (cddr classspec)))))
-    (assert (subtypep type required-type)
-            ()
-            "Specified type ~A is not a ~A as required." type required-type)
     (cons type args)))
 
 (defmethod initialize-instance :after
@@ -221,6 +225,13 @@ function."
                             (symbol (slot-value module size))
                             (function (funcall size module))))))))
 
+(defmethod build-inside((module module))
+  (build-submodules module)
+  (for-each-submodule module #'build-inside))
+
+(defmethod finish((module module))
+  (for-each-submodule module #'finish))
+
 (defun for-each-gate(module operator)
   (labels((over(slot direction)
             (let ((v (funcall direction slot)))
@@ -250,15 +261,16 @@ function."
      (when slot (gate slot direction :index index))))
 
 (defmethod for-each-child((module module) (operator function))
-  (for-each-gate module operator))
+  (for-each-gate module operator)
+  (for-each-submodule module operator))
 
 (defmethod arrived ((module module) (message message) (gate gate) time)
   (setf (to message) gate)
+  (setf (owner message) module)
   (let ((onstart (deliver-on-reception-start-p gate)))
     (if (typep message 'packet)
         (setf (reception-start-p message) onstart
-              (arrival-time message)
-              (if onstart time (+ time (duration message))))
+              (arrival-time message) (if onstart time (+ time (duration message))))
         (setf (arrival-time message) time)))
   (schedule message))
 
@@ -273,7 +285,7 @@ function."
   (assert (next-gate outgate)
           ()
           "Output gate ~A not connected" outgate)
-  (assert (or (not (owner message)) (eql (owner message) from-module))
+  (assert (or (not (owner message)) (eql (owner message) fromnetwork-module))
           ()
           "~A cannot send message ~A currently owned by ~A."
           from-module message (owner message))
@@ -314,7 +326,8 @@ function."
       (assert (zerop duration)))
   (deliver message to-gate (+ (simulation-time) propagation-delay)))
 
-(defmethod schedule-at((module module) (message message) &key time)
+(defmethod schedule-at((module module) (message message)
+                       &key delay (time (+ (simulation-time) delay)))
   "Schedule a self message"
   (assert (not (scheduled-p message))
           ()
@@ -331,7 +344,7 @@ function."
 
 (defclass compound-module-class(module-class)
   ((%localtypes :type list :initarg :types :initform nil
-           :documentation "Specified local type mapping.")
+           :documentation "Specified local type mapping.")network
    (%submodules :type list :initarg :submodules :initform nil
                 :documentation "Submodule specifications")
    (%connections :type list :initarg :connections :initform nil
@@ -386,9 +399,9 @@ initargs (including types)"
                       (and (symbolp (third spec)) ;; or classname with keywords
                       (eql (symbol-package (third spec))
                            (find-package :keyword)))))
-             ;; then it is single module
+             ;; then it is single modulenetwork
              (return-from submodule-generators
-               `(,name nil ,@(merge-local-typespec (cdr spec) class 'module))))
+               `(,name nil ,@(merge-local-typespec (cdr spec) class))))
             ((numberp v)
              #'(lambda(instance) (declare (ignore instance)) v))
             ((functionp v)
@@ -403,6 +416,7 @@ initargs (including types)"
          (typespec (cddr spec)))
     ;; if we get here we have a module vector - determine if typespec is
     ;; a range plist or the same for each element
+;;network
     (list
      name
      sizespec
@@ -412,12 +426,12 @@ initargs (including types)"
           (loop
              :for a :on typespec :by #'cddr
              :do (setf (second a)
-                       (merge-local-typespec (second a) class 'module)))
+                       (merge-local-typespec (second a) class)))
           #'(lambda(instance index)
               (declare (ignore instance))
               (range-getf typespec index))))
       (t
-       (let ((typespec (merge-local-typespec typespec class 'module)))
+       (let ((typespec (merge-local-typespec typespec class)))
          #'(lambda(instance index)
              (declare (ignore instance index))
              typespec)))))))
@@ -436,7 +450,7 @@ return the gate given by spec. Validates spec based on class definitions"
     (when modulename
       (let ((modulespec
              (find modulename (slot-value class '%submodules) :key #'first)))
-        (unless modulespec
+        (unless modulespecnetwork
           (error "Invalid module name ~A in gate address ~A" modulename spec))
         (when (or (and moduleindex (not (second modulespec)))
                   (and (not moduleindex) (second modulespec)))
@@ -469,7 +483,7 @@ return the gate given by spec. Validates spec based on class definitions"
     (flet ((connect-func(ffrom ffto)
              (if channelspec
                  (let ((channelspec
-                        (merge-local-typespec channelspec class 'channel)))
+                        (merge-local-typespec channelspec class)))
                    ;; if no name specified in initargs use class name as name
                    (unless (getf (cdr channelspec) :name)
                      (setf (getf (cdr channelspec) :name) (car channelspec)))
@@ -601,12 +615,15 @@ specification of a specific subclass."
     (let ((submodule (gethash name (submodules module))))
       (if index (aref submodule index) submodule))))
 
-(defun for-each-submodule(module operator)
-  (maphash
-   #'(lambda(k v)
-       (declare (ignore k))
-       (if (vectorp v) (map nil operator v) (funcall operator v)))
-   (submodules module)))
+(defgeneric for-each-submodule(module operator)
+  (:method((module compound-module) operator)
+    (maphash
+     #'(lambda(k v)
+         (declare (ignore k))
+         (if (vectorp v) (map nil operator v) (funcall operator v)))
+     (submodules module)))
+  (:method((module module) operator)
+    (declare (ignore operator))))
 
 (defun for-each-channel(module operator)
   (map nil operator (channels module)))

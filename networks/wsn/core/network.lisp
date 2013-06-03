@@ -2,11 +2,16 @@
 
 (defclass SensorNetwork(Network)
   ((field :parameter t
-          :type coord :reader field :initform #S(coord :x 30 :x 30 :z 0)
+          :type coord :reader field
+          :initform (make-coord :x 30.0d0 :x 30.0d0 :z 0.0d0)
           :documentation "Size of deployment field")
-   (num-nodes :parameter t :type fixnum :documentation "Number of nodes")
-   (deployment :type list :reader deployment :initform nil
+   (num-nodes :parameter t :type fixnum :reader num-nodes
+              :initform 30 :documentation "Number of nodes")
+   (deployment :parameter t :type list :reader deployment :initform 'uniform
+               :properties (:format 'read)
                :documentation "Node deployment spec"))
   (:metaclass compound-module-class)
   (:submodules
-   (wireless-channel wireless-channel num
+   (wireless-channel wireless-channel)
+   (nodes num-nodes node)
+   (physical-processes 0 physical-process)))

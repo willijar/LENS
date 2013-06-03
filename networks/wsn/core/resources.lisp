@@ -27,7 +27,7 @@
     :parameter t :type list :initform nil :initarg :cpu-power-levels
     :documentation "plist mapping power level names to power")
    (cpu-power-level
-    :parameter t :type symbol :initform nil :initarg
+    :parameter t :type symbol :initform nil :initarg :cpu-power-level
     :documentation "Current power level - initialised from parameter")
    (clock-drift-sigma
     :parameter t :type real :initform 0.00003
@@ -53,8 +53,7 @@
    (disabled-p :type boolean :initform t :accessor disabled-p))
   (:metaclass module-class))
 
-(defmethod configure((module resources))
-  (call-next-method)
+(defmethod configure :after ((module resources))
   (assert (>= (update-interval module) 0)
           ()
           "Resource update interval must be >=0")
@@ -64,7 +63,7 @@
     (setf clock-drift
           (max (min clock-drift (* 3 clock-drift-sigma))
                (* -3 clock-drift-sigma))))
-  (with-slots(baseline-node-power current-node-power) instance
+  (with-slots(baseline-node-power current-node-power) module
     (assert (>= baseline-node-power 0)
             ()
             "Baseline node power must be >=0")
@@ -97,9 +96,9 @@
     ((eql message (periodic-update-message instance))
      (calculate-energy-spent instance)
      (schedule-at instance message
-                  :time (+ (simulation-time) (update-interval instance))))
+                  :delay (update-interval instance)))
     (t
-     (error 'unknown-message :module instance :message message))))
+     (warn 'unknown-message :module instance :message message))))
 
 (defmethod handle-message((instance resources) (message draw-power))
   (calculate-energy-spent instance)
@@ -118,16 +117,14 @@
         (emit instance 'out-of-memory)
         nil)
        (t
-        (incf total-ram-data (num-bytes message))
+        (incf total-ram-data num-bytes)
         (when (< total-ram-data 0) (setf total-ram-data 0))
         t))))
 
 (defmethod handle-message((instance resources) (message ram-store))
   (ram-store instance (num-bytes message)))
 
-(defgeneric get-simulation-time(instance local-time)
-  (:documentation "Convert a local time value into a simulation time")
-  (:method((instance resources) local-time)
+(defmethod get-simulation-time((instance resources) local-time)
     (* local-time (clock-drift instance)))
-  (:method(instance local-time)
-    (get-simulation-time (submodule (parent-module instance) 'resources))))
+
+

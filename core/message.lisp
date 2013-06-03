@@ -30,13 +30,6 @@
 
 (in-package :lens)
 
-(define-condition unknown-mesage(serious-condition)
-  ((module :reader module :initarg :module)
-   (message :reader message :initarg :message))
-  (:report (lambda(c os)
-             (format os "Unknown message ~A arrived at module ~A" (message c)
-                     (module c)))))
-
 (defclass message(owned-object event)
   ((creation-time
     :type time-type :initform (simulation-time) :reader creation-time
@@ -52,38 +45,46 @@ retransmissions and/or segmentation/reassembly.")
        :documentation  "Module or Gate to receive message after delay")
    (sent-time :type time-type :accessor sent-time)
    (event-time :accessor arrival-time)
-   (time-stamp :type time-type :initarg :time-xstamp :initform 0.0d0
-               :accessor time-stamp
+   (timestamp :type time-type :initarg :timestamp :initform 0.0d0
+               :accessor timestamp
                :documentation "Utility time stamp field fror programmer"))
   (:documentation "Messages objects represent events, packets,
 commands, jobs, customers or other kinds of entities, depending on the
 model domain."))
 
+(defmethod latency((message message))
+  (- (timestamp message) (arrival-time message)))
+
 (defmethod duplicate((message message)
-                      &optional (duplicate (make-instance 'message)))
+                      &optional (duplicate (make-instance (class-of message))))
   (call-next-method message duplicate)
-  (copy-slots '(creation-time to from sent-time event-time time-stamp)
+  (copy-slots '(creation-time to from sent-time event-time timestamp)
               message duplicate))
 
+(define-condition unknown-message(serious-condition)
+  ((module :reader module :initarg :module)
+   (message :reader message :initarg :message))
+  (:report (lambda(c os)
+             (format os "Unknown message ~A arrived at module ~A" (message c)
+                     (module c)))))
+
 (defgeneric handle-message(entity message)
-  (:documentation "Must be implemented for protocols to receive messages"))
+  (:documentation "Must be implemented for protocols to receive messages")
+  (:method(entity message)
+    (warn 'unknown-message :module entity :message message)))
 
 (defmethod handle((message message))
   (let ((*context* (to-module message)))
     (handle-message *context* message)))
 
-(defgeneric bit-length(entity)
-  (:documentation "Return the length in bits of an entity"))
-
 (defgeneric byte-length(entity)
-  (:documentation "Return the length in whole octets (8 bit bytes) of entity")
-  (:method(entity) (* 8 (ceiling (bit-length entity) 8))))
+  (:documentation "Return the length in whole octets (8 bit bytes) of entity"))
 
-(defmethod bit-length((v bit-vector)) (length v))
+(defmethod byte-length((v bit-vector)) (* 8 (ceiling  (length v) 8)))
 
 (defclass packet(message)
   ((encapsulated-packet
-    :type packet
+    :type packet :initarg :encapsulated-packet
     :documentation "Higher level encapsulated protocol packet.")
    (duration :accessor duration :type number :initform 0
              :documentation "Duration of last transmission")
@@ -105,21 +106,20 @@ bit error rate (BER). It is up to the receiver to examine this flag
 after having received the packet, and to act upon it."))
    (:documentation "Representation of network packets"))
 
-(defmethod duplicate((packet packet)
-                     &optional (duplicate (make-instance 'packet)))
+;; TODO add in reference counting so last reference of encapsulated
+;; packet doesn't need to be duplicated.
+
+(defgeneric encapsulate(packet packet-to-be-encapsulated)
+  (:documentation "Called to encapsulate one packet within another")
+  (:method((packet packet) other)
+    (assert (not (slot-boundp packet 'encapsulated-packet)))
+    (setf (slot-value packet 'encapsulated-packet) other)))
+
+(defgeneric decapsulate(packet)
+  (:documentation "Users must use this to get encapsulated packet for subsequent packet may be shared shared across network.")
+  (:method((packet packet)) (duplicate (slot-value packet 'encapsulated-packet))))
+
+(defmethod duplicate((packet packet) &optional duplicate)
   (call-next-method)
   (copy-slots '(encapsulated-packet bit-error-p control-info duration)
-              packet duplicate)
-  (copy-slots (mapcar #'car (header-specification packet))
               packet duplicate))
-
-(defgeneric header-specification(packet)
-  (:documentation "return an a-list mapping header field slot names to
-  length in bits")
-  (:method((packet packet)) nil))
-
-(defmethod bit-length((packet packet))
-  (+ (reduce #'+ (header-specification packet) :key #'cdr)
-     (if (slot-boundp packet 'encapsulated-packet)
-         (bit-length  (slot-value packet 'encapsulated-packet))
-         0)))
