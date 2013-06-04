@@ -18,14 +18,12 @@
     :initform (make-instance 'message :name 'mobility-periodic-update)))
   (:metaclass module-class))
 
-(defmethod initialize((instance line-mobility) &optional (stage 0))
-  (case stage
-    (0
-     (with-slots(start-location distance delta location) instance
+(defmethod initialize-instance :after ((instance line-mobility)
+                                       &key &allow-other-keys)
+  (with-slots(start-location distance delta location destination) instance
        (setf start-location location
              distance       (distance location destination)
-             delta          (coord- destination location)))))
-  (call-next-method))
+             delta          (coord- destination location))))
 
 (defmethod startup((instance line-mobility))
   (schedule-at instance (periodic-update-message instance) :delay 0)
@@ -37,7 +35,7 @@
 
 (defmethod handle-message((instance line-mobility) message)
   (if (eql message (periodic-update-message instance))
-      (with-slots(start-location destination speed delta) instance
+      (with-slots(start-location distance speed delta) instance
         (let ((distance-travelled (* (simulation-time) speed)))
           (multiple-value-bind(n d)
               (floor distance-travelled distance)

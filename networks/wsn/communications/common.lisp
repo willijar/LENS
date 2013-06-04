@@ -14,13 +14,19 @@
                     :documentation "a field to distinguish between packets"))
   (:documentation "Base class for network and link layer packets"))
 
+
+(defmethod duplicate((packet wsn-packet) &optional duplicate)
+  (call-next-method)
+  (copy-slots '(header-overhead source destination sequence-number)
+              packet duplicate))
+
 (defmethod byte-length((packet wsn-packet))
   (+ (header-overhead packet)
      (byte-length (slot-value packet 'lens::encapsulated-packet))))
 
 (defmethod bit-length((packet wsn-packet)) (* 8 (byte-length packet)))
 
-(defclass comms-module(module-with-packet-queue module)
+(defclass comms-module(module)
   ((buffer :type packet-buffer :reader buffer)
    (packet-history
     :type history-buffer
@@ -35,7 +41,8 @@
    (header-overhead
     :type integer :parameter t :initform 10 :reader header-overhead
     :properties (:units "B")
-    :documentation "in bytes")))
+    :documentation "in bytes"))
+  (:metaclass module-class))
 
 (defmethod build-submodules((module comms-module))
   (setf (slot-value module 'buffer)

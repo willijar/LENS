@@ -38,13 +38,15 @@
                (:file "application" :depends-on ("common" "node"))))
      (:module "communications" :depends-on ("core")
               :components
-              ((:file "common")))
-     #+nil(:module "application" :depends-on ("core")
+              ((:file "common")
+               (:file "network" :depends-on ("common"))
+               (:file "mac" :depends-on ("common"))))
+     (:module "application" :depends-on ("core")
               :components
               ((:file "value-reporting")))
-      #+nil(:module "physical-process" :depends-on ("core")
+      (:module "physical-process" :depends-on ("core")
               :components
               ((:file "scenario")))
-      #+nil(:module "mobility" :depends-on ("core")
+      (:module "mobility" :depends-on ("core")
               :components
               ((:file "line-mobility")))))

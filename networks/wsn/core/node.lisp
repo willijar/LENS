@@ -15,12 +15,12 @@
   (:submodules
    (sensors num-sensors sensor)
    (application application)
-   (communication-module communication-module)
+   (communications communications)
    (mobility mobility)
    (resources resources))
   (:connections
-   (<=> (application network) (communication-module application))
-   (<=> (communication-module wireless-channel) wireless-channel))
+   (<=> (application network) (communications application))
+   (<=> (communications wireless-channel) wireless-channel))
   (:metaclass compound-module-class))
 
 (defmethod build-connections((node node))

@@ -21,10 +21,6 @@
   need a more specialized packet you have to create one the extends
   this generic packet."))
 
-(defmethod duplicate((packet routing-packet) &optional duplicate)
-  (call-next-method)
-  (copy-slots '(source destination sequence-number) packet duplicate))
-
 ;; Network_GenericFrame has the following real-world
 ;; (non-simulation-specific) fields:
 ;;    unsigned short int frameType; --> 2bytes
@@ -43,14 +39,13 @@
 
 (defclass routing(comms-module)
   ((max-net-frame-size
-    :initform 0
-    :type integer :parameter t :initform nil :reader max-net-frame-size
+    :initform 0 :type integer :parameter t :reader max-net-frame-size
     :properties (:units "B")
-    :documentation "in bytes"))
+    :documentation "in bytes (0 for no limit)"))
   (:gates
    (application :inout)
    (mac :inout))
-  (:metaclass module))
+  (:metaclass module-class))
 
 ;; default - pass through unwanted control commands and messages -
 ;; warn if for this layer but unhandled
@@ -59,7 +54,7 @@
 
 (defmethod handle-message((instance routing)
                           (message network-control-command))
-  (warn 'unknown-message :module routing :message message))
+  (warn 'unknown-message :module instance :message message))
 
 (defmethod handle-message((instance routing)
                           (message communications-control-command))
@@ -67,16 +62,13 @@
 
 (defmethod handle-message((instance routing)
                           (message network-control-message))
-  (warn 'unknown-message :module routing :message message))
+  (warn 'unknown-message :module instance :message message))
 
 (defmethod handle-message((instance routing)
                           (message communications-control-message))
   (send instance message 'application))
 
 (defmethod node((instance comms-module)) (owner (owner instance)))
-
-(defmethod handle-message :after ((module routing) (packet routing-packet))
-  (record-seen-packet module packet))
 
 (defmethod handle-message :around ((module routing) (packet application-packet))
   (with-slots(max-net-frame-size header-overhead) module
@@ -90,7 +82,7 @@
   (:method((module routing) (command communications-control-command)
            &optional destination)
     (assert (and (not destination)
-                 (not (typep entity 'network-control-command))))
+                 (not (typep command 'network-control-command))))
     (send module command 'mac))
   (:method((module routing) (packet routing-packet) &optional destination)
     (if destination
@@ -101,6 +93,7 @@
         (assert (next-hop (control-info packet))))
     (send module packet 'mac))
   (:method((module routing) (message message) &optional destination)
+    (declare (ignore destination))
     (error "Network module ~A attempting to send ~A to mac"
            module message)))
 
