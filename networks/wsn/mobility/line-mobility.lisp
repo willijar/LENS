@@ -16,7 +16,8 @@
    (periodic-update-message
     :type message :reader periodic-update-message
     :initform (make-instance 'message :name 'mobility-periodic-update)))
-  (:metaclass module-class))
+  (:metaclass module-class)
+  (:default-initargs :static-p nil))
 
 (defmethod initialize-instance :after ((instance line-mobility)
                                        &key &allow-other-keys)

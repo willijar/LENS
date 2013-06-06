@@ -1,5 +1,5 @@
 ;;; LENS System definition -*- Lisp -*-
-;; Copyright (C) 2007-2010 Dr. John A.R. Williams
+;; Copyright (C) 2013 Dr. John A.R. Williams
 
 ;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
 ;; Keywords:
@@ -39,8 +39,9 @@
      (:module "communications" :depends-on ("core")
               :components
               ((:file "common")
-               (:file "network" :depends-on ("common"))
-               (:file "mac" :depends-on ("common"))))
+               (:file "network-base" :depends-on ("common"))
+               (:file "mac-base" :depends-on ("common"))
+               (:file "radio-base" :depends-on ("common"))))
      (:module "application" :depends-on ("core")
               :components
               ((:file "value-reporting")))

@@ -447,33 +447,26 @@ return the gate given by spec. Validates spec based on class definitions"
                   (if (numberp (second spec))
                       (values (first spec) (second spec) (third spec))
                       (values (first spec) nil (second spec) (third spec))))))
-    (when modulename
-      (let ((modulespec
-             (find modulename (slot-value class '%submodules) :key #'first)))
-        (unless modulespecnetwork
-          (error "Invalid module name ~A in gate address ~A" modulename spec))
-        (when (or (and moduleindex (not (second modulespec)))
-                  (and (not moduleindex) (second modulespec)))
-          (error "Invalid module index ~A in gate address ~A"
-                 moduleindex spec))
-        ;; since module specified need to check gates in submodule class
-        (setf class
-              (find-class
-               (if moduleindex
-                   (first (funcall (third modulespec) nil moduleindex))
-                   (third modulespec))))))
-      (let ((gatespec (find name (slot-value class '%gatespec) :key #'first)))
-        (unless gatespec
-          (error "Invalid gate name ~A in gate address ~A" name spec))
-        (when (or (and index (not (third gatespec)))
-                  (and (not index) (third gatespec)))
-          (error "Invalid gate index ~A in gate address ~A" index spec)))
-      (if modulename
-        #'(lambda(instance)
-            (gate (submodule instance modulename :index moduleindex)
-                  name :index index :direction direction))
-        #'(lambda(instance)
-            (gate instance  name :index index :direction :input)))))
+    (if modulename
+        (let ((modulespec
+               (find modulename (slot-value class '%submodules) :key #'first)))
+          (unless modulespec
+            (error "Invalid module name ~A in gate address ~A" modulename spec))
+          (when (or (and moduleindex (not (second modulespec)))
+                    (and (not moduleindex) (second modulespec)))
+            (error "Invalid module index ~A in gate address ~A"
+                   moduleindex spec))
+          #'(lambda(instance)
+              (gate (submodule instance modulename :index moduleindex)
+                    name :index index :direction direction)))
+        (let ((gatespec (find name (slot-value class '%gatespec) :key #'first)))
+          (unless gatespec
+            (error "Invalid gate name ~A in gate address ~A" name spec))
+          (when (or (and index (not (third gatespec)))
+                    (and (not index) (third gatespec)))
+            (error "Invalid gate index ~A in gate address ~A" index spec))
+          #'(lambda(instance)
+              (gate instance  name :index index :direction :input))))))
 
 (defun connection-func(class spec)
   (multiple-value-bind(dir channelspec arg1 arg2)
@@ -677,44 +670,3 @@ nil)
      (,@vars)
      ,@args
      (:metaclass module-class)))
-
-;; #|
-;; Syntax wanted
-
-;; (defnetwork network(basis)
-;;   (:types
-;;    ((C DatarateChannel :datarate 100MBps)))
-;;   (:submodules
-;;    (node 6 iNode :address index)
-;;    (node1 Node)
-;;    (node2 Node))
-;;   (:connections
-;;    (<-> C (node 1 port) (node 2 port))
-;;    (<-> C (next-gate port node1) (next-gate port node4))
-;;    (<-> C (next-gate port node4) (next-gate port node6))))
-
-
-;; (defsimple app(basis)
-;;   ((parameters etc))
-;;   (:gates
-;;    (in :input)
-;;    (out :output)))
-
-
-;; (defmodule node(basis)
-;;   ((paramaters etc))
-;;   (:gates
-;;    (port () :inout))
-;;   (:submodules
-;;    (app App)
-;;    (routing Routing)
-;;    (queue (length port) Queue))
-;;   (:connections
-;;    (-> (routing localOut) (app in))
-;;    (<- (routing localIn) (app out))
-;;    (for(i 0 (1- (sizeof port)))
-;;        (-> (routing out i) (queue in i))
-;;        (<- (routing in i) (queue out  i))
-;;        (<-> (queue line i) (port i)))))
-
-;; |#

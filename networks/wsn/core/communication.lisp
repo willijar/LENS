@@ -4,24 +4,25 @@
   ()
   (:gates
    (application :inout)
-   (wireless-channel :inout))
+   (receive :input))
   (:submodules
-   (network network)
-   (mac mac)
-   (radio radio))
+   (network network-layer)
+   (mac mac-layer)
+   (radio radio-layer))
   (:connections
    (<=> application (network application))
    (<=> (network mac) (mac network))
    (<=> (mac radio) (radio mac))
-   (<=> (radio wireless-channel) wireless-channel))
+   (<= (radio receive) receive))
   (:metaclass compound-module-class)
   (:documentation "Communications module"))
 
 (defclass communications-control-message(message)
   ()
   (:documentation "Base class for all communications control
-  messages (information going up to higher layers). We create classes for these so the layers can specialize
-  handle-message on them and pick out those they need"))
+  messages (information going up to higher layers). We create classes
+  for these so the layers can specialize handle-message on them and
+  pick out those they need"))
 
 (defclass network-control-message(communications-control-message)
   ())

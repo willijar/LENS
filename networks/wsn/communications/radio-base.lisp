@@ -7,10 +7,19 @@
 
 (deftype radio-state () (member rx tx sleep))
 
+(register-signal
+ 'txed-packets
+ "Transmitted packets")
+
+(register-signal
+ 'rx-packeted
+ "Received packets")
+
+
 (defclass radio(comms-module)
   ((radio-parameters-file
     :parameter t :type string :reader radio-parameters-file
-    :documentation "the file that cointains most radio parameters")
+    :documentation "the file that contains most radio parameters")
    (mode :parameter t :initform nil :reader mode
          :documentation "we can choose a mode to begin with. Modes are
          defined in the RadioParametersFile. Empty string means use
@@ -26,7 +35,10 @@
     means use the first tx power defined (which is also the highest)")
    (sleep-level
     :type symbol :parameter t :initform nil :accessor sleep-level
-    :documentation "we can choose a sleep level which will be used when a transition to SLEEP state is requested. Empty string means use first level defined (will usually be the fastest and most energy consuming sleep state)")
+    :documentation "we can choose a sleep level which will be used
+    when a transition to SLEEP state is requested. Empty string means
+    use first level defined (will usually be the fastest and most
+    energy consuming sleep state)")
    (carrier-frequency
     :type double :parameter t :initform 2.4E9 :accessor carrier-frequency
     :documentation "the carrier frequency (in Hz) to begin with.")
@@ -35,7 +47,8 @@
     :documentation "none, simple, additive or advance interference")
    (cca-threshold
     :type real :parameter t :initform -95 :reader cca-threshold
-    :documentation "the threshold of the RSSI register (in dBm) were above it channel is NOT clear")
+    :documentation "the threshold of the RSSI register (in dBm) were
+    above it channel is NOT clear")
    (symbols-for-rssi
     :type integer :parameter t :initform 8 :reader symbols-for-rssi)
    (carrier-sense-interrupt-enabled
@@ -50,8 +63,12 @@
    (avg-busy-frame
     :type real :initform 1 :parameter t :reader avg-busy-frame
     :documentation "integration time for measuring avg busy time")
-   (buffer-size :initform 16))
+   (buffer-size :initform 16)
+   (wireless-channel :type gate :reader wireless-channel
+                     :documentation "Gate to directly send wireless messages
+               to. Messages from the wireless layer will be send
+               direct to fromWireless input gate in radio module"))
   (:gates
    (mac :inout)
-   (wireless-channel :inout))
-  (:metaclass module-metaclass)
+   (fromWireless :input))
+  (:metaclass module-metaclass))

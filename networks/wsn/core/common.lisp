@@ -1,11 +1,8 @@
 (in-package :lens.wsn)
 
-(defstruct node-move from to)
-
 (register-signal
  'node-move
- "Emitted immediately after node location has changed with node-move
- type value")
+ "Emitted immediately after node location has changed.")
 
 (register-signal
  'out-of-energy

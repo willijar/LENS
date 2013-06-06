@@ -1,6 +1,5 @@
 (in-package :lens.wsn)
 
-
 (defclass net-mac-control-info()
   ((RSSI :type double-float :initarg :RSSI :accessor RSSI
          :documentation "the RSSI of the received packet")
@@ -37,7 +36,7 @@
 ;; BypassRoutingModule has a total overhead of:
 ;; 14-(2+2) = 10 bytes
 
-(defclass routing(comms-module)
+(defclass routing(network-layer)
   ((max-net-frame-size
     :initform 0 :type integer :parameter t :reader max-net-frame-size
     :properties (:units "B")

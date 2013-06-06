@@ -67,9 +67,7 @@
          (parse-input 'list value
                       :type '(number :coerce-to double-float)
                       :min-length 2 :max-length 3)))
-    (make-coord :x (first coords)
-                :y (second coords)
-                :z (or (third coords) 0.0d0))))
+    (make-coord (first coords) (second coords) (or (third coords) 0.0d0))))
 
 (defmethod parse-input((spec (eql 'number-or-expression)) value
                        &key type &allow-other-keys)

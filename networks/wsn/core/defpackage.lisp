@@ -26,11 +26,12 @@
    #:node-move #:out-of-energy #:node-startup #:node-shutdown #:out-of-memory
    #:application-receive #:application-send
    ;; common
-   #:startup #:shutdown #:node #:wsn-module #:disabled-p
+   #:startup #:shutdown #:node #:nodeid #:wsn-module #:disabled-p
    #:get-simulation-time #:set-timer
    ;; application
    #:app-net-control-info #:application-packet
-   #:application #:RSSI #:LQI #:source #:destination #:applicationid
+   #:application #:RSSI #:LQI #:source-address #:destination-address
+   #:applicationid
    #:sequence-number #:header-overhead #:payload-overhead
    #:next-sequence-number #:sensor-request #:handle-sensor-reading
    #:toNetwork #:packet-size

@@ -9,7 +9,7 @@
 (defclass mac-packet(wsn-packet)
   ())
 
-(defclass mac(comms-module)
+(defclass mac(mac-layer)
   ((max-mac-frame-size
     :initform 0 :type integer :parameter t :reader max-net-frame-size
     :properties (:units "B")

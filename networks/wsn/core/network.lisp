@@ -1,9 +1,9 @@
 (in-package :lens.wsn)
 
-(defclass SensorNetwork(Network)
+(defclass WSN(Network)
   ((field :parameter t
           :type coord :reader field
-          :initform (make-coord :x 30.0d0 :x 30.0d0 :z 0.0d0)
+          :initform (make-coord 30.0d0 30.0d0)
           :documentation "Size of deployment field")
    (num-nodes :parameter t :type fixnum :reader num-nodes
               :initform 30 :documentation "Number of nodes")
@@ -15,3 +15,6 @@
    (wireless-channel wireless-channel)
    (nodes num-nodes node)
    (physical-processes 0 physical-process)))
+
+(defgeneric nodes(network)
+  (:method((network WSN)) (submodule network 'nodes)))

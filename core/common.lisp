@@ -98,25 +98,32 @@ appended onto end of list1 value"
                      v1)))
     result))
 
-(defstruct coord
+(defstruct (coord (:constructor make-coord(&optional x y z)))
   (x 0.0d0 :type double-float :read-only t)
   (y 0.0d0 :type double-float :read-only t)
   (z 0.0d0 :type double-float :read-only t))
 
 (defun coord+(a b)
-  (make-coord :x (+ (coord-x a) (coord-x b))
-              :y (+ (coord-y a) (coord-y b))
-              :z (+ (coord-z a) (coord-z b))))
+  (make-coord (+ (coord-x a) (coord-x b))
+              (+ (coord-y a) (coord-y b))
+              (+ (coord-z a) (coord-z b))))
 
 (defun coord-(a b)
-  (make-coord :x (- (coord-x a) (coord-x b))
-              :y (- (coord-y a) (coord-y b))
-              :z (- (coord-z a) (coord-z b))))
+  (make-coord (- (coord-x a) (coord-x b))
+              (- (coord-y a) (coord-y b))
+              (- (coord-z a) (coord-z b))))
 
 (defun coord*(a b)
-  (make-coord :x (* (coord-x a) b)
-              :y (* (coord-y a) b)
-              :z (* (coord-z a) b)))
+  (make-coord (* (coord-x a) b)
+              (* (coord-y a) b)
+              (* (coord-z a) b)))
+
+(defun coord-op(op coords)
+  "Given a function and a set of coordinates apply op to each set of ordinates"
+  (apply
+   #'make-coord
+   (mapcar #'(lambda(f) (apply op (mapcar f coords)))
+           (load-time-value (list #'coord-x #'coord-y #'coord-z)))))
 
 (defgeneric distance(a b)
   (:method((a coord) (b coord))

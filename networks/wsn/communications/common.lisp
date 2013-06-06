@@ -4,21 +4,21 @@
   ((header-overhead
     :initform 0 :reader header-overhead :initarg :header-overhead
     :documentation "In bytes")
-   (source :initarg :source :reader source
+   (source-address :initarg :source :reader source-address
            :documentation "the  source address of the received packet")
-   (destination
-    :initarg :destination :reader destination
-    :documentation "the destination of the packet to be sent")
+   (destination-address
+    :initarg :destination :reader destination-address
+    :documentation "the destination address of the packet to be sent")
    (sequence-number :initarg :seqnum :initarg :sequence-number
                     :reader sequence-number :reader sequence-number
                     :documentation "a field to distinguish between packets"))
   (:documentation "Base class for network and link layer packets"))
 
-
 (defmethod duplicate((packet wsn-packet) &optional duplicate)
   (call-next-method)
-  (copy-slots '(header-overhead source destination sequence-number)
-              packet duplicate))
+  (copy-slots
+   '(header-overhead source-address destination-address sequence-number)
+   packet duplicate))
 
 (defmethod byte-length((packet wsn-packet))
   (+ (header-overhead packet)
@@ -33,7 +33,7 @@
     :initform (make-instance 'history-buffer
                              :element-type 'packet
                              :key #'(lambda(p)
-                                      (cons (source p)
+                                      (cons (source-address p)
                                             (sequence-number p))))
     :reader packet-history)
    (last-sequence-number :initform -1 :type integer

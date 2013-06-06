@@ -2,6 +2,7 @@
 
 (defclass node(compound-module)
   ((owner :reader network)
+   (nodeid :type integer :reader nodeid :initarg :nodeid)
    (num-sensors :parameter t :initform 1 :type integer :reader num-sensors)
    (network-address :parameter t :reader network-address)
    (startup-offset
@@ -11,7 +12,7 @@
     :parameter t :type time-type :initform 0.05 :reader startup-randomization
     :documentation "node startup randomisation, in seconds"))
   (:gates
-   (wireless-channel :inout))
+   (receive :input))
   (:submodules
    (sensors num-sensors sensor)
    (application application)
@@ -20,7 +21,7 @@
    (resources resources))
   (:connections
    (<=> (application network) (communications application))
-   (<=> (communications wireless-channel) wireless-channel))
+   (<= (communications receive) receive))
   (:metaclass compound-module-class))
 
 (defmethod build-connections((node node))
@@ -43,6 +44,8 @@
 (defmethod initialize((node node) &optional (stage 0))
   (case stage
     (0
+     (unless (slot-boundp node 'nodeid)
+       (setf (slot-value node 'nodeid) (index node)))
      (schedule-at node (make-instance 'message :name 'node-startup)
                   :delay  (+ (startup-offset node)
                              (* (uniform 0 1) (startup-randomization node))))))
