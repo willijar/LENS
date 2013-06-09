@@ -3,7 +3,7 @@
 (defclass line-mobility(mobility)
   ((start-location :type coord :reader start-location)
    (destination
-    :parameter t :type coord :initform (make-coord :x 1.0d0 :y 1.0d0)
+    :parameter t :type coord :initform (make-coord 1.0d0 1.0d0)
     :initarg :destination-location)
    (delta :type coord :documentation "Vector delta from start to end")
    (distance :type real

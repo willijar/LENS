@@ -6,9 +6,9 @@
    (application :inout)
    (receive :input))
   (:submodules
-   (network network-layer)
-   (mac mac-layer)
-   (radio radio-layer))
+   (network routing)
+   (mac mac)
+   (radio radio))
   (:connections
    (<=> application (network application))
    (<=> (network mac) (mac network))

@@ -36,7 +36,7 @@
 ;; BypassRoutingModule has a total overhead of:
 ;; 14-(2+2) = 10 bytes
 
-(defclass routing(network-layer)
+(defclass routing(comms-module)
   ((max-net-frame-size
     :initform 0 :type integer :parameter t :reader max-net-frame-size
     :properties (:units "B")

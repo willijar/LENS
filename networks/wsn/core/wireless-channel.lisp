@@ -24,7 +24,7 @@
     :type coord :reader field
     :documentation "wireless coverage field (may be larger than network field")
    (path-loss-exponent
-    :parmeter t :type real :initform 2.4 :initarg :path-loss-exponent
+    :parameter t :type real :initform 2.4 :initarg :path-loss-exponent
     :accessor path-loss-exponent
     :documentation " how fast is the signal strength fading")
    (PLd0
@@ -78,25 +78,23 @@
 (defun coord-cell(coord module)
   "Return row major aref  of cell indicies corresponding to coord for wireless
 channel module"
-  (with-slots(cells) module
+  (let ((cells (cells module)))
     (row-major-aref
      cells
      (apply #'array-row-major-index
             cells
             (mapcar
              #'(lambda(f)
-              (let ((a (max 0 (min (funcall f coord) (funcall f (field module))))))
-                (floor a (funcall f (cell-size module)))))
-          #.(list #'coord-x #'coord-y #'coord-z))))))
+                 (let ((a (max 0 (min (funcall f coord)
+                                      (funcall f (field module))))))
+                   (floor a (funcall f (cell-size module)))))
+             (load-time-value (list #'coord-x #'coord-y #'coord-z)))))))
 
 (defmethod initialize((wireless wireless-channel) &optional (stage 0))
   (let* ((nodes (nodes (network *simulation*))))
     (when (= 0 stage)
       (call-next-method)
-      (dolist(node nodes)
-        (subscribe node 'node-move wireless)
-        (subscribe node 'signal-start)
-        (subscribe node 'signal-end))
+      (dolist(node nodes) (subscribe node 'node-move wireless))
       (return-from initialize nil))
     (let ((mobility-modules
            (mapcar #'(lambda(node) (submodule node 'mobility)) nodes))
@@ -131,7 +129,7 @@ channel module"
                                    (make-cell
                                     :coord (make-coord x y z)))))))))
                  (dolist(module mobility-modules)
-                   (let ((cell (coord-cell (coord (location module)))))
+                   (let ((cell (coord-cell (coord (location module)) wireless)))
                      (setf (cell (location module)) cell)
                      (push module (cell-occupation cell)))))))
          (with-slots(max-tx-power signal-delivery-threshold
@@ -140,10 +138,10 @@ channel module"
          (let* ((distance-threshold
                  (expt 10 (/ (- max-tx-power signal-delivery-threshold PLd0
                                  (* -3 sigma))
-                             (* 10.0 path-loss-exponent)))))
+                             (* 10.0 path-loss-exponent))))
                (cells (cells wireless))
                (no-cells (reduce #'* (array-dimensions cells)))
-               (path-loss (path-loss wireless)))
+                (path-loss (path-loss wireless)))
            (dotimes(i no-cells)
              (let ((celli (row-major-aref cells i)))
                ;; path loss to self is zero
@@ -171,7 +169,7 @@ channel module"
                        (push (make-path-loss-element
                               :destination celli
                               :avg-path-loss (- Pld bidirection-pathloss-jitter))
-                             (row-major-aref path-loss j))))))))))
+                             (row-major-aref path-loss j)))))))))))
          (parse-path-loss-map channel))
     ;; TODO temporal model
     (call-next-method)))
@@ -203,13 +201,25 @@ channel module"
 (defclass wireless-signal-start(message)
   ((node :type node :initarg :node :reader node)
    (power-dBm :type real :initarg :power-dBm :reader power-dBm)
-   (frequency :type real :initarg :frequency :reader frequency)
+   (carrier-frequency :type real :initarg :carrier-frequency :reader carrier-frequency)
    (bandwidth :type real :initarg :bandwidth :reader bandwidth)
    (modulation-type :initarg :modulation-type :reader modulation-type)
    (encoding-type :initarg :encoding-type :reader encoding-type)))
 
+(defmethod duplicate((original wireless-signal-start) &optional
+                     (duplicate (make-instance 'wireless-signal-start)))
+  (call-next-method)
+  (copy-slots
+   '(node power-dbm carrier-frequency bandwidth modulation-type encoding-type)
+   original duplicate))
+
 (defclass wireless-signal-end(packet)
   ((node :type node :initarg :node :reader node)))
+
+(defmethod duplicate((original wireless-signal-end) &optional
+                     (duplicate (make-instance 'wireless-signal-end)))
+  (call-next-method)
+  (copy-slots '(node) original duplicate))
 
 (defmethod receive-signal((wireless wireless-channel) (signal (eql 'node-move))
                           (mobility mobility) value)
@@ -218,7 +228,8 @@ channel module"
          (old-cell (location-cell location))
          (new-cell (coord-cell (coord location) wireless)))
     (unless (eql old-cell new-cell)
-      (delete mobility (cell-occupation old-cell))
+      (setf (cell-occupation old-cell)
+            (delete mobility (cell-occupation old-cell)))
       (push mobility (cell-occupation new-cell))
       (setf (location-cell mobility) new-cell))))
 
@@ -240,8 +251,8 @@ channel module"
                 (receiver (gate (node module) 'receive :direction :input)))
             (setf (power-dbm msgcopy) current-signal-received)
                   (send-direct wireless receiver msgcopy))
-          (push receiver (aref (receivers wireless) nodeid)))))))
-
+          (push receiver (aref (receivers wireless) nodeid))))
+      next)))
 
 (defmethod handle-message((wireless wireless-channel)
                           (message wireless-signal-end))

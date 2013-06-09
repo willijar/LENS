@@ -35,6 +35,7 @@
                (:file "sensor" :depends-on ("physical-process" "mobility"))
                (:file "node" :depends-on ("common" "communication"))
                (:file "communication" :depends-on ("defpackage"))
+               (:file "wireless-channel" :depends-on ("mobility"))
                (:file "application" :depends-on ("common" "node"))))
      (:module "communications" :depends-on ("core")
               :components

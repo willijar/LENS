@@ -10,7 +10,7 @@
             :reader sources
             :documentation "List showing how sources evolve over time"
             :initform
-            `((,(make-coord :x 10.0 :y 10.0) (0.0 30.5) (5.0 45) (10.0 7.3)))))
+            `((,(make-coord 10.0 10.0) (0.0 . 30.5) (5.0 . 45) (10.0 . 7.3)))))
   (:default-initargs :description 'fire)
   (:metaclass module-class))
 
@@ -30,9 +30,9 @@
                 (value
 
                  (loop :for r :on (rest source)
-                    :for a = (first r)
-                    :for b = (second r)
-                    :until (not b)
+                    :for a = (car r)
+                    :for b = (cdr r)
+                    :until (not r)
                     :finally (return (snapshot-value a))
                     :when (>= time (snapshot-time a))
                     :do
