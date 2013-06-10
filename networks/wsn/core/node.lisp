@@ -24,6 +24,11 @@
    (<= (communications receive) receive))
   (:metaclass compound-module-class))
 
+(defmethod print-object((node node) os)
+  (print-unreadable-object(node os :type t :identity t)
+    (when (slot-boundp node 'nodeid)
+      (format os "~D (~A)" (nodeid node) (network-address node)))))
+
 (defmethod build-connections((node node))
   (call-next-method)
   (let ((application (submodule node 'application)))
@@ -36,8 +41,7 @@
          (submodule node 'sensors))))
 
 (defmethod initialize-instance :after ((node node) &key &allow-other-keys)
-  (unless (slot-boundp node 'network-address)
-    (setf (slot-value node 'network-address) (index node)))
+
   (subscribe node 'out-of-memory node)
   (subscribe node 'out-of-energy node))
 
@@ -46,6 +50,8 @@
     (0
      (unless (slot-boundp node 'nodeid)
        (setf (slot-value node 'nodeid) (index node)))
+     (unless (slot-boundp node 'network-address)
+       (setf (slot-value node 'network-address) (nodeid node)))
      (schedule-at node (make-instance 'message :name 'node-startup)
                   :delay  (+ (startup-offset node)
                              (* (uniform 0 1) (startup-randomization node))))))

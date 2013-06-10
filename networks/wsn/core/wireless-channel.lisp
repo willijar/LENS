@@ -199,27 +199,38 @@ channel module"
 ;; we encapsulate transmitted data in wireless-end message
 
 (defclass wireless-signal-start(message)
-  ((node :type node :initarg :node :reader node)
+  ((src :initarg :src :reader src
+       :documentation "Source ID for this signal")
    (power-dBm :type real :initarg :power-dBm :reader power-dBm)
-   (carrier-frequency :type real :initarg :carrier-frequency :reader carrier-frequency)
+   (carrier-frequency :type real :initarg :carrier-frequency
+                      :reader carrier-frequency)
    (bandwidth :type real :initarg :bandwidth :reader bandwidth)
-   (modulation-type :initarg :modulation-type :reader modulation-type)
-   (encoding-type :initarg :encoding-type :reader encoding-type)))
+   (modulation :initarg :modulation :reader modulation)
+   (encoding :initarg :encoding :reader encoding)))
+
+(defmethod print-object((msg wireless-signal-start) os)
+  (print-unreadable-object(msg os :type t :identity t)
+    (format os "~A dBm from ~A" (power-dbm msg)  (node msg))))
 
 (defmethod duplicate((original wireless-signal-start) &optional
                      (duplicate (make-instance 'wireless-signal-start)))
   (call-next-method)
   (copy-slots
-   '(node power-dbm carrier-frequency bandwidth modulation-type encoding-type)
+   '(src power-dbm carrier-frequency bandwidth modulation encoding)
    original duplicate))
 
 (defclass wireless-signal-end(packet)
-  ((node :type node :initarg :node :reader node)))
+  ((src :initarg :src :reader src
+        :documentation "Source ID must match signal start source id")))
+
+(defmethod print-object((msg wireless-signal-end) os)
+  (print-unreadable-object(msg os :type t :identity t)
+    (format os "from ~A"  (node msg))))
 
 (defmethod duplicate((original wireless-signal-end) &optional
                      (duplicate (make-instance 'wireless-signal-end)))
   (call-next-method)
-  (copy-slots '(node) original duplicate))
+  (copy-slots '(src) original duplicate))
 
 (defmethod receive-signal((wireless wireless-channel) (signal (eql 'node-move))
                           (mobility mobility) value)

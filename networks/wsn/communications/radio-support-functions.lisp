@@ -29,20 +29,21 @@
     (if (< snr-db +ideal-modulation-threshold+) 1.0 0.0)))
 
 (defun probability-of-exactly-N-errors(ber num-errors num-bits)
+  (declare (double-float ber) (fixnum num-errors) (fixnum bum-bits))
   (cond
     ((= num-errors 0)
-     (expt (- 1.0 ber) num-bits))
+     (expt (- 1.0d0 ber) num-bits))
     ((>= num-errors num-bits)
      (expt ber num-bits))
     (t
      (when (> num-errors (/ num-bits 2))
        (setf num-errors (- num-bits num-errors)))
      (do((i 1 (1+ i))
-         (combinations 1.0 (* (/ combinations i) (- (1+ num-bits) i))))
-        ((> i num-errors)
+         (combinations 1.0d0 (* (/ combinations i) (- (1+ num-bits) i))))
+        ((>= i num-errors)
          (* combinations
             (expt ber num-errors)
-            (expt (- 1.0 ber) (- num-bits num-errors))))))))
+            (expt (- 1.0d0 ber) (- num-bits num-errors))))))))
 
 (defun erfc(x) (- 1d0 (erf x)))
 (defun erfcinv(x) (erfinv (- 1d0 x)))
@@ -54,6 +55,7 @@
   The main computation evaluates near-minimax approximations
   from 'Rational Chebyshev approximations for the error function'
   by W. J. Cody, Math. Comp., 1969, PP. 631-638."
+  (declare (doble-float x))
   (let* ((xbreak 0.46875d0)
 	 (y (abs x))
 	 (result
@@ -117,11 +119,11 @@
   X = ERFINV(Y) is the inverse error function for each element of X.
   The inverse error functions satisfies y = erf(x), for -1 <= y < 1
   and -inf <= x <= inf."
-
+  (declare (doble-float y))
   ; Exceptional cases.
-  (when (> (abs y) 1)
+  (when (> (abs y) 1.-d0)
     (error 'arithmetic-error :operation 'erfinv :operands y))
-  (when (or (= y -1) (= y 1))
+  (when (or (= y -1.0d0) (= y 1.0d0))
     (error 'floating-point-overflow :operation 'erfinv :operands y))
   ; Coefficients in rational approximations.
   (let* ((a #( 0.886226899d0 -1.645349621d0  0.914624893d0 -0.140543331d0))
@@ -167,9 +169,8 @@
     x))
 
 (let ((ber-array
-       (make-array 32 :element-type 'double-float
-                   :initial-contents
-  '(0.01723590060469	;; BER for SNR 6.0dB  PER(200bits) = 0.03
+       (coerce
+  #(0.01723590060469	;; BER for SNR 6.0dB  PER(200bits) = 0.03
 		0.01515859222543	;; BER for SNR 6.2dB
 		0.01326127169356	;; ...
 		0.01153737654219
@@ -201,25 +202,27 @@
 		0.00001404308722
 		0.00000905258912	;; BER for SNR 12.0dB
 		0.00000572139679)	;; BER for SNR 12.2dB  PER(4000bits) = 0.9773
+  '(array double-float 1))))
 (defmethod snr2ber((encoding (eql 'dqpsk)) snr-db bpnb)
-  (declare (ignore dpnb))
+  (declare (ignore dpnb) (dobule-float snr-db))
 	;; The values of the SNR parameter should be within 6.0 and 12.2 dB if not
 	;; we should issue a warning. here we just return appropriate values
   (cond
-    ((< snr-db 6.0) 1.0)
-    ((>=snr-db 12.2 0.0))
+    ((< snr-db 6.0d0) 1.0d0)
+    ((>= snr-db 12.2d0) 0.0d0)
     (t
-     (multiple-value-bind(index a) (floor (- snr-db 6.0) 0.2)
+     (multiple-value-bind(index a) (floor (- snr-db 6.0d0) 0.2d0)
        (+ (* a (aref ber-array index))
           (* (- 1 a) (aref ber-array (1+ index))))))))
 
 (defmethod snr2ber((custom array) snr-db &optional bpnb)
-  (declare (ignore bpnb))
+  (declare (ignore bpnb) (type doule-float snr-db)
+           (type (array double-float 1) custom))
   (let ((n (1- (length custom))))
     (flet (snr(i) (custom-modulation-snr (aref custom i)))
       (cond
-        ((> (snr 0) snr-db) 0.0)
-        ((< (snr n) snr-db) 1.0)
+        ((> (snr 0) snr-db) 0.0d0)
+        ((< (snr n) snr-db) 1.0d0)
         (t
          (dotimes(i n)
            (when (>= (snr (1+ i)) snr-db)
