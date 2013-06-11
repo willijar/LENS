@@ -72,7 +72,7 @@
   (name nil :type symbol)
   (power 0.0 :type double-float)
   (up (make-transition-element) :type (or transition-element nil))
-  (down (make-transition-element) :type (or transmition-element nil)))
+  (down (make-transition-element) :type (or transition-element nil)))
 
 (defstruct tx-level
   (output-power 0.0 :type double-float) ;; in dbm
@@ -115,7 +115,7 @@
     :reader collision-model
     :documentation "none, simple, additive or advance interference")
    (cca-threshold
-    :type real :parameter t :initform -95 :reader cca-threshold
+    :type real :parameter t :initform -95 :accessor cca-threshold
     :documentation "the threshold of the RSSI register (in dBm) were
     above it channel is NOT clear")
    (symbols-for-rssi
@@ -148,9 +148,9 @@
    (rx-mode :type rx-mode :accessor rx-mode)
    (sleep-level :type sleep-level :accessor sleep-level)
    (last-transition-time
-    :type time-type :initform 0.0 :reader last-transition-time)
+    :type time-type :initform 0.0 :accessor last-transition-time)
    (changing-to-state
-    :type radio-state :initform nil :accessor changin-to-state
+    :type radio-state :initform nil :accessor changing-to-state
     :documentation "indicates that the Radio is in the middle of changing to
 							a new state")
    (received-signals
@@ -178,7 +178,11 @@
     :type message :reader continue-tx-message
     :initform (make-instance 'message :name 'radio-continue-tx)
     :documentation "Self message to continue transmitting")
-   (state-after-tx :initform 'rx :type radio-state :reader state-after-tx))
+   (state-after-tx :initform 'rx :type radio-state :accessor state-after-tx)
+   (processing-delay
+    :type time-type :initarg :processing-delay :parameter t
+    :initform 0.00001 :reader processing-delay
+    :documentation "delay to pass packets/messages/interrupts to upper layer"))
   (:gates
    (mac :inout)
    (fromWireless :input))
@@ -208,34 +212,32 @@
   (with-slots(initial-mode initial-tx-output-power initial-sleep-level
               rssi-integration-time) radio
     (setf (rx-mode radio)
-          (or (find initial-mode (rx-modes radio) :key rx-mode-name)
+          (or (find initial-mode (rx-modes radio) :key #'rx-mode-name)
               (elt (rx-modes radio) 0)))
     (setf (tx-level radio)
           (or (find initial-tx-output-power (tx-levels radio)
-                    :key tx-level-output-power :test #'=)
+                    :key #'tx-level-output-power :test #'=)
               (elt (tx-levels radio) 0)))
     (setf (sleep-level radio)
           (or (find initial-sleep-level (sleep-levels radio)
-                    :key sleep-level-name)
+                    :key #'sleep-level-name)
               (elt (sleep-levels radio) 0)))
     (setf rssi-integration-time
           (* (symbols-for-rssi radio)
              (/ (rx-mode-bits-per-symbol (rx-mode radio))
                 (rx-mode-data-rate (rx-mode radio)))))
-    (setf (last-transition-time radio) 0.0))
-)
+    (setf (last-transition-time radio) 0.0d0)))
 
 (defmethod initialize((radio radio) &optional (stage 0))
   (case stage
     (0
      ;; determine address based on node index if undefined
-     (unless (slot-boundp instance 'address)
-       (setf (slot-value instance 'address) (nodeid (node instance))))
+     (unless (slot-boundp radio 'address)
+       (setf (slot-value radio 'address) (nodeid (node radio))))
       ;; complete initialisation according to starting state
      (setf (changing-to-state radio) (state radio)
            (state radio) 'rx)
-     (complete-state-transition radio)
-     ))
+     (complete-state-transition radio)))
   (call-next-method))
 
 (defmethod startup((radio radio))
@@ -272,17 +274,17 @@
                    "Invalid sleep levels specification in radio parameters file")
            (setf (slot-value radio 'sleep-levels) args))
           (transitions
-           (let ((sec '(rx tx sleep)))
+           (let ((sec (load-time-value '(rx tx sleep))))
              (loop :for to :in sec
-                (loop :for from in sec
-                   :unless (eql from to)
-                   :for e = (getf (getf args to) from)
-                   :do (assert (transition-element-p e)
+                :do (loop :for from in sec
+                       :unless (eql from to)
+                       :do (let ((e (getf (getf args to) from)))
+                             (assert (transition-element-p e)
                                ()
-                               "Invalid state transition ~A in radio parameters file" e))))
+                               "Invalid state transition ~A in radio parameters file" e)))))
            (setf (slot-value radio 'transitions) args)))))))
 
-(defun update-received-signals(radio &optional ending-signal)
+(defun update-received-signals(radio interferance)
   "Update current interference and bit errors in received signals"
   (dolist(signal (received-signals radio))
     (let ((bit-errors (received-signal-bit-errors signal))
@@ -296,17 +298,17 @@
                               (time-of-last-signal-change radio)))))
               (ber (snr2ber (rx-mode radio)
                             (- (received-signal-power-dbm signal)
-                               (current-interference signal)))))
+                               (received-signal-current-interference signal)))))
           (incf (received-signal-bit-errors signal)
                 (bit-errors ber num-of-bits max-errors)))
         ;; update current-interference in the received signal structure
-        (unless (eql signal ending-signal)
-          (update-interference signal message))))))
+        (unless (eql signal interferance)
+          (update-interference radio signal interferance))))))
 
 (defmethod handle-message((radio radio) (message wireless-signal-start))
   ;; if carrier doesn't match ignore messge - may want to calculate
   ;; spectral overlap interference in future taking account of bandwidth
-  (unless (= (frequency message) (carrier-frequency message))
+  (unless (= (carrier-frequency radio) (carrier-frequency message))
     (return-from handle-message))
   ;; if we are not in RX state or we are changing state, then process
   ;; the signal minimally. We still need to keep a list of signals
@@ -324,7 +326,7 @@
     (return-from handle-message))
   ;; If we are in RX state, go throught the list of received signals
   ;; and update bit-errors and current-interference
-  (update-received-signals radio)
+  (update-received-signals radio message)
   ;;insert new signal in the received signals list
   (let* ((rx-mode (rx-mode radio))
          (new-signal
@@ -371,7 +373,7 @@
   (let ((ending-signal (find (src message) (received-signals radio)
                              :key #'received-signal-src)))
     (unless ending-signal
-      (event-log "End signal ignored - mo matching start signal, probably due to carrier frequency change")
+      (eventlog "End signal ignored - mo matching start signal, probably due to carrier frequency change")
       (return-from handle-message))
     ;; if not in RX state or are changing state just delete signal
     (when (or (changing-to-state radio) (not (eql (state radio) 'rx)))
@@ -386,14 +388,15 @@
     (setf (time-of-last-signal-change radio) (simulation-time))
     (when (numberp (received-signal-bit-errors ending-signal))
       (cond
-        ((<= (received-signal-bit-errors end-signal)
-             (max-errors-allowed radio (received-signal-encoding signal)))
+        ((<= (received-signal-bit-errors ending-signal)
+             (max-errors-allowed
+              radio (received-signal-encoding ending-signal)))
          (let* ((mac-pkt (decapsulate message))
                 (info (control-info mac-pkt)))
-           (setf (mac-radio-control-info-rssi info) (read-rssi radio)
-                 (mac-radio-control-info-lqi info)
+           (setf (rssi info) (read-rssi radio)
+                 (lqi info)
                  (- (received-signal-power-dbm ending-signal)
-                    (received-signal-power-max-interference ending-signal)))
+                    (received-signal-max-interference ending-signal)))
            (send radio mac-pkt 'mac :delay (processing-delay radio)))
          (if (= (received-signal-max-interference ending-signal)
                 (rx-mode-noise-floor (rx-mode radio)))
@@ -434,7 +437,7 @@
 (defmethod handle-message((radio radio) (message radio-control-command))
   (ecase (command message)
     (set-state
-     (check-type (argument message) 'radio-state)
+     (check-type (argument message) radio-state)
      ;; The command changes the basic state of the radio. Because of
 		 ;; the transition delay and other restrictions we need to create a
 		 ;; self message and schedule it in the apporpriate time in the future.
@@ -457,7 +460,7 @@
      (setf changing-to-state (argument message))
      (let* ((transition
              (getf (getf (transitions radio) changing-to-state) state))
-            (transition-delay (transisiton-element-delay transition))
+            (transition-delay (transition-element-delay transition))
             (transition-power (transition-element-power transition)))
        ;; With sleep levels it gets a little more complicated. We
 			 ;; can add the trans delay from going to one sleep level to the
@@ -470,14 +473,15 @@
 			 ;; might be a little less accurate in rare situations (very
 			 ;; fast state changes), but cleaner in implementation.
        (flet((accumulate-level(level direction)
-               (let ((transition (funcall direction level))
-                     (level-delay (transition-element-delay transition))
-                     (level-power (transition-element-power transition)))
-                 (set transition-power
+               (let* ((transition (funcall direction level))
+                      (level-delay (transition-element-delay transition))
+                      (level-power (transition-element-power transition)))
+                 (setf transition-power
                       (/ (+ (* transition-power transition-delay)
                             (* level-power level-delay))
                          (+ transition-delay level-delay))
-                      transition-delay (+ transition-delay level-delay)))))
+                      transition-delay
+                      (+ transition-delay level-delay)))))
          (cond
            ((eql state 'sleep)
             (loop :for a :on (reverse (sleep-levels radio))
@@ -510,11 +514,11 @@
     (set-mode
      (with-slots(rx-mode rx-modes rssi-integration-time symbols-for-rssi state)
          radio
-       (setf rx-mode (find (argument message) rx-modes :key rx-mode-name))
+       (setf rx-mode (find (argument message) rx-modes :key #'rx-mode-name))
        (assert rx-mode()
                "No radio mode named ~A found" (argument message))
        (eventlog "Changed rx mode to ~A" rx-mode)
-       (setf rssi-integration-mode
+       (setf rssi-integration-time
              (* symbols-for-rssi
                   (/ (rx-mode-bits-per-symbol rx-mode)
                      (rx-mode-data-rate rx-mode))))
@@ -537,7 +541,7 @@
        (setf sleep-level (find (argument message) sleep-levels
                                :key #'sleep-level-name))
        (assert sleep-level ()
-               "Invalid sleep level ~A" (argument-message))
+               "Invalid sleep level ~A" (argument message))
        (eventlog "Changed default sleep level to ~A"
                  (sleep-level-name sleep-level))))
 
@@ -552,7 +556,7 @@
     (set-cca-threshold
      (with-slots(cca-threshold) radio
        (setf cca-threshold (argument message))
-       (eventlog "Changed CCA thresold to ~A dBm" cca-threshold)))
+       (eventlog "Changed CCA threshold to ~A dBm" cca-threshold)))
 
     (set-cs-interrupt-on
      (setf (slot-value radio 'carrier-sense-interrupt-enabled) t)
@@ -564,7 +568,7 @@
 
     (set-encoding
      (with-slots(encoding) radio
-       (check-type (argument message) 'encoding-type)
+       (check-type (argument message) encoding-type)
        (setf encoding (argument message))))))
 
 (defun delay-state-transition(radio delay)
@@ -603,7 +607,7 @@
             (emit radio 'power-drawn (tx-level-power-consumed (tx-level radio)))
             ;; flush received power history
             (setf (total-power-received radio) nil)
-            (schedule-at module (continue-tx-message radio)
+            (schedule-at radio (continue-tx-message radio)
                          :delay time-to-tx-packet)))))
       (rx
        (emit radio 'power-drawn (rx-mode-power (rx-mode radio)))
@@ -636,7 +640,7 @@
        (emit radio 'power-drawn (tx-level-power-consumed (tx-level radio)))
        ;; flush received power history
        (setf (total-power-received radio) nil)
-       (schedule-at module (continue-tx-message radio)
+       (schedule-at radio (continue-tx-message radio)
                     :delay time-to-tx-packet)))))
 
 (defun debuffer-and-send(radio)
@@ -700,7 +704,7 @@
   receivedSignals list."))
 
 (defmethod update-interference
-    (radio (received-signal received-signal) (msg wireless-channel-signal-begin))
+    (radio (received-signal received-signal) (msg wireless-signal-start))
   (ecase (collision-model radio)
     (no-interference-no-collisions );; do nothing
     (simple-collision-model
@@ -734,7 +738,7 @@
      (setf (received-signal-current-interference remaining-signal)
            (rx-mode-noise-floor (rx-mode radio)))
      (dolist(it (received-signals radio))
-       (unless (or (eql it remaining-signal) (eql it enging-signal))
+       (unless (or (eql it remaining-signal) (eql it ending-signal))
          (setf (received-signal-current-interference remaining-signal)
                (dbm+
                 (received-signal-current-interference remaining-signal)
@@ -748,26 +752,28 @@
          (current-time (simulation-time))
          (rssi-integration-time (rssi-integration-time radio))
          (limit-time (- current-time rssi-integration-time)))
-    (do((remaining (total-power-received radio) (cdr remaining)))
-       ((or (<= current-time limit-time) (not remaining)))
-      (let ((it (car remaining))
-            (fraction-time (- current-time
-                              (/ (max (total-power-received-start-time it)
-                                      limit-time)
-                                 rssi-integration-time))))
-         (setf rssi (dbm+ (+ (total-power-received-power-dbm it)
-                             (radio-to-db fraction-time))
-                          rssi))
-         (setf current-time  (total-power-received-start-time it))))
-    ;; if not rx long enough return error code
-    (when (> current-time limit-time) (return-from read-rssi 'cs-not-valid-yet))
-    (when (<= rssi-integration-time 0)
-       ;; special case for naive model - current total signal power returned
-       (setf rssi (total-power-received-power-dbm (car remaining)))
-       (setf remaining (cdr remaining)))
-    ;; erase rest of elements that are out of date
-    (when remaining (setf (cdr remaining) nil))
-    rssi))
+    (do*((remaining (total-power-received radio) (cdr remaining)))
+        ((or (<= current-time limit-time) (not remaining))
+         (progn
+           ;; if not rx long enough return error code
+           (when (> current-time limit-time)
+             (return-from read-rssi 'cs-not-valid-yet))
+           (when (<= rssi-integration-time 0)
+             ;; special case for naive model - current total signal power returned
+             (setf rssi (total-power-received-power-dbm (car remaining)))
+             (setf remaining (cdr remaining)))
+           ;; erase rest of elements that are out of date
+           (when remaining (setf (cdr remaining) nil))
+           rssi))
+      (let* ((it (car remaining))
+             (fraction-time (- current-time
+                               (/ (max (total-power-received-start-time it)
+                                       limit-time)
+                                  rssi-integration-time))))
+        (setf rssi (dbm+ (+ (total-power-received-power-dbm it)
+                            (ratio-to-db fraction-time))
+                         rssi))
+        (setf current-time  (total-power-received-start-time it))))))
 
 (defun update-possible-cs-interrupt(radio)
  ;; A method to calculate a possible carrier sense in the future and
@@ -791,7 +797,7 @@
             (db-to-ratio
              (- (total-power-received-power-dbm
                  (car (total-power-received radio)))
-                (cca-thresold radio))))))
+                (cca-threshold radio))))))
 	;;  we might adjust the fraction based on symbolsForRSSI. E.g. if
 	;; symbolsForRSSI is 4 and we get 1/8 then we might adjust it to
 	;; 1/4. We do not have enough  details for the RSSI model
@@ -802,8 +808,8 @@
                  :delay (+ (processing-delay radio)
                            (* fraction-time (rssi-integration-time radio))))))
 
-(defmethod snr2ber(rx-mode snr-db &optonal bpnb)
-  (declare (ignore bpnb))
+(defmethod snr2ber(rx-mode snr-db &optional bpnb)
+  (declare (ignore bpnb) (double-float snr-db))
   (snr2ber (modulation rx-mode) snr-db
            (/ (rx-mode-data-rate rx-mode)
               (rx-mode-noise-bandwidth rx-mode))))
@@ -816,13 +822,20 @@
 
 (defun bit-errors(ber num-of-bits max-bit-errors-allowed)
   (flet((prob(n) (probability-of-exactly-n-errors ber n num-of-bits)))
-    (do((bit-errors 0 (1+ bit-errors))
+    (do*((bit-errors 0 (1+ bit-errors))
         (prob (prob bit-errors) (prob bit-errors))
         (c 0.0)) ;cumulativeProbabilityOfUnrealizedEvents
        ((or (= bit-errors max-bit-errors-allowed)
             (<= (lens::%gendblrand 0) (/ prob (- 1.0 c))))
         (if (= bit-errors max-bit-errors-allowed) (1+ bit-errors) bit-errors))
       (setf c (+ c prob)))))
+
+(defgeneric max-errors-allowed(radio encoding)
+  (:documentation "Return the maximum number of bit errors acceptable for given encoding")
+  (:method(radio encoding)
+    (declare (ignore radio encoding))
+    0))
+
 
 (defun max-tx-power-consumed(radio)
   (reduce #'max (mapcar #'tx-level-power-consumed (tx-levels radio))))

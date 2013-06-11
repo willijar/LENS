@@ -266,7 +266,6 @@ function."
 
 (defmethod arrived ((module module) (message message) (gate gate) time)
   (setf (to message) gate)
-  (setf (owner message) module)
   (let ((onstart (deliver-on-reception-start-p gate)))
     (if (typep message 'packet)
         (setf (reception-start-p message) onstart
@@ -285,7 +284,7 @@ function."
   (assert (next-gate outgate)
           ()
           "Output gate ~A not connected" outgate)
-  (assert (or (not (owner message)) (eql (owner message) fromnetwork-module))
+  (assert (or (not (owner message)) (eql (owner message) from-module))
           ()
           "~A cannot send message ~A currently owned by ~A."
           from-module message (owner message))

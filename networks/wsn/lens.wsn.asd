@@ -42,7 +42,9 @@
               ((:file "common")
                (:file "network-base" :depends-on ("common"))
                (:file "mac-base" :depends-on ("common"))
-               (:file "radio-base" :depends-on ("common"))))
+               (:file "radio-support-functions")
+               (:file "radio-base"
+                      :depends-on ("common" "radio-support-functions"))))
      (:module "application" :depends-on ("core")
               :components
               ((:file "value-reporting")))

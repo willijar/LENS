@@ -34,10 +34,10 @@
   ())
 
 (defclass communications-control-command(message)
-  ((name :reader command :initarg :command
+  ((name :accessor command :initarg :command
          :documentation "Command is held as message name")
-   (argument :reader argument :initarg :argument
-              :documentation "Additional arguments with command"))
+   (argument :accessor argument :initarg :argument
+             :documentation "Additional arguments with command"))
   (:documentation "Base class for all communications control
   commands (commands going down to lower layers."))
 

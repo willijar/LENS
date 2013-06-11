@@ -1,35 +1,41 @@
 (in-package :lens.wsn)
 
-(declaim (inline ratio-to-db db-to-ratio))
+(declaim (inline ratio-to-db db-to-ratio dbm+ dbm-))
 
 (defun ratio-to-db(ratio)
-  (declare (double-float ratio) (optimize speed))
-  (* 10.0 (log ratio 10.0)))
+  (declare (double-float ratio))
+  (* 10.0d0 (log ratio 10.0d0)))
 
 (defun db-to-ratio(db)
-  (declare (double-float db) (optimize speed))
-  (expt 10.0 (/ db 10.0)))
+  (declare (double-float db))
+  (expt 10.0d0 (* db 0.1d0)))
 
 (defun dbm+(a b)
+  (declare (double-float a b))
   (ratio-to-db (+ (db-to-ratio a) (db-to-ratio b))))
 
 (defun dbm-(a b)
+  (declare (double-float a b))
   (ratio-to-db (- (db-to-ratio a) (db-to-ratio b))))
 
+(defvar +ideal-modulation-threshold+ 5.0)
+
 (defgeneric snr2ber(encoding snr-db &optional bits-per-noise-bandwidth)
-  (:documentation "Given a particular encoding, signal to noise ratio in db and the ratio of data rate to noise bandwidth calculate the bit error rate")
+  (:documentation "Given a particular encoding, signal to noise ratio
+  in db and the ratio of data rate to noise bandwidth calculate the
+  bit error rate")
   (:method((encoding (eql 'fsk)) snr-db &optional bpnb)
-    (* 0.5 (exp (* -0.5 (/ (db-to-ratio snr-db) &optional bpnb)))))
-  (:method((encoding (eql 'psk)) snr-db bpnb)
-    (* 0.5 (erfc (sqrt (/ (db-to-ratio snr-db) &optional bpnb)))))
+    (* 0.5 (exp (* -0.5 (/ (db-to-ratio snr-db) bpnb)))))
+  (:method((encoding (eql 'psk)) snr-db &optional bpnb)
+    (* 0.5 (erfc (sqrt (/ (db-to-ratio snr-db)  bpnb)))))
   (:method((encoding (eql 'dpsk)) snr-db &optional bpnb)
-    (* 0.5 (exp (/ (db-to-ratio snr-db) &optional bpnb))))
-  (:method((encoding (eql ideal)) snr-db &optional bpnb)
+    (* 0.5 (exp (/ (db-to-ratio snr-db)  bpnb))))
+  (:method((encoding (eql 'ideal)) snr-db &optional bpnb)
     (declare (ignore bpnb))
-    (if (< snr-db +ideal-modulation-threshold+) 1.0 0.0)))
+    (if (< snr-db +ideal-modulation-threshold+) 1.0d0 0.0d0)))
 
 (defun probability-of-exactly-N-errors(ber num-errors num-bits)
-  (declare (double-float ber) (fixnum num-errors) (fixnum bum-bits))
+  (declare (double-float ber) (fixnum num-errors) (fixnum num-bits))
   (cond
     ((= num-errors 0)
      (expt (- 1.0d0 ber) num-bits))
@@ -55,7 +61,7 @@
   The main computation evaluates near-minimax approximations
   from 'Rational Chebyshev approximations for the error function'
   by W. J. Cody, Math. Comp., 1969, PP. 631-638."
-  (declare (doble-float x))
+  (declare (double-float x))
   (let* ((xbreak 0.46875d0)
 	 (y (abs x))
 	 (result
@@ -119,9 +125,9 @@
   X = ERFINV(Y) is the inverse error function for each element of X.
   The inverse error functions satisfies y = erf(x), for -1 <= y < 1
   and -inf <= x <= inf."
-  (declare (doble-float y))
+  (declare (double-float y))
   ; Exceptional cases.
-  (when (> (abs y) 1.-d0)
+  (when (> (abs y) 1.0d0)
     (error 'arithmetic-error :operation 'erfinv :operands y))
   (when (or (= y -1.0d0) (= y 1.0d0))
     (error 'floating-point-overflow :operation 'erfinv :operands y))
@@ -203,8 +209,8 @@
 		0.00000905258912	;; BER for SNR 12.0dB
 		0.00000572139679)	;; BER for SNR 12.2dB  PER(4000bits) = 0.9773
   '(array double-float 1))))
-(defmethod snr2ber((encoding (eql 'dqpsk)) snr-db bpnb)
-  (declare (ignore dpnb) (dobule-float snr-db))
+(defmethod snr2ber((encoding (eql 'dqpsk)) snr-db &optional bpnb)
+  (declare (ignore bpnb) (double-float snr-db))
 	;; The values of the SNR parameter should be within 6.0 and 12.2 dB if not
 	;; we should issue a warning. here we just return appropriate values
   (cond
@@ -213,13 +219,12 @@
     (t
      (multiple-value-bind(index a) (floor (- snr-db 6.0d0) 0.2d0)
        (+ (* a (aref ber-array index))
-          (* (- 1 a) (aref ber-array (1+ index))))))))
+          (* (- 1 a) (aref ber-array (1+ index)))))))))
 
 (defmethod snr2ber((custom array) snr-db &optional bpnb)
-  (declare (ignore bpnb) (type doule-float snr-db)
-           (type (array double-float 1) custom))
+  (declare (ignore bpnb) (type double-float snr-db))
   (let ((n (1- (length custom))))
-    (flet (snr(i) (custom-modulation-snr (aref custom i)))
+    (flet ((snr(i) (custom-modulation-snr (aref custom i))))
       (cond
         ((> (snr 0) snr-db) 0.0d0)
         ((< (snr n) snr-db) 1.0d0)

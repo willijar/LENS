@@ -9,16 +9,11 @@
    (min-sample-interval :parameter t :type real :initform 1)
    (random-back-off-interval-fraction :parameter t :initform '(uniform 0 1)
                                       :properties (:format 'eval))
-   (timer-message :type message
-                  :reader timer-message))
+   (timer-message :type message :reader timer-message
+                  :initform (make-instance 'message :name 'request-sample)))
   (:metaclass module-class)
   (:documentation "Document class which will continually sample sensors
 and send data to 'SINK over network"))
-
-(defmethod initialize-instance :after ((instance value-reporting)
-                                       &key &allow-other-keys)
-  (setf (slot-value application 'timer-message)
-        (make-instance 'message :owner instance :name 'request-sample)))
 
 (defmethod startup((application value-reporting))
   (call-next-method)
@@ -37,11 +32,11 @@ and send data to 'SINK over network"))
      ;; timer fired so request sensor measurements and reset timer
      (dotimes(i (gate-size application 'sensor))
        (send application
-             (make-instance 'measurement-message)
+             (make-instance 'sensor-message)
              (gate application 'sensor :index i)))
      (set-timer application message
                 (slot-value application 'max-sample-interval)))
-    ((typep message 'measurement-message)
+    ((typep message 'sensor-message)
      ;; got measurement from sensor
      (send application (measurement message) (sink-address application)))
     (t (warn 'unknown-message :message message :module application))))
