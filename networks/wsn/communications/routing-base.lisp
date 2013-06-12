@@ -1,9 +1,9 @@
 (in-package :lens.wsn)
 
 (defclass net-mac-control-info()
-  ((RSSI :type double-float :initarg :RSSI :accessor RSSI
+  ((RSSI :type double-float :initarg :RSSI :accessor RSSI :initform nil
          :documentation "the RSSI of the received packet")
-   (LQI :type double-float :initarg :LQI :accessor LQI
+   (LQI :type double-float :initarg :LQI :accessor LQI :initform nil
         :documentation "the LQI of the received packet")
    (next-hop :type integer :initarg :next-hop :accessor next-hop)
    (last-hop :type integer :initarg :last-hop :accessor last-hop))
@@ -76,19 +76,19 @@
         (eventlog "Oversized packet ~A dropped. Size ~A, network layer overhead ~A, max network packet size ~A" (byte-length packet) header-overhead max-net-frame-size)
         (call-next-method))))
 
-(defgeneric toMacLayer(routing entity &optional destination)
+(defgeneric to-mac(routing entity &optional next-hop-mac-address)
   (:documentation "Send packet to mac layer")
   (:method((module routing) (command communications-control-command)
            &optional destination)
     (assert (and (not destination)
                  (not (typep command 'network-control-command))))
     (send module command 'mac))
-  (:method((module routing) (packet routing-packet) &optional destination)
-    (if destination
+  (:method((module routing) (packet routing-packet) &optional next-hop)
+    (if next-hop
         (setf (control-info packet)
               (make-instance
                'net-mac-control-info
-               :next-hop destination))
+               :next-hop next-hop))
         (assert (next-hop (control-info packet))))
     (send module packet 'mac))
   (:method((module routing) (message message) &optional destination)
@@ -99,7 +99,15 @@
 (defmethod encapsulate((module routing) (packet application-packet))
   (encapsulate
    (make-instance 'routing-packet
+                  :name (class-name (class-of module))
                   :header-overhead (header-overhead module)
                   :source (network-address (node module))
                   :sequence-number (next-sequence-number module))
    packet))
+
+(defgeneric resolve-network-address((module routing) network-address)
+  (:documentation "Return  resolved mac address from given network address")
+  (:method(routing network-address)
+    (declare (ignore routing))
+    ;; by default mac address and network address have same values in WSN
+    network-address))

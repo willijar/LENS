@@ -2,12 +2,12 @@
 
 (defclass wsn-packet(packet)
   ((header-overhead
-    :initform 0 :reader header-overhead :initarg :header-overhead
+    :initform 0 :accessor header-overhead :initarg :header-overhead
     :documentation "In bytes")
-   (source-address :initarg :source :reader source-address
+   (source :initarg :source :accessor source
            :documentation "the  source address of the received packet")
-   (destination-address
-    :initarg :destination :reader destination-address
+   (destination
+    :initarg :destination :accessor destination
     :documentation "the destination address of the packet to be sent")
    (sequence-number :initarg :seqnum :initarg :sequence-number
                     :reader sequence-number :reader sequence-number
@@ -28,6 +28,7 @@
 
 (defclass comms-module(module)
   ((buffer :type packet-buffer :reader buffer)
+   (buffer-size :parameter t :initform 0 :type integer :initarg :buffer-size)
    (packet-history
     :type history-buffer
     :initform (make-instance 'history-buffer
@@ -45,8 +46,11 @@
   (:metaclass module-class))
 
 (defmethod build-submodules((module comms-module))
-  (setf (slot-value module 'buffer)
-        (make-instance 'packet-buffer :owner module :name 'buffer)))
+  (let ((buffer-size (slot-value module 'buffer-size)))
+    (unless (zerop buffer-size)
+      (setf (slot-value module 'buffer)
+            (make-instance 'packet-buffer :owner module :name 'buffer
+                           :buffer-size buffer-size)))))
 
 (defmethod for-each-submodule((module comms-module) (operator function))
   (funcall operator (buffer module)))

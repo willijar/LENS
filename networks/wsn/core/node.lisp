@@ -41,17 +41,16 @@
          (submodule node 'sensors))))
 
 (defmethod initialize-instance :after ((node node) &key &allow-other-keys)
-
+  (unless (slot-boundp node 'nodeid)
+    (setf (slot-value node 'nodeid) (index node)))
+  (unless (slot-boundp node 'network-address)
+    (setf (slot-value node 'network-address) (nodeid node)))
   (subscribe node 'out-of-memory node)
   (subscribe node 'out-of-energy node))
 
 (defmethod initialize((node node) &optional (stage 0))
   (case stage
     (0
-     (unless (slot-boundp node 'nodeid)
-       (setf (slot-value node 'nodeid) (index node)))
-     (unless (slot-boundp node 'network-address)
-       (setf (slot-value node 'network-address) (nodeid node)))
      (schedule-at node (make-instance 'message :name 'node-startup)
                   :delay  (+ (startup-offset node)
                              (* (uniform 0 1) (startup-randomization node))))))

@@ -31,8 +31,21 @@
   (:documentation "Actually read a fully named parameter from source
   using specified format")
   (:method((full-path list) (trie trie) format)
-    (multiple-value-bind(txt found-p) (trie-match full-path trie)
-      (values (when found-p (dfv:parse-input format txt)) found-p))))
+    (multiple-value-bind(txt found-p source) (trie-match full-path trie)
+      (when found-p
+        (restart-case
+            (values
+             (dfv:parse-input format txt) found-p source)
+           (ignore()
+             :report (lambda(os) (format os "Invalid parameter
+             format at ~A. ~A expected. Ignore and use default value."
+             source format))
+             (values nil))
+           (use-value(v)
+             :interactive (lambda() (format t "Enter a new value: ")
+                                   (eval (read)))
+             :report "Use a new value"
+             (values v t)))))))
 
 (defgeneric format-from-type(type)
   (:documentation "Given a type declaration return a format declaration")

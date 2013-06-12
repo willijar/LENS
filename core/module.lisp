@@ -247,8 +247,7 @@ function."
 
 (defmethod gate((module module) (name symbol) &key direction index)
    (let ((slot (gethash name (gate-slots module))))
-     (when slot
-           (gate slot direction :index index))))
+     (when slot (gate slot direction :index index))))
 
 (defun gate-size(module name)
   (let ((slot (gethash name (gate-slots module))))
@@ -524,11 +523,6 @@ return the gate given by spec. Validates spec based on class definitions"
     (channels :type list :initform nil :reader channels))
   (:metaclass compound-module-class))
 
-(defmethod index((module module))
-  (let ((v (gethash (name module) (submodules (owner module)))))
-    (when (vectorp v)
-      (position module v))))
-
 (defmethod size((module module))
   (let ((v (gethash (name module) (submodules (owner module)))))
     (when (vectorp v) (length v))))
@@ -551,9 +545,12 @@ return the gate given by spec. Validates spec based on class definitions"
   "Attempt to add a submodule to instance - throw error if submodule
 already exists. Checks for a typename configuration parameter to allow
 specification of a specific subclass."
-  (let ((sm (gethash name (submodules instance)))
-        (basetype (first initargs))
-        (initargs `(:name ,name :owner ,instance ,@(rest initargs))))
+  (let* ((sm (gethash name (submodules instance)))
+         (basetype (first initargs))
+         (initargs `(:name ,name
+                     :owner ,instance
+                     ,@(when (arrayp sm) (list :index (length sm)))
+                     ,@(rest initargs))))
     (assert (subtypep basetype 'module)
               ()
               "Unrecognised submodule type ~A" basetype)
@@ -605,7 +602,19 @@ specification of a specific subclass."
   (:documentation "Return submodule of given name (and index if in an array)")
   (:method((module compound-module) (name symbol) &key index)
     (let ((submodule (gethash name (submodules module))))
-      (if index (aref submodule index) submodule))))
+      (if index (aref submodule index) submodule)))
+  (:method((module compound-module) (address list) &key index)
+    (assert (null index))
+    (if (integerp (second address))
+        (let ((module (submodule module (first address)
+                                 :index (second address))))
+          (if (cddr address)
+              (submodule module (cddr address))
+              module))
+        (let ((module (submodule module (first address))))
+          (if (cdr address)
+            (submodule module (cdr address))
+            module)))))
 
 (defgeneric for-each-submodule(module operator)
   (:method((module compound-module) operator)
@@ -658,9 +667,6 @@ nil)
 
 (defmethod full-path((network network))
   (list (name (owner network)) (name network)))
-
-(defmethod index((network network))
-  nil)
 
 (defmacro defmodule(name (&rest superclasses) (&rest vars) &rest args)
   (unless (member 'module superclasses)

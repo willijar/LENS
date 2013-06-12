@@ -18,7 +18,8 @@
 (in-package :cl-user)
 
 (asdf:defsystem :lens.wsn
-    :description "Wireless Sensor Networks for Lisp Educational Network Simulator (LENS)"
+    :description "Wireless Sensor Networks for Lisp Educational
+    Network Simulator (LENS)"
     :author "Dr. John A.R. Williams <J.A.R.Williams@aston.ac.uk>"
     :maintainer "Dr. John A.R. Williams <J.A.R.Williams@aston.ac.uk>"
     :licence "GPL v3"
@@ -40,17 +41,24 @@
      (:module "communications" :depends-on ("core")
               :components
               ((:file "common")
-               (:file "network-base" :depends-on ("common"))
+               (:file "routing-base" :depends-on ("common"))
                (:file "mac-base" :depends-on ("common"))
                (:file "radio-support-functions")
                (:file "radio-base"
-                      :depends-on ("common" "radio-support-functions"))))
+                      :depends-on ("common" "radio-support-functions"))
+               (:module "routing" :depends-on ("routing-base")
+                       :components
+                       (:file "bypass-routing"))
+               (:module "mac" :depends-on ("mac-base")
+                       :components
+                       (:file "bypass-mac"))))
      (:module "application" :depends-on ("core")
               :components
-              ((:file "value-reporting")))
-      (:module "physical-process" :depends-on ("core")
+              ((:file "value-reporting")
+               (:file "throughput-test")))
+     (:module "physical-process" :depends-on ("core")
               :components
               ((:file "scenario")))
-      (:module "mobility" :depends-on ("core")
+     (:module "mobility" :depends-on ("core")
               :components
               ((:file "line-mobility")))))

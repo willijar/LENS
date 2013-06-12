@@ -1,9 +1,9 @@
 (in-package :lens.wsn)
 
 (defclass app-net-control-info()
-  ((RSSI :type double-float :initarg :RSSI :reader RSSI
+  ((RSSI :type double-float :initarg :RSSI :reader RSSI :initform nil
          :documentation "the RSSI of the received packet")
-   (LQI :type double-float :initarg :LQI :reader LQI
+   (LQI :type double-float :initarg :LQI :reader LQI :initform nil
         :documentation "the LQI of the received packet")
    (source :initarg :source :reader source
            :documentation "the routing layer source of the received packet")
@@ -95,7 +95,7 @@
   (:method(application measurement)
     (declare (ignore application measurement))))
 
-(defgeneric toNetwork(application entity &optional destination)
+(defgeneric to-network(application entity &optional destination)
   (:documentation "Send message, packet or data to network")
   (:method((application application) (command communications-control-command)
            &optional destination)
@@ -117,7 +117,9 @@
   (:method((application application) (message message) &optional destination)
     (declare (ignore destination))
     (error "Application ~A attempting to send ~A to network"
-           application message)))
+           application message))
+  (:method((application application) data &optional destination)
+    (to-network application (encapsulate application data) destination)))
 
 (defmethod encapsulate((application application) data)
   (make-instance
@@ -133,12 +135,11 @@
     (declare (ignore data))
     (+ (header-overhead application) (payload-overhead application))))
 
-(defmethod handle-message :around ((application application)
-                                   (message application-packet))
+(defmethod handle-message ((application application)
+                           (message application-packet))
   (when (or (not (applicationid application))
             (eql (applicationid application) (applicationid message)))
-    (emit application 'application-receive message)
-    (call-next-method)))
+    (emit application 'application-receive message))))
 
 (defmethod handle-message((application application) (message sensor-message))
   (handle-sensor-reading application (measurement message)))

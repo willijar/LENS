@@ -37,9 +37,11 @@
 (defclass packet-buffer(entity-with-signals parameter-object)
   ((queue :reader queue :type timestamped-queue)
    (buffer-size
+    :initarg :buffer-size
     :type integer :parameter t :initform 32 :reader buffer-size
     :documentation "max size in messages")
    (buffer-size-bytes
+    :initarg :buffer-size-bytes
     :type integer :parameter t :initform nil :reader buffer-size-bytes
     :documentation "max size in bytes")
    (byte-length :initform 0 :type integer :reader byte-length))

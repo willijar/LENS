@@ -6,15 +6,13 @@
 
 (defclass named-object(lens-object)
   ((name :type symbol :initarg :name :accessor name
-         :documentation "Name of this object")))
+         :documentation "Name of this object")
+   (index :initarg :index :reader index :type fixnum
+          :documentation "Position in an object vector")))
 
 (defclass owned-object(named-object)
-  ((owner :initarg :owner :type named-object :initform nil
-          :accessor owner)))
-
-(defgeneric index(owned-object)
-  (:documentation "In in an array of objects return the index")
-  (:method((o owned-object)) nil))
+  ((owner :initarg :owner :type named-object :initform nil :accessor owner
+          :documentation "Object which owns this in object heirarchy")))
 
 (defgeneric parent-module(object)
   (:documentation "Return the parent module of this object - not always owner")
@@ -26,8 +24,7 @@ submodule can be part of a module vector, or a gate can be part of a
 gate vector), this method returns the object's name with the index in
 brackets;")
   (:method((o named-object))
-    (cons (name o)
-          (let ((i (index o))) (when i (list i))))))
+    (cons (name o) (when (slot-boundp o 'index) (list (index i))))))
 
 (defgeneric full-path(o)
   (:documentation "Returns the full path of the object in the object

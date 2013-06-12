@@ -447,3 +447,22 @@
     (t ;; simply return sample from stored ones
      (aref (cells instance)  (%genintrand (result-count instance) rng))))))
 
+(defclass indexed-count-recorder(result-recorder)
+  ((count :initform (make-hash-table) :accessor recorded-value )))
+
+(define-result-recorder 'indexed-count-recorder 'indexed-count)
+
+(defmethod record((recorder indexed-count-recorder) time value)
+  (incf (gethash value (recorded-value recorder) 0)))
+
+(defmethod record((recorder indexed-count-recorder) time (value list))
+  (incf (gethash (car value) (recorded-value recorder) 0) (cdr value)))
+
+(defmethod report((r indexed-count-recorder) os)
+  (format os "statistic ~A ~A~%" (full-path-string (owner r)) (title r))
+  (maphash
+   #'(lambda(k v)
+       (format os "field ~A ~A~%" k v))
+   (recorded-value r)))
+
+

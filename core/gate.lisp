@@ -79,9 +79,9 @@ needs to know about its surroundings."))
   (name (owner link)))
 
 (defmethod full-name((gate gate))
-  (let ((d (gate-direction gate))
-        (i (index gate)))
-    `(,(name gate) ,d ,@(when i (list i)))))
+  `(,(name gate)
+     ,(gate-direction gate)
+     ,@(when (slot-boundp gate 'index) (list (index gate)))))
 
 (defun gate-direction(gate)
   (let ((input (input (owner gate))))
@@ -89,15 +89,6 @@ needs to know about its surroundings."))
            ((eql gate (output (owner gate))) :output)
            ((find gate input) :input)
            (:output))))
-
-(defmethod index((gate gate))
-  (let* ((gs (owner gate))
-         (ip (input gs))
-         (op (output gs)))
-    (unless (or (eql gate ip) (eql gate op))
-      (or
-       (and (arrayp ip) (position gate ip))
-       (and (arrayp op) (position gate op))))))
 
 (defmethod for-each-child((slot gate-slot) (operator function))
   (dolist(d (list (input slot) (output slot)))
@@ -109,10 +100,10 @@ needs to know about its surroundings."))
     (let ((s (ecase direction
                (:input (input entity))
                (:output (output entity)))))
-      (assert s)
       (if index
           (if (eql index '++)
-              (let ((new-gate (make-instance 'gate :owner entity)))
+              (let ((new-gate
+                     (make-instance 'gate :index (length s) :owner entity)))
                 (vector-push-extend new-gate s)
                 new-gate)
               (aref s index))

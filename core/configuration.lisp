@@ -31,6 +31,15 @@
 
 (in-package :lens)
 
+(defstruct (parameter-source
+             (:print-object
+              (lambda(s os)
+                  (format os "file ~A line number ~A"
+                          (parameter-source-pathname s)
+                          (parameter-source-line-number s)))))
+  pathname
+  line-number)
+
 (defclass trie()
   ((trie-prefix :initarg :prefix :reader trie-prefix
                 :documentation "The prefix matched by this branch")
@@ -38,7 +47,8 @@
                :documentation "The value stored at this branch")
    (trie-children :initform nil
                   :initarg :children :type list :accessor trie-children
-                  :documentation "The children trie's"))
+                  :documentation "The children trie's")
+   (trie-source :initarg :source :accessor trie-source))
   (:documentation "A trie data structure for prefix matching"))
 
 (defmethod print-object((trie trie) stream)
@@ -62,7 +72,7 @@
 
 (defgeneric trie-match(pattern structure)
   (:documentation "Matching function returns value from structure
-  matching pattern and whether match was found"))
+  matching pattern, whether match was found and source of value"))
 
 (defgeneric trie-delete(pattern structure)
   (:documentation "Delete branch from a trie matching pattern"))
@@ -154,7 +164,7 @@
         ;; we have a match!!
        (unless more (return-from trie-match
                       (if (slot-boundp trie 'trie-value)
-                          (values (trie-value trie) t)
+                          (values (trie-value trie) t (trie-source trie))
                           (values nil nil))))
         ;; look an exact suffix match first
        (dolist(child (trie-children trie))
@@ -189,7 +199,7 @@
                   (delete child (trie-children trie)))
             child)))))
 
-(defun read-ini-line(is)
+(defun read-ini-line(is parameter-source)
     "Returns either a string representing a section title, a trie
 representing a value, a pathname for an extension file or nil if no
  ((more data"
@@ -197,23 +207,27 @@ representing a value, a pathname for an extension file or nil if no
            (wstrim
             (with-output-to-string(os)
               (loop
-                (let* ((s (read-line is))
-                       (end (1- (length s))))
-                  (unless (or (< end 0)(char= (char s 0) #\#))
-                    (when (char/=  (char s end) #\\)
-                      (write-string s os)
-                      (return))
-                    (write-string s os :end end))))))))
+                 (incf (parameter-source-line-number parameter-source))
+                 (let* ((s (read-line is))
+                        (end (1- (length s))))
+                   (unless (or (< end 0)(char= (char s 0) #\#))
+                     (when (char/=  (char s end) #\\)
+                       (write-string s os)
+                       (return))
+                     (write-string s os :end end))))))))
       (cond
         ((and (char= (char line 0) #\[)
               (char= (char line (1- (length line))) #\]))
          (wstrim (subseq line 1 (1- (length line)))))
         ((let ((p (position #\= line)))
            (when p
-             (make-trie
-              (cons nil (split-sequence:split-sequence
-                         #\.(wstrim (subseq line 0 p))))
-              (wstrim (subseq line (1+ p)))))))
+             (let ((trie
+                    (make-trie
+                     (cons nil (split-sequence:split-sequence
+                                #\.(wstrim (subseq line 0 p))))
+                     (wstrim (subseq line (1+ p))))))
+             (setf (trie-source trie) (copy-parameter-source parameter-source))
+             trie))))
         ((zerop (search "include" line :test #'char-equal))
          (parse-namestring (wstrim (subseq line 7))))
         (t
@@ -226,10 +240,13 @@ representing a value, a pathname for an extension file or nil if no
     (labels((do-read-file(pathname)
               (with-open-file(is pathname :direction :input)
                 (let ((saved-section current-section)
+                      (source
+                       (make-parameter-source
+                        :pathname pathname :line-number 0))
                       (*default-pathname-defaults* (merge-pathnames pathname)))
                   (handler-case
                       (loop
-                         (let ((v (read-ini-line is)))
+                         (let ((v (read-ini-line is source)))
                            (etypecase v
                              (string (setf current-section v)
                                      (unless (gethash v sections)
