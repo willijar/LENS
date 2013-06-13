@@ -24,7 +24,7 @@ submodule can be part of a module vector, or a gate can be part of a
 gate vector), this method returns the object's name with the index in
 brackets;")
   (:method((o named-object))
-    (cons (name o) (when (slot-boundp o 'index) (list (index i))))))
+    (cons (name o) (when (slot-boundp o 'index) (list (index o))))))
 
 (defgeneric full-path(o)
   (:documentation "Returns the full path of the object in the object
@@ -42,7 +42,9 @@ hierarchy, like '(net host 2 tcp winsize)'.")
   (:documentation "Enables traversing the object tree, performing some
   operation on each object.")
   (:method((parent sequence) (operator function))
-    (map 'nil operator parent)))
+    (map 'nil operator parent))
+  (:method(dummy operator)
+    (declare (ignore dummy operator))))
 
 (defgeneric info(o)
   (:documentation "Produce a one-line description of object.

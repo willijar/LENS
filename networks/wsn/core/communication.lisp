@@ -6,12 +6,12 @@
    (application :inout)
    (receive :input))
   (:submodules
-   (network routing)
+   (routing routing)
    (mac mac)
    (radio radio))
   (:connections
-   (<=> application (network application))
-   (<=> (network mac) (mac network))
+   (<=> application (routing application))
+   (<=> (routing mac) (mac routing))
    (<=> (mac radio) (radio mac))
    (<= (radio receive) receive))
   (:metaclass compound-module-class)

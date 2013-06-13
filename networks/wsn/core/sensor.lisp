@@ -69,7 +69,7 @@ In responsive mode there will be measurement-delay delay between
 request message and sending back a readin message. If in sampling mode
 thern the message will correspond to the last sampled time."))
 
-(defmethod configure :after ((sensor sensor))
+(defmethod initialize-instance :after ((sensor sensor) &key &allow-other-keys)
   (with-slots(measurement-delay sample-interval) sensor
     (assert (or (zerop measurement-delay)
                 (> sample-interval measurement-delay))

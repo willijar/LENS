@@ -53,7 +53,8 @@
    (disabled-p :type boolean :initform t :accessor disabled-p))
   (:metaclass module-class))
 
-(defmethod configure :after ((module resources))
+(defmethod initialize-instance :after
+    ((module resources) &key &allow-other-keys)
   (assert (>= (update-interval module) 0)
           ()
           "Resource update interval must be >=0")

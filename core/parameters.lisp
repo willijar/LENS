@@ -25,7 +25,9 @@
 
 (defgeneric configuration(instance)
   (:documentation "Return the parameter source associated with an instance")
-  (:method(instance) (declare (ignore instance)) (configuration *simulation*)))
+  (:method(instance)
+    (declare (ignore instance))
+    (configuration *simulation*)))
 
 (defgeneric read-parameter(full-path source format)
   (:documentation "Actually read a fully named parameter from source
@@ -47,15 +49,25 @@
              :report "Use a new value"
              (values v t)))))))
 
+(defmethod read-parameter((full-path list) (trie trie)
+                          (format (eql 'pathname)))
+  (multiple-value-bind(p found-p source) (call-next-method)
+    (if source
+        (values (merge-pathnames p (parameter-source-pathname source))
+                found-p
+                source)
+        (values p found-p source))))
+
 (defgeneric format-from-type(type)
   (:documentation "Given a type declaration return a format declaration")
-  (:method((type list)) (format-from-type (first type)))
+  (:method((type list)) (cons (format-from-type (first type)) (rest type)))
   (:method((type symbol))
     (if (subtypep type 'number)
         `(number-or-expression :type ,type)
         type))
   (:method((type (eql 'symbol)))
-    `(symbol :convert ,#'string-upcase :package ,*package*)))
+    `(symbol :convert ,#'string-upcase :package ,*package*))
+  (:method((type (eql 'time-type))) type))
 
 (defmethod parse-input((spec (eql 'time-type)) value &key &allow-other-keys)
   (multiple-value-bind(n p) (parse-integer value :junk-allowed t)
@@ -111,7 +123,7 @@
 
 (defgeneric slot-definition-parameter-name(slot)
   (:method((slot parameter-slot))
-    (getf (properties slot) :parameter-name (slot-definition-name slot))))
+    (getf (slot-definition-properties slot) :parameter-name (slot-definition-name slot))))
 
 ;; The directs slot type identifies whether this should be a volatile slot
 (defclass parameter-direct-slot-definition

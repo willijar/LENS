@@ -49,7 +49,7 @@
   (noise-bandwidth 0.0 :type double-float)
   (noise-floor 0.0 :type double-float)
   (sensitivity 0.0 :type double-float)
-  (power 0.0 :type double-float))
+  (power-consumed 0.0 :type double-float))
 
 (defstruct received-signal
   src ;; used to distingish between signals e.g. node or radio id
@@ -83,8 +83,8 @@
 (defclass radio(comms-module)
   ((address :parameter t :type integer :reader mac-address
             :documentation "MAC address - will default to node index.")
-   (radio-parameters-file
-    :parameter t :type string :reader radio-parameters-file
+   (parameters-file
+    :parameter t :type pathname :reader parameters-file
     :documentation "the file that contains most radio parameters")
    (initial-mode :parameter t :initform  nil :type symbol
          :documentation "we can choose an rx-mode to begin with. Modes are
@@ -106,7 +106,8 @@
     use first level defined (will usually be the fastest and most
     energy consuming sleep state)")
    (carrier-frequency
-    :type double-float :parameter t :initform 2.4E9 :accessor carrier-frequency
+    :type double-float :parameter t :initform 2.4E9
+    :accessor carrier-frequency
     :properties (:units "Hz")
     :documentation "the carrier frequency (in Hz) to begin with.")
    (encoding :type encoding-type :reader encoding)
@@ -140,7 +141,7 @@
    ;; these are derived from radio-parameters file or ini file
    (tx-levels :type sequence :reader tx-levels)
    (rx-modes :type sequence :reader rx-modes)
-   (sleep-levels :initform nil :type sequence :reader sleep-levels)
+   (sleep-levels :type sequence :reader sleep-levels)
    (transitions
     :type list :reader transitions
     :documentation "Power and delay for transitions between states stored in p-list of p-lists - access is (getf (getf args to) from)")
@@ -185,7 +186,7 @@
     :documentation "delay to pass packets/messages/interrupts to upper layer"))
   (:gates
    (mac :inout)
-   (fromWireless :input))
+   (receive :input))
   (:properties
    :statistic (tx
                :title "Transmissions" :default (count))
@@ -249,7 +250,7 @@
 
 (defun parse-radio-parameter-file(radio)
   (let ((parameters
-         (with-open-file(is (merge-pathnames (radio-parameters-file radio))
+         (with-open-file(is (merge-pathnames (parameters-file radio))
                             :direction :input :if-does-not-exist :error)
            (read is))))
     (dolist(record parameters)
@@ -524,7 +525,7 @@
                      (rx-mode-data-rate rx-mode))))
        ;; if in rx mode change drawn power
        (when (eql state 'rx)
-         (emit radio 'power-drawn (rx-mode-power rx-mode)))))
+         (emit radio 'power-drawn (rx-mode-power-consumed rx-mode)))))
 
     (set-tx-output
      (with-slots(tx-level tx-levels) radio
@@ -610,7 +611,7 @@
             (schedule-at radio (continue-tx-message radio)
                          :delay time-to-tx-packet)))))
       (rx
-       (emit radio 'power-drawn (rx-mode-power (rx-mode radio)))
+       (emit radio 'power-drawn (rx-mode-power-consumed (rx-mode radio)))
        (update-total-power-received radio nil))
       (sleep
        (emit radio 'power-drawn (sleep-level-power (sleep-level radio)))

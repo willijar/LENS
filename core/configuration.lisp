@@ -34,7 +34,7 @@
 (defstruct (parameter-source
              (:print-object
               (lambda(s os)
-                  (format os "file ~A line number ~A"
+                  (format os "\"~A\" line ~A"
                           (parameter-source-pathname s)
                           (parameter-source-line-number s)))))
   pathname
@@ -57,9 +57,11 @@
     (when (slot-boundp trie 'trie-value)
       (format stream "=~A" (trie-value trie)))
     (when (trie-children trie)
-      (format stream " (~D children)" (length (trie-children trie))))))
+      (format stream " (~D children)" (length (trie-children trie))))
+    (when (slot-boundp trie 'trie-source)
+      (format stream " ~A" (trie-source trie)))))
 
-(defgeneric make-trie(sequence value)
+(defgeneric make-trie(sequence value &optional source)
   (:documentation "Make a heirarchy from a sequence with value stored"))
 
 (defgeneric nmerge-trie(trie1 trie2)
@@ -77,13 +79,15 @@
 (defgeneric trie-delete(pattern structure)
   (:documentation "Delete branch from a trie matching pattern"))
 
-(defmethod make-trie((pattern list) value)
+(defmethod make-trie((pattern list) value  &optional source)
   (if (rest pattern)
       (make-instance 'trie
                      :prefix (first pattern)
-                     :children (list (make-trie (rest pattern) value)))
+                     :source source
+                     :children (list (make-trie (rest pattern) value source)))
       (make-instance 'trie
                      :prefix (first pattern)
+                     :source source
                      :value value)))
 
 (define-condition trie-condition(serious-condition)
@@ -162,29 +166,33 @@
            (any-child nil)
            (any-suffix nil))
         ;; we have a match!!
-       (unless more (return-from trie-match
-                      (if (slot-boundp trie 'trie-value)
-                          (values (trie-value trie) t (trie-source trie))
-                          (values nil nil))))
+       (unless more
+         (return-from trie-match
+           (if (slot-boundp trie 'trie-value)
+               (values (trie-value trie) t (trie-source trie))
+               (values nil nil))))
         ;; look an exact suffix match first
        (dolist(child (trie-children trie))
          (cond
            ((string-equal (trie-prefix child) '*) (setf any-child child))
            ((string-equal (trie-prefix child) '**) (setf any-suffix child))
            (t
-            (multiple-value-bind(value found-p)
+            (multiple-value-bind(value found-p source)
                 (trie-match more child)
-              (when found-p (return-from trie-match (values value found-p)))))))
+              (when found-p
+                (return-from trie-match (values value found-p source)))))))
        (when any-child
-         (multiple-value-bind(value found-p)
+         (multiple-value-bind(value found-p source)
              (trie-match more any-child)
-           (when found-p (return-from trie-match (values value found-p)))))
+           (when found-p
+             (return-from trie-match (values value found-p source)))))
        (when any-suffix
          (maplist
           #'(lambda(pattern)
-              (multiple-value-bind(value found-p)
+              (multiple-value-bind(value found-p source)
                   (trie-match pattern any-suffix)
-                (when found-p (return-from trie-match (values value found-p)))))
+                (when found-p
+                  (return-from trie-match (values value found-p source)))))
           more))))
     (values nil nil))
 
@@ -209,25 +217,25 @@ representing a value, a pathname for an extension file or nil if no
               (loop
                  (incf (parameter-source-line-number parameter-source))
                  (let* ((s (read-line is))
-                        (end (1- (length s))))
-                   (unless (or (< end 0)(char= (char s 0) #\#))
+                        (p (position #\# s :from-end t)))
+                   (when p (setf s (subseq s 0 p)))
+                   (let ((end (1- (length s))))
+                   (unless (or (< end 0) (char= (char s 0) #\#))
                      (when (char/=  (char s end) #\\)
-                       (write-string s os)
+                       (write-string (subseq s 0 (1+ end)) os)
                        (return))
-                     (write-string s os :end end))))))))
+                     (write-string s os :end end)))))))))
       (cond
         ((and (char= (char line 0) #\[)
               (char= (char line (1- (length line))) #\]))
          (wstrim (subseq line 1 (1- (length line)))))
         ((let ((p (position #\= line)))
            (when p
-             (let ((trie
-                    (make-trie
-                     (cons nil (split-sequence:split-sequence
-                                #\.(wstrim (subseq line 0 p))))
-                     (wstrim (subseq line (1+ p))))))
-             (setf (trie-source trie) (copy-parameter-source parameter-source))
-             trie))))
+             (make-trie
+              (cons nil (split-sequence:split-sequence
+                         #\.(wstrim (subseq line 0 p))))
+              (wstrim (subseq line (1+ p)))
+              (copy-parameter-source parameter-source)))))
         ((zerop (search "include" line :test #'char-equal))
          (parse-namestring (wstrim (subseq line 7))))
         (t
@@ -243,7 +251,8 @@ representing a value, a pathname for an extension file or nil if no
                       (source
                        (make-parameter-source
                         :pathname pathname :line-number 0))
-                      (*default-pathname-defaults* (merge-pathnames pathname)))
+                      (*default-pathname-defaults*
+                       (merge-pathnames pathname)))
                   (handler-case
                       (loop
                          (let ((v (read-ini-line is source)))
@@ -251,7 +260,9 @@ representing a value, a pathname for an extension file or nil if no
                              (string (setf current-section v)
                                      (unless (gethash v sections)
                                        (setf (gethash v sections)
-                                             (make-instance 'trie :prefix nil))))
+                                             (make-instance
+                                              'trie
+                                              :prefix nil :source source))))
                              (pathname
                               (do-read-file (merge-pathnames v)))
                              (trie

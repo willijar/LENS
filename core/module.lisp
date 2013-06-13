@@ -4,7 +4,8 @@
   (:documentation "Initialise gates on instance using gatespec in class."))
 
 (defgeneric build-submodules(instance)
-  (:documentation "Build submodules inside a  module. A compound module will do this on the basis of the class definition."))
+  (:documentation "Build submodules inside a  module. A compound module will do this on the basis of the class definition.")
+  (:method(instance) (declare (ignore instance))))
 
 (defgeneric build-connections(instance)
   (:documentation "Build connectiuons between submodules and gates in
@@ -247,7 +248,9 @@ function."
 
 (defmethod gate((module module) (name symbol) &key direction index)
    (let ((slot (gethash name (gate-slots module))))
-     (when slot (gate slot direction :index index))))
+     (assert slot()
+             "No gate ~A in module ~A" name module)
+     (gate slot direction :index index)))
 
 (defun gate-size(module name)
   (let ((slot (gethash name (gate-slots module))))
@@ -257,7 +260,9 @@ function."
                 &key (direction (third gateid)) (index (second gateid)))
   "Allow gate arrays to be indexed by list of name and index"
    (let ((slot (gethash (first gateid) (gate-slots module))))
-     (when slot (gate slot direction :index index))))
+     (assert slot()
+             "No gate ~A in module ~A" (first gateid) module)
+     (gate slot direction :index index)))
 
 (defmethod for-each-child((module module) (operator function))
   (for-each-gate module operator)
@@ -271,9 +276,6 @@ function."
               (arrival-time message) (if onstart time (+ time (duration message))))
         (setf (arrival-time message) time)))
   (schedule message))
-
-(defmethod build-inside((module module))
-  "DO nothing for simple module")
 
 (defmethod send((from-module module) (message message) (outgate gate)
                 &key (delay 0))
@@ -440,11 +442,15 @@ return the gate given by spec. Validates spec based on class definitions"
   (multiple-value-bind(modulename moduleindex name index)
       (etypecase spec
         (symbol (values nil nil spec nil))
-        (list (if (= (length spec) 4)
-                  (values-list spec)
-                  (if (numberp (second spec))
-                      (values (first spec) (second spec) (third spec))
-                      (values (first spec) nil (second spec) (third spec))))))
+        (list
+         (case (length spec)
+           (4 (values-list spec))
+           (3 (if (numberp (second spec))
+                  (values (first spec) (second spec) (third spec))
+                  (values (first spec) nil (second spec) (third spec))))
+           (2 (if (numberp (second spec))
+                  (values nil nil (first spec) (second spec))
+                  (values (first spec) nil (second spec) nil))))))
     (if modulename
         (let ((modulespec
                (find modulename (slot-value class '%submodules) :key #'first)))
@@ -464,15 +470,25 @@ return the gate given by spec. Validates spec based on class definitions"
                     (and (not index) (third gatespec)))
             (error "Invalid gate index ~A in gate address ~A" index spec))
           #'(lambda(instance)
-              (gate instance  name :index index :direction :input))))))
+              (gate instance  name :index index :direction direction))))))
 
 (defun connection-func(class spec)
   (multiple-value-bind(dir channelspec arg1 arg2)
       (ecase (length spec)
         (3 (values (first spec) nil (second spec) (third spec)))
         (4 (values-list spec)))
-    (flet ((connect-func(ffrom ffto)
-             (if channelspec
+    (labels ((class-gate-p(gatespec) ;; i.e. is not a submodule gate
+               (or (symbolp gatespec)
+                   (and (= (length gatespec) 2) (numberp (second gatespec)))
+                   (null (first gatespec))))
+             (connect-func(from to)
+               (let ((ffrom
+                      (gate-accessor
+                       class from (if (class-gate-p from) :input :output)))
+                     (ffto
+                       (gate-accessor
+                        class to (if (class-gate-p to) :output :input))))
+               (if channelspec
                  (let ((channelspec
                         (merge-local-typespec channelspec class)))
                    ;; if no name specified in initargs use class name as name
@@ -492,19 +508,14 @@ return the gate given by spec. Validates spec based on class definitions"
                  #'(lambda(instance)
                      (connect (funcall ffrom instance)
                               (funcall ffto instance)
-                              :leave-uninitialized t)))))
+                              :leave-uninitialized t))))))
       (ecase dir
-        (=> (connect-func (gate-accessor class arg1 :output)
-                          (gate-accessor class arg2 :input)))
-        (<= (connect-func (gate-accessor class arg2 :output)
-                          (gate-accessor class arg1 :input)))
+        (=> (connect-func arg1 arg2))
+        (<= (connect-func arg2 arg1))
         (<=> #'(lambda(instance)
-                  (funcall (connect-func (gate-accessor class arg1 :output)
-                                         (gate-accessor class arg2 :input))
-                           instance)
-                  (funcall (connect-func (gate-accessor class arg2 :output)
-                                         (gate-accessor class arg1 :input))
-                           instance)))))))
+                 (funcall (connect-func arg1 arg2) instance)
+                 (funcall (connect-func arg2 arg1) instance)))))))
+
 
 (defun connection-code-walk(class specs)
   (mapcar
@@ -616,15 +627,13 @@ specification of a specific subclass."
             (submodule module (cdr address))
             module)))))
 
-(defgeneric for-each-submodule(module operator)
-  (:method((module compound-module) operator)
-    (maphash
-     #'(lambda(k v)
-         (declare (ignore k))
-         (if (vectorp v) (map nil operator v) (funcall operator v)))
-     (submodules module)))
-  (:method((module module) operator)
-    (declare (ignore operator))))
+(defmethod for-each-submodule((module compound-module) operator)
+  (call-next-method)
+  (maphash
+   #'(lambda(k v)
+       (declare (ignore k))
+       (if (vectorp v) (map nil operator v) (funcall operator v)))
+   (submodules module)))
 
 (defun for-each-channel(module operator)
   (map nil operator (channels module)))
@@ -646,6 +655,15 @@ specification of a specific subclass."
       (for-each-channel module #'init)
       (for-each-submodule module #'init))
     initialized-p))
+
+(defun connected-p(gate)
+  (if (typep (parent-module gate) 'compound-module)
+      (and (previous-gate gate) (next-gate gate))
+      (connected-outside-p gate)))
+
+(defun path-ok-p(gate)
+  (not (or (typep (parent-module (path-start-gate gate)) 'compound-module)
+           (typep (parent-module (path-end-gate gate)) 'compound-module))))
 
 (defclass network(compound-module)
   ((gate-slots :initform nil))

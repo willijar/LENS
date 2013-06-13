@@ -16,8 +16,9 @@
     :documentation "in bytes")
    (address :parameter t :type integer :reader mac-address
             :documentation "MAC address - will default to nodeid."))
+  (:default-initargs :num-rngs 2)
   (:gates
-   (network :inout)
+   (routing :inout)
    (radio :inout))
   (:metaclass module-class))
 
@@ -25,7 +26,7 @@
   (case stage
     (0
      (unless (slot-boundp instance 'address)
-       (setf (slot-value instance 'address) (nodeid instance)))))
+       (setf (slot-value instance 'address) (nodeid (node instance))))))
   (call-next-method))
 
 (defmethod mac-address((node node))
@@ -47,7 +48,7 @@
 
 (defmethod handle-message((instance mac)
                           (message radio-control-message))
-  (send instance message 'network))
+  (send instance message 'routing))
 
 (defmethod handle-message :around ((module mac) (packet mac-packet))
   (with-slots(max-mac-frame-size header-overhead) module
@@ -56,17 +57,15 @@
         (eventlog "Oversized packet ~A dropped. Size ~A, mac layer overhead ~A, max mac packet size ~A" (byte-length packet) header-overhead max-mac-frame-size)
         (call-next-method))))
 
-(defgeneric toRadioLayer(mac entity)
+(defgeneric to-radio(mac entity)
   (:documentation "Send packet to radio layer")
-  (:method((module mac) (command communications-control-command)
-           &optional destination)
+  (:method((module mac) (command communications-control-command))
     (assert (typep module 'radio-control-command))
     (send module command 'radio))
   (:method((module routing) (packet mac-packet))
     (send module packet 'radio))
   (:method((module routing) (message message))
-    (declare (ignore destination))
-    (error "Network module ~A attempting to send ~A to mac"
+    (error "Mac module ~A attempting to send ~A to RADIO"
            module message)))
 
 (defmethod encapsulate((module mac) (packet application-packet))

@@ -65,6 +65,7 @@
    (cells
     :type array :reader cells
     :documentation "an array of cell entities with node occupation and path-loss to other cells"))
+  (:default-initargs :num-rngs 3)
   (:gates
    (fromNodes :input))
   (:properties
@@ -94,10 +95,10 @@ channel module"
   (let* ((nodes (nodes (network *simulation*))))
     (when (= 0 stage)
       (call-next-method)
-      (dolist(node nodes) (subscribe node 'node-move wireless))
+      (map 'nil #'(lambda(node) (subscribe node 'node-move wireless)) nodes)
       (return-from initialize nil))
     (let ((mobility-modules
-           (mapcar #'(lambda(node) (submodule node 'mobility)) nodes))
+           (map 'list #'(lambda(node) (submodule node 'mobility)) nodes))
           (static-only-p  (every #'static-p mobility-modules)))
       (if static-only-p
           (progn

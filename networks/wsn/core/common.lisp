@@ -30,6 +30,7 @@
 
 (defconstant broadcast-network-address -1)
 (defconstant broadcast-mac-address -1)
+(defvar *simulations* #p"/home/willijar/dev/lisp/src/lens/networks/wsn/simulations/")
 
 (defclass wsn-module(module)
   ((disabled-p :initform nil :initarg :disabled-p :reader disabled-p))
@@ -58,7 +59,8 @@
   (:method(instance) (declare (ignore instance))))
 
 (defgeneric node(module)
-  (:documentation "Return the node module for a particular submodule"))
+  (:documentation "Return the node module for a particular submodule")
+  (:method((module wsn-module)) (owner module)))
 
 (defmethod receive-signal((instance wsn-module)
                           signal

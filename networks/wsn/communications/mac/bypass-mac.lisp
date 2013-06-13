@@ -4,9 +4,6 @@
   ((header-overhead :initform 8)
    (buffer-size :initform 0)
    (max-mac-frame-size :initform 0))
-  (:gates
-   (network :inout)
-   (radio :inout))
   (:metaclass module-class))
 
 (defmethod handle-message((instance bypass-mac) (packet routing-packet))
@@ -22,10 +19,10 @@
 (defmethod handle-message((instance bypass-mac) (packet mac-packet))
   ;; from radio layer
     (when (or (eql (destination packet) (mac-address instance))
-              (eql (destination packet) broadcase-mac-address))
+              (eql (destination packet) broadcast-mac-address))
       (let ((routing-packet (decapsulate packet)))
         (setf (control-info routing-packet)
               (make-instance 'net-mac-control-info
                              :rssi (rssi (control-info packet))
                              :lpi (lqi (control-info packet))))
-        (send instance routing-packet 'network))))
+        (send instance routing-packet 'routing))))

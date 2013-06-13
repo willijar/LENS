@@ -3,7 +3,7 @@
 (defclass node(compound-module)
   ((owner :reader network)
    (nodeid :type integer :reader nodeid :initarg :nodeid)
-   (num-sensors :parameter t :initform 1 :type integer :reader num-sensors)
+   (num-sensors :parameter t :initform 0 :type integer :reader num-sensors)
    (network-address :parameter t :reader network-address)
    (startup-offset
     :parameter t :type time-type :initform 0.0d0 :reader startup-offset
@@ -14,7 +14,7 @@
   (:gates
    (receive :input))
   (:submodules
-   (sensors num-sensors sensor)
+   (sensor num-sensors sensor)
    (application application)
    (communications communications)
    (mobility mobility)
@@ -38,7 +38,7 @@
                       (gate application 'sensor :direction :input :index '++))
              (connect (gate application 'sensor :direction :output :index '++)
                       (gate sensor 'application :direction :input)))
-         (submodule node 'sensors))))
+         (submodule node 'sensor))))
 
 (defmethod initialize-instance :after ((node node) &key &allow-other-keys)
   (unless (slot-boundp node 'nodeid)

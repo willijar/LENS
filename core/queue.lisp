@@ -91,7 +91,7 @@
    (key :initform #'identity :initarg :key :reader buffer-key))
   (:documentation "A class for recording history of seen objects."))
 
-(defmethod intialize-instance :after ((instance history-buffer)
+(defmethod initialize-instance :after ((instance history-buffer)
                                       &key (size +default-history-size+)
                                       (element-type t)
                                       &allow-other-keys)

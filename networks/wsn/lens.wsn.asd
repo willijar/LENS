@@ -37,7 +37,7 @@
                (:file "node" :depends-on ("common" "communication"))
                (:file "communication" :depends-on ("defpackage"))
                (:file "wireless-channel" :depends-on ("mobility"))
-               (:file "application" :depends-on ("common" "node"))))
+               (:file "application" :depends-on ("common" "node" "sensor"))))
      (:module "communications" :depends-on ("core")
               :components
               ((:file "common")
@@ -48,10 +48,10 @@
                       :depends-on ("common" "radio-support-functions"))
                (:module "routing" :depends-on ("routing-base")
                        :components
-                       (:file "bypass-routing"))
+                       ((:file "bypass-routing")))
                (:module "mac" :depends-on ("mac-base")
                        :components
-                       (:file "bypass-mac"))))
+                       ((:file "bypass-mac")))))
      (:module "application" :depends-on ("core")
               :components
               ((:file "value-reporting")
@@ -61,4 +61,5 @@
               ((:file "scenario")))
      (:module "mobility" :depends-on ("core")
               :components
-              ((:file "line-mobility")))))
+              ((:file "line-mobility")
+               (:file "no-mobility")))))

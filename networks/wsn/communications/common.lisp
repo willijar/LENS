@@ -17,7 +17,7 @@
 (defmethod duplicate((packet wsn-packet) &optional duplicate)
   (call-next-method)
   (copy-slots
-   '(header-overhead source-address destination-address sequence-number)
+   '(header-overhead source destination sequence-number)
    packet duplicate))
 
 (defmethod byte-length((packet wsn-packet))
@@ -28,13 +28,13 @@
 
 (defclass comms-module(module)
   ((buffer :type packet-buffer :reader buffer)
-   (buffer-size :parameter t :initform 0 :type integer :initarg :buffer-size)
+   (buffer-size :parameter t :initform 32 :type integer :initarg :buffer-size)
    (packet-history
     :type history-buffer
     :initform (make-instance 'history-buffer
                              :element-type 'packet
                              :key #'(lambda(p)
-                                      (cons (source-address p)
+                                      (cons (source p)
                                             (sequence-number p))))
     :reader packet-history)
    (last-sequence-number :initform -1 :type integer
@@ -47,10 +47,9 @@
 
 (defmethod build-submodules((module comms-module))
   (let ((buffer-size (slot-value module 'buffer-size)))
-    (unless (zerop buffer-size)
-      (setf (slot-value module 'buffer)
+    (setf (slot-value module 'buffer)
             (make-instance 'packet-buffer :owner module :name 'buffer
-                           :buffer-size buffer-size)))))
+                           :buffer-size buffer-size))))
 
 (defmethod for-each-submodule((module comms-module) (operator function))
   (funcall operator (buffer module)))

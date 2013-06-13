@@ -105,7 +105,7 @@
                   :sequence-number (next-sequence-number module))
    packet))
 
-(defgeneric resolve-network-address((module routing) network-address)
+(defgeneric resolve-network-address(routing network-address)
   (:documentation "Return  resolved mac address from given network address")
   (:method(routing network-address)
     (declare (ignore routing))

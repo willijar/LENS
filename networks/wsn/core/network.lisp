@@ -13,8 +13,8 @@
   (:metaclass compound-module-class)
   (:submodules
    (wireless-channel wireless-channel)
-   (nodes num-nodes node)
+   (node num-nodes node)
    (physical-processes 0 physical-process)))
 
 (defgeneric nodes(network)
-  (:method((network WSN)) (submodule network 'nodes)))
+  (:method((network WSN)) (submodule network 'node)))

@@ -139,7 +139,7 @@
                            (message application-packet))
   (when (or (not (applicationid application))
             (eql (applicationid application) (applicationid message)))
-    (emit application 'application-receive message))))
+    (emit application 'application-receive message)))
 
 (defmethod handle-message((application application) (message sensor-message))
   (handle-sensor-reading application (measurement message)))

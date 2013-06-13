@@ -13,10 +13,11 @@
 
 (defmethod handle-message((instance bypass-routing) (packet application-packet))
   ;; from application layer
-  (let* ((routing-packet (encapsulate instance packet)))
-    (setf (destination routing-packet)
-          (application-net-control-info-destination (control-info packet)))
-    (to-mac instance routing-packet (resolve-network-address destination))))
+  (let ((routing-packet (encapsulate instance packet))
+        (destination (destination (control-info packet))))
+    (setf (destination routing-packet) destination)
+    (to-mac instance routing-packet
+            (resolve-network-address instance destination))))
 
 (defmethod handle-message ((instance bypass-routing) (packet routing-packet))
   ;; from mac layer

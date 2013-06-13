@@ -83,6 +83,14 @@ needs to know about its surroundings."))
      ,(gate-direction gate)
      ,@(when (slot-boundp gate 'index) (list (index gate)))))
 
+(defmethod print-object((gate gate) stream)
+  (print-unreadable-object (gate stream :type t :identity t)
+    (format stream "~A.~A[~A]~@[[~A]~]"
+            (name (parent-module gate))
+            (first (full-name gate))
+            (second (full-name gate))
+            (third (full-name gate)))))
+
 (defun gate-direction(gate)
   (let ((input (input (owner gate))))
     (cond  ((eql gate input) :input)
@@ -247,7 +255,7 @@ to disconnect a gate; use disconnect() for that.")
   (:documentation "Disconnects the gate, and also deletes the
   associated channel object if one has been set. disconnect() must be
   invoked on the source gate (from side) of the connection.
-The method has no effect if the gate is not connected.")
+The method has no effect i(load-system :lens.wsn)f the gate is not connected.")
   (:method((gate gate))
     (unless (next-gate gate) (return-from disconnect))
     (let* ((module (parent-module gate))
@@ -352,12 +360,3 @@ The method has no effect if the gate is not connected.")
   (if (eql (gate-direction gate) :input)
       (next-gate gate)
       (previous-gate gate)))
-
-(defun connected-p(gate)
-  (if (typep (parent-module gate) 'compound-module)
-      (and (previous-gate gate) (next-gate gate))
-      (connected-outside-p gate)))
-
-(defun path-ok-p(gate)
-  (not (or (typep (parent-module (path-start-gate gate)) 'compound-module)
-           (typep (parent-module (path-end-gate gate)) 'compound-module))))

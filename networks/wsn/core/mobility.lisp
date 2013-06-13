@@ -9,19 +9,21 @@
   (orientation (make-orientation) :type orientation)
   cell) ;; cell this entity is in - used by wireless-channel
 
-(defmethod parse-input((spec (eql 'location)) value &key &allow-other-keys)
+(defmethod dfv::parse-input((spec (eql 'orientation)) value
+                            &key &allow-other-keys)
   (let ((coords
-         (parse-input 'list value
+         (dfv::parse-input 'list value
                       :type '(number :coerce-to double-float)
-                      :min-length 2 :max-length 5)))
-    (make-location
-     :coord (make-coord (first coords) (second coords) (or (third coords) 0.0d0))
-     :orientation (make-orientation :phi (or (fourth coords) 0.0d0)
-                                    :theta (or (fifth coords) 0.0d0)))))
+                      :min-length 2 :max-length 2)))
+    (make-orientation :phi (first coords)
+                      :theta (second coords))))
 
 (defclass mobility(wsn-module)
-  ((location :type location :parameter t :initarg :location :reader location
+  ((location :type coord :parameter t :initarg :location :reader location
              :documentation "current location initalized from parameter file")
+   (orientation
+    :type orientation :parameter t :initarg :orientation :reader orientation
+    :documentation "current orientation initialized from parameter gile")
    (static-p :initform t :initarg :static-p :reader static-p))
   (:metaclass module-class))
 
@@ -36,7 +38,7 @@
     (assert (not (static-p instance))
             ()
             "Attempt to change location of static node ~A" (node instance))
-    (setf (location-coord (location instance)) location)
+    (setf (location instance) location)
     (emit instance 'node-move)
     location))
 
@@ -45,8 +47,8 @@
   (eventlog "~A initial location is ~A" (node instance) (location instance)))
 
 (defun parse-deployment(instance)
-  (let* ((network (network instance))
-         (node (node instance))
+  (let* ((node (node instance))
+         (network (network node))
          (xlen (coord-x (field network)))
          (ylen (coord-y (field network)))
          (zlen (coord-z (field network))))
@@ -55,8 +57,7 @@
       (setf
        (slot-value instance 'location)
        (cond
-         ((not deployment)
-          (read-parameter node 'coord 'coord))
+         ((not deployment) (slot-value instance 'location) )
          ((eql deployment 'uniform)
           (make-coord (uniform 0 xlen) (uniform 0 ylen) (uniform 0 zlen)))
          ((eql deployment 'center)

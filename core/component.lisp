@@ -14,20 +14,20 @@
     (call-next-method)))
 
 (defmethod initialize-instance :after
-    ((component component) &key config num-rngs &allow-other-keys)
+    ((component component) &key (num-rngs 1) &allow-other-keys)
   (setf (slot-value component 'rng-map)
-        (if num-rngs
-            (let* ((map (make-array num-rngs))
-                   (path (copy-list (full-path component)))
-                   (last (last path))
-                   (format `(integer :min 0 :max ,(num-rngs *simulation*))))
+        (let* ((map (make-array num-rngs))
+               (path (copy-list (full-path component)))
+               (last (last path))
+               (format `(integer :min 0 :max ,(num-rngs *simulation*))))
               (dotimes(i num-rngs)
-                (rplacd last (intern (format nil "RNG-~D" i)))
+                (rplacd last (list (intern (format nil "RNG-~D" i))))
                 (setf (aref map i)
-                      (multiple-value-bind
-                            (m found-p) (read-parameter path config format)
-                        (aref (rng-map *simulation*) (if found-p m 0))))))
-            (rng-map *simulation*))))
+                      (multiple-value-bind(m found-p)
+                          (read-parameter
+                           path (configuration component) format)
+                        (aref (rng-map *simulation*) (if found-p m 0)))))
+              map)))
 
 (defmethod finish :around ((component component))
   (let ((*context* component))
