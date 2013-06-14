@@ -24,7 +24,7 @@
   (let ((record (call-next-method)))
     (setf (timestamped-queue-average-timestamp q)
           (if (zerop (size q))
-              0.0
+              0.0d0
           (/ (- (* (1+ (size q)) (timestamped-queue-average-timestamp q))
                 (timestamped-time record))
              (size q))))
@@ -38,13 +38,13 @@
   ((queue :reader queue :type timestamped-queue)
    (buffer-size
     :initarg :buffer-size
-    :type integer :parameter t :initform 32 :reader buffer-size
+    :type fixnum :parameter t :initform 32 :reader buffer-size
     :documentation "max size in messages")
    (buffer-size-bytes
     :initarg :buffer-size-bytes
-    :type integer :parameter t :initform nil :reader buffer-size-bytes
+    :type fixnum :parameter t :initform nil :reader buffer-size-bytes
     :documentation "max size in bytes")
-   (byte-length :initform 0 :type integer :reader byte-length))
+   (byte-length :initform 0 :type fixnum :reader byte-length))
   (:metaclass parameter-class))
 
 (defmethod initialize-instance :after((buffer packet-buffer)

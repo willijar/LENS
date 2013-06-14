@@ -86,7 +86,7 @@ model domain."))
   ((encapsulated-packet
     :type packet :initarg :encapsulated-packet
     :documentation "Higher level encapsulated protocol packet.")
-   (duration :accessor duration :type number :initform 0
+   (duration :accessor duration :type time-type :initform 0.0d0
              :documentation "Duration of last transmission")
    (control-info
     :accessor control-info :initarg :control-info
@@ -116,8 +116,10 @@ after having received the packet, and to act upon it."))
     (setf (slot-value packet 'encapsulated-packet) other)))
 
 (defgeneric decapsulate(packet)
-  (:documentation "Users must use this to get encapsulated packet for subsequent packet may be shared shared across network.")
-  (:method((packet packet)) (duplicate (slot-value packet 'encapsulated-packet))))
+  (:documentation "Users must use this to get encapsulated packet for
+  subsequent packet may be shared shared across network.")
+  (:method((packet packet))
+    (duplicate (slot-value packet 'encapsulated-packet))))
 
 (defmethod duplicate((packet packet) &optional duplicate)
   (call-next-method)

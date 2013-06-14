@@ -1,6 +1,5 @@
 (in-package :lens.wsn)
 
-
 (defclass scenario-physical-process(physical-process)
   ((k :parameter t :type real :initform 0.25 :initarg :k
                      :documentation "multiplicative parameter (k)")

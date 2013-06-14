@@ -61,10 +61,14 @@
    (max-tx-power :type real :initform 0.0 :accessor max-tx-power)
    (receivers
     :type array :reader receivers
-    :documentation "an array of lists of receiver gateways affected by ongoing transmission from node i.")
+    :documentation "an array of lists of receiver gateways affected by
+    ongoing transmission from node i.")
    (cells
     :type array :reader cells
-    :documentation "an array of cell entities with node occupation and path-loss to other cells"))
+    :documentation "an array of cell entities with node occupation and
+    path-loss to other cells")
+   (location-cells :type hash-table :initform (make-hash-table)
+                   :documentation "Cached location cell by node instance"))
   (:default-initargs :num-rngs 3)
   (:gates
    (fromNodes :input))
@@ -91,31 +95,36 @@ channel module"
                    (floor a (funcall f (cell-size module)))))
              (load-time-value (list #'coord-x #'coord-y #'coord-z)))))))
 
+(defun location-cell(channel instance)
+  (or (gethash instance (slot-value channel 'location-cells))
+      (index (node instance))))
+
+(defun (setf location-cell)(index channel instance)
+  (setf (gethash instance (slot-value channel 'location-cells)) index))
+
 (defmethod initialize((wireless wireless-channel) &optional (stage 0))
   (let* ((nodes (nodes (network *simulation*))))
     (when (= 0 stage)
       (call-next-method)
       (map 'nil #'(lambda(node) (subscribe node 'node-move wireless)) nodes)
       (return-from initialize nil))
-    (let ((mobility-modules
-           (map 'list #'(lambda(node) (submodule node 'mobility)) nodes))
-          (static-only-p  (every #'static-p mobility-modules)))
-      (if static-only-p
-          (progn
-            (setf (slot-value wireless 'cells) (make-array (length nodes)))
-               (dolist(module mobility-modules)
-                 (let ((idx (index (node module))))
-                   (setf (location-cell (location module)) idx)
-                   (setf (aref (cells wireless) idx)
-                         (make-cell :coord (coord (location module))
-                                    :occupation (list module))))))
-             (with-slots(field cell-size cells) wireless
-               (setf field
-                     (coord-op #'(lambda(f) (if (<= f 0.0) 1.0 f))
-                               (field (network wireless))))
-               (setf cell-size
-                     (coord-op #'(lambda(f c)  (if (<= c 0.0) f (min f c)))
-                               field cell-size))
+    (if (every #'(lambda(node) (static-p (submodule node 'mobility)))
+               nodes) ;; all static then one node per cell
+        (progn
+          (setf (slot-value wireless 'cells) (make-array (length nodes)))
+          (dolist(node nodes)
+            (let ((idx (index node)))
+              (setf (location-cell wireless node) idx)
+              (setf (aref (cells wireless) idx)
+                    (make-cell :coord (coord (location node))
+                               :occupation (list node))))))
+        (with-slots(field cell-size cells) wireless
+          (setf field
+                (coord-op #'(lambda(f) (if (<= f 0.0) 1.0 f))
+                          (field (network wireless))))
+          (setf cell-size
+                (coord-op #'(lambda(f c)  (if (<= c 0.0) f (min f c)))
+                          field cell-size))
                (let ((dimensions
                       (let ((d (coord-op #'ceiling field cell-size)))
                         (list (coord-x d) (coord-y d) (coord-z d)))))
@@ -129,10 +138,10 @@ channel module"
                              (setf (aref cells i j k)
                                    (make-cell
                                     :coord (make-coord x y z)))))))))
-                 (dolist(module mobility-modules)
-                   (let ((cell (coord-cell (coord (location module)) wireless)))
-                     (setf (cell (location module)) cell)
-                     (push module (cell-occupation cell)))))))
+                 (dolist(node nodes)
+                   (let ((cell (coord-cell (location node) wireless)))
+                     (setf (location-cell wireless node) cell)
+                     (push node (cell-occupation cell)))))))
          (with-slots(max-tx-power signal-delivery-threshold
                      d0 PLd0 sigma path-loss-exponent bidirectional-sigma)
              wireless
@@ -156,7 +165,8 @@ channel module"
                    (multiple-value-bind(PLd bidirection-pathloss-jitter)
                        (if (< distance (/ d0 10.0))
                            (values 0.0 0.0)
-                           (values (+ PLd0 (* 10 path-loss-exponent * (log (/ distance 10) 10))
+                           (values (+ PLd0 (* 10 path-loss-exponent
+                                              (log (/ distance 10) 10))
                                       (normal 0 sigma))
                                    (/ (normal 0 bidirectional-sigma) 2)))
                      (when (>= (- max-tx-power Pld bidirection-pathloss-jitter)
@@ -165,7 +175,8 @@ channel module"
                               :destination cellj
                               :avg-path-loss (+ Pld bidirection-pathloss-jitter))
                              (row-major-aref path-loss i)))
-                     (when (>= (- max-tx-power (- Pld bidirection-pathloss-jitter))
+                     (when (>= (- max-tx-power
+                                  (- Pld bidirection-pathloss-jitter))
                                signal-delivery-threshold)
                        (push (make-path-loss-element
                               :destination celli
@@ -173,14 +184,17 @@ channel module"
                              (row-major-aref path-loss j)))))))))))
          (parse-path-loss-map channel))
     ;; TODO temporal model
-    (call-next-method)))
+    (call-next-method))
 
 (defun parse-path-loss-map(wireless-channel)
-  "Format is list of lists of transmitter id and cons's of receiver id and pathloss e.g. ((transmitterid (receiverid . loss) (receiverid . loss) ... ) ... )"
+  "Format is list of lists of transmitter id and cons's of receiver id
+and pathloss e.g. ((transmitterid (receiverid . loss) (receiverid
+. loss) ... ) ... )"
   (unless (slot-boundp wireless-channel 'path-loss-map-file)
     (return-from parse-path-loss-map))
   (let ((path-loss-map
-         (with-open-file(is (merge-pathnames (path-loss-map-file wireless-channel)))
+         (with-open-file(is (merge-pathnames
+                             (path-loss-map-file wireless-channel)))
            (read is)))
         (cells (cells wireless-channel)))
     (flet ((idx(id)  (apply #'array-row-major-index cells id)))
@@ -237,17 +251,17 @@ channel module"
                           (mobility mobility) value)
   (declare (ignore value))
   (let* ((location (location mobility))
-         (old-cell (location-cell location))
+         (old-cell (location-cell wireless (node mobility)))
          (new-cell (coord-cell (coord location) wireless)))
     (unless (eql old-cell new-cell)
       (setf (cell-occupation old-cell)
             (delete mobility (cell-occupation old-cell)))
       (push mobility (cell-occupation new-cell))
-      (setf (location-cell mobility) new-cell))))
+      (setf (location-cell wireless (node mobility)) new-cell))))
 
 (defmethod handle-message((wireless wireless-channel)
                           (message wireless-signal-start))
-  (let ((cell-tx (location-cell (location node)))
+  (let ((cell-tx (location-cell wireless (node message)))
         (nodeid (nodeid (node message))))
     (dolist(path-loss (cell-path-loss cell-tx))
       (unless (cell-occupation (path-loss-destination path-loss)) (go next))

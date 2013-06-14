@@ -26,7 +26,7 @@
   "Current global context in which evaluation (e.g. random functions)
   is to be done.")
 
-(defvar *time-format* "~6,3f"  "Time output format control")
+(defvar *time-format* "~8,3f"  "Time output format control")
 
 ;; base class for in simulation errors (not program errors)
 (define-condition simulation-condition(condition)())
@@ -98,10 +98,15 @@ appended onto end of list1 value"
                      v1)))
     result))
 
-(defstruct (coord (:constructor make-coord(&optional x y z)))
-  (x 0.0d0 :type double-float :read-only t)
-  (y 0.0d0 :type double-float :read-only t)
-  (z 0.0d0 :type double-float :read-only t))
+(defstruct (coord (:constructor make-coord(&optional x y z))
+                  (:print-object (lambda(c os)
+                                   (format os "(~A,~A,~A)"
+                                           (coord-x c)
+                                           (coord-y c)
+                                           (coord-z c)))))
+  (x 0.0 :type float :read-only t)
+  (y 0.0 :type float :read-only t)
+  (z 0.0 :type float :read-only t))
 
 (defun coord+(a b)
   (make-coord (+ (coord-x a) (coord-x b))
@@ -118,7 +123,7 @@ appended onto end of list1 value"
               (* (coord-y a) b)
               (* (coord-z a) b)))
 
-(defun coord-op(op coords)
+(defun coord-op(op &rest coords)
   "Given a function and a set of coordinates apply op to each set of ordinates"
   (apply
    #'make-coord

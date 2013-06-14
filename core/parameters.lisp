@@ -90,9 +90,9 @@
 (defmethod parse-input((spec (eql 'coord)) value &key &allow-other-keys)
   (let ((coords
          (parse-input 'list value
-                      :type '(number :coerce-to double-float)
+                      :type '(number :coerce-to float)
                       :min-length 2 :max-length 3)))
-    (make-coord (first coords) (second coords) (or (third coords) 0.0d0))))
+    (make-coord (first coords) (second coords) (or (third coords) 0.0))))
 
 (defmethod parse-input((spec (eql 'number-or-expression)) value
                        &key type &allow-other-keys)

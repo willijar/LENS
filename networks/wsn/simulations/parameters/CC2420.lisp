@@ -45,13 +45,13 @@
  (transitions
   rx
    (rx nil
-    tx #s(transition-element :delay 0.01 :power 62e-3)
-    sleep #s(transition-element :delay 0.194 :power 62e-3))
+    tx #s(transition-element :delay 0.01d0 :power 62e-3)
+    sleep #s(transition-element :delay 0.194d0 :power 62e-3))
   tx
-   (rx #s(transition-element :delay 0.01e-3 :power 62e-3)
+   (rx #s(transition-element :delay 0.01d-3 :power 62e-3)
     tx nil
-    sleep #s(transition-element :delay 0.194e-3 :power 62e-3))
+    sleep #s(transition-element :delay 0.194d-3 :power 62e-3))
   sleep
-   (rx #s(transition-element :delay 0.05e-3 :power 1.4e-3)
-    tx #s(transition-element :delay 0.05e-3 :power 1.4e-3)
+   (rx #s(transition-element :delay 0.05d-3 :power 1.4e-3)
+    tx #s(transition-element :delay 0.05d-3 :power 1.4e-3)
     sleep nil)))

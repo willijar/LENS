@@ -22,8 +22,6 @@
 
 ;; time requires double precision - set this as default for reader too
 (deftype time-type() 'double-float)
-(eval-when(:compile-toplevel :load-toplevel :execute)
-  (setf *read-default-float-format* 'double-float))
 
 (defclass simulation (named-object parameter-object)
   ((clock :type time-type :initform 0.0d0
@@ -312,12 +310,17 @@ are dispatched in current thread"
 
 (defvar *simulation-trace-stream* *standard-output*)
 
-(defun eventlog(&rest args)
-  (when *simulation-trace-stream*
-    (format *simulation-trace-stream* *time-format* (simulation-time))
-    (write-char #\space *simulation-trace-stream*)
-    (apply #'format *simulation-trace-stream* args)
-    (write-char #\newline *simulation-trace-stream*)))
+(let ((last-context nil))
+  (defun eventlog(&rest args)
+    (when *simulation-trace-stream*
+      (unless (eql *context* last-context)
+        (setf last-context *context*)
+        (format *simulation-trace-stream* "~A~%" last-context))
+      (write-char #\space *simulation-trace-stream*)
+      (format *simulation-trace-stream* *time-format* (simulation-time))
+      (write-char #\space *simulation-trace-stream*)
+      (apply #'format *simulation-trace-stream* args)
+      (write-char #\newline *simulation-trace-stream*))))
 
 (defstruct timestamped
   (time (simulation-time) :type time-type)

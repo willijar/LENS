@@ -27,7 +27,7 @@
   (:export
    ;; common
    #:coord #:make-coord #:coord-x #:coord-y #:coord-z
-   #:coord+ #:coord- #:coord* #:distance
+   #:coord+ #:coord- #:coord* #:coord-op #:distance
    #:while #:until #:filter #:for #:copy-slots
    #:range-getf #:range-list-p
    #:queue #:make-queue #:enqueue #:dequeue #:average-queue-time #:size

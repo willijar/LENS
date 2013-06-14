@@ -1,19 +1,14 @@
 (in-package :lens.wsn)
 
 (defstruct orientation
-  (phi 0.0 :type double-float :read-only t)
-  (theta 0.0 :type double-float :read-only t))
-
-(defstruct location
-  (coord (make-coord) :type coord)
-  (orientation (make-orientation) :type orientation)
-  cell) ;; cell this entity is in - used by wireless-channel
+  (phi 0.0 :type float :read-only t)
+  (theta 0.0 :type float :read-only t))
 
 (defmethod dfv::parse-input((spec (eql 'orientation)) value
                             &key &allow-other-keys)
   (let ((coords
          (dfv::parse-input 'list value
-                      :type '(number :coerce-to double-float)
+                      :type '(number :coerce-to float)
                       :min-length 2 :max-length 2)))
     (make-orientation :phi (first coords)
                       :theta (second coords))))
@@ -26,11 +21,6 @@
     :documentation "current orientation initialized from parameter gile")
    (static-p :initform t :initarg :static-p :reader static-p))
   (:metaclass module-class))
-
-(defmethod initialize((instance mobility) &optional (stage 0))
-  (case stage
-    (0 (setf (location-cell (location instance)) (index (node instance)))))
-  (call-next-method))
 
 (defgeneric (setf location)(location instance)
   (:documentation "Change location in mobility manager")

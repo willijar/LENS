@@ -45,7 +45,8 @@
                (:file "mac-base" :depends-on ("common"))
                (:file "radio-support-functions")
                (:file "radio-base"
-                      :depends-on ("common" "radio-support-functions"))
+                      :depends-on
+                      ("common" "mac-base" "radio-support-functions"))
                (:module "routing" :depends-on ("routing-base")
                        :components
                        ((:file "bypass-routing")))

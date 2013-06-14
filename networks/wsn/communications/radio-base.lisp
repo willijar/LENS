@@ -26,8 +26,8 @@
                  "packets failed, radio not in RX")
 
 (defstruct custom-modulation ;; element for storing custom snrtober.
-  (snr 0.0 :type double-float)
-  (ber 0.0 :type double-float))
+  (snr 0.0 :type float)
+  (ber 0.0 :type float))
 
 (deftype modulation-type() '(or symbol (array custom-modulation 1)))
 
@@ -42,41 +42,41 @@
 
 (defstruct rx-mode
   (name nil :type symbol)
-  (data-rate 0.0 :type double-float)
+  (data-rate 0.0 :type float)
   (modulation 'ideal :type modulation-type)
   (bits-per-symbol 1 :type fixnum)
-  (bandwidth 0.0 :type double-float)
-  (noise-bandwidth 0.0 :type double-float)
-  (noise-floor 0.0 :type double-float)
-  (sensitivity 0.0 :type double-float)
-  (power-consumed 0.0 :type double-float))
+  (bandwidth 0.0 :type float)
+  (noise-bandwidth 0.0 :type float)
+  (noise-floor 0.0 :type float)
+  (sensitivity 0.0 :type float)
+  (power-consumed 0.0 :type float))
 
 (defstruct received-signal
   src ;; used to distingish between signals e.g. node or radio id
-  (power-dbm 0.0 :type double-float)
+  (power-dbm 0.0 :type float)
   (modulation 'ideal :type modulation-type)
   (encoding 'nrz :type encoding-type)
-  (current-interference 0.0 :type double-float) ;; in dbm
-  (max-interference 0.0 :type double-float) ;; in dbm
+  (current-interference 0.0 :type float) ;; in dbm
+  (max-interference 0.0 :type float) ;; in dbm
   (bit-errors 0 :type (or fixnum t)))
 
 (defstruct total-power-received
-  (power-dbm 0.0 :type double-float)
-  (start-time 0.0 :type time-type))
+  (power-dbm 0.0 :type float)
+  (start-time 0d0 :type time-type))
 
 (defstruct transition-element
-  (delay 0.0 :type time-type)
-  (power 0.0 :type double-float)) ;; in mW
+  (delay 0d0 :type time-type)
+  (power 0.0 :type float)) ;; in mW
 
 (defstruct sleep-level
   (name nil :type symbol)
-  (power 0.0 :type double-float)
+  (power 0.0 :type float)
   (up (make-transition-element) :type (or transition-element nil))
   (down (make-transition-element) :type (or transition-element nil)))
 
 (defstruct tx-level
-  (output-power 0.0 :type double-float) ;; in dbm
-  (power-consumed 0.0 :type double-float)) ;; in W
+  (output-power 0.0 :type float) ;; in dbm
+  (power-consumed 0.0 :type float)) ;; in W
 
 (deftype cca-result() '(member clear busy cs-not-valid cs-not-valid-yet))
 
@@ -95,7 +95,7 @@
           with. RX and TX are always there. according to the radio
           defined we can choose from a different set of sleep states")
    (initial-tx-output-power
-    :type double-float :parameter t :initform nil
+    :type float :parameter t :initform nil
     :documentation "we can choose a Txpower to begin with. Possible tx
     power values are defined in the RadioParametersFile. nil
     means use the first tx power defined (which is also the highest)")
@@ -106,7 +106,7 @@
     use first level defined (will usually be the fastest and most
     energy consuming sleep state)")
    (carrier-frequency
-    :type double-float :parameter t :initform 2.4E9
+    :type float :parameter t :initform 2.4E9
     :accessor carrier-frequency
     :properties (:units "Hz")
     :documentation "the carrier frequency (in Hz) to begin with.")
@@ -116,7 +116,7 @@
     :reader collision-model
     :documentation "none, simple, additive or advance interference")
    (cca-threshold
-    :type real :parameter t :initform -95 :accessor cca-threshold
+    :type float :parameter t :initform -95 :accessor cca-threshold
     :documentation "the threshold of the RSSI register (in dBm) were
     above it channel is NOT clear")
    (symbols-for-rssi
@@ -125,14 +125,14 @@
     :type boolean :parameter t :initform nil
     :reader carrier-sense-interrupt-enabled)
    (max-phy-frame-size
-    :initform 1024 :type integer :parameter t :reader max-phy-frame-size
+    :initform 1024 :type fixnum :parameter t :reader max-phy-frame-size
     :properties (:units "B") :documentation "in bytes")
    (header-overhead :initform 6 :documentation "in bytes - 802.15.4=6bytes")
    (avg-busy-frame
-    :type double-float :initform 1 :parameter t :reader avg-busy-frame
+    :type time-type :initform 1d0 :parameter t :reader avg-busy-frame
     :properties (:units "s")
     :documentation "integration time for measuring avg busy time")
-   (avg-busy :type double-float :initform 0 :accessor avg-busy)
+   (avg-busy :type time-type :initform 0d0 :accessor avg-busy)
    (buffer-size :initform 16) ;; overwrite inherited default
    (wireless-channel :type gate :reader wireless-channel
                      :documentation "Gate to directly send wireless messages
@@ -149,7 +149,7 @@
    (rx-mode :type rx-mode :accessor rx-mode)
    (sleep-level :type sleep-level :accessor sleep-level)
    (last-transition-time
-    :type time-type :initform 0.0 :accessor last-transition-time)
+    :type time-type :initform 0d0 :accessor last-transition-time)
    (changing-to-state
     :type radio-state :initform nil :accessor changing-to-state
     :documentation "indicates that the Radio is in the middle of changing to
@@ -158,13 +158,13 @@
     :initform nil :type list :accessor received-signals
     :documentation " a list of signals curently being received")
    (time-of-last-signal-change
-    :initform 0.0 :type time-type :accessor time-of-last-signal-change
+    :initform 0d0 :type time-type :accessor time-of-last-signal-change
     :documentation "last time the above list changed")
    (total-power-received
     :initform nil :type list :accessor total-power-received
     :documentation " a history of recent changes in total received power to help calculate RSSI")
    (rssi-integration-time
-    :initform 1.0 :type time-type :reader rssi-integration-time
+    :initform 1d0 :type time-type :reader rssi-integration-time
     :documentation "span of time the total received power is integrated to calculate RSSI")
    (cs-interrupt-message
     :type radio-control-message :reader cs-interrupt-message
@@ -182,7 +182,7 @@
    (state-after-tx :initform 'rx :type radio-state :accessor state-after-tx)
    (processing-delay
     :type time-type :initarg :processing-delay :parameter t
-    :initform 0.00001 :reader processing-delay
+    :initform 10d-6 :reader processing-delay
     :documentation "delay to pass packets/messages/interrupts to upper layer"))
   (:gates
    (mac :inout)
@@ -494,7 +494,7 @@
             (loop :for a :on (sleep-levels radio)
                :until (eql (car a) (sleep-level radio))
                :do (accumulate-level (car a) #'sleep-level-down)))))
-       (emit radio 'power-drawn transition-power)
+       (emit radio 'power-change transition-power)
        (eventlog "Set state to ~A, delay=~A, power=~A"
                  changing-to-state transition-delay transition-power)
        (delay-state-transition radio transition-delay))))
@@ -525,7 +525,7 @@
                      (rx-mode-data-rate rx-mode))))
        ;; if in rx mode change drawn power
        (when (eql state 'rx)
-         (emit radio 'power-drawn (rx-mode-power-consumed rx-mode)))))
+         (emit radio 'power-change (rx-mode-power-consumed rx-mode)))))
 
     (set-tx-output
      (with-slots(tx-level tx-levels) radio
@@ -605,16 +605,16 @@
           (eventlog "WARNING: just changed to TX but buffer is empty - changing to RX"))
          (t
           (let ((time-to-tx-packet (debuffer-and-send radio)))
-            (emit radio 'power-drawn (tx-level-power-consumed (tx-level radio)))
+            (emit radio 'power-change (tx-level-power-consumed (tx-level radio)))
             ;; flush received power history
             (setf (total-power-received radio) nil)
             (schedule-at radio (continue-tx-message radio)
                          :delay time-to-tx-packet)))))
       (rx
-       (emit radio 'power-drawn (rx-mode-power-consumed (rx-mode radio)))
+       (emit radio 'power-change (rx-mode-power-consumed (rx-mode radio)))
        (update-total-power-received radio nil))
       (sleep
-       (emit radio 'power-drawn (sleep-level-power (sleep-level radio)))
+       (emit radio 'power-change (sleep-level-power (sleep-level radio)))
        (setf (total-power-received radio) nil)))))
 
 (defmethod handle-message((radio radio) (message message))
@@ -638,7 +638,7 @@
      (setf (state-after-tx radio) 'rx)) ;; return to default behaviour
     (t
      (let ((time-to-tx-packet (debuffer-and-send radio)))
-       (emit radio 'power-drawn (tx-level-power-consumed (tx-level radio)))
+       (emit radio 'power-change (tx-level-power-consumed (tx-level radio)))
        ;; flush received power history
        (setf (total-power-received radio) nil)
        (schedule-at radio (continue-tx-message radio)
@@ -810,7 +810,7 @@
                            (* fraction-time (rssi-integration-time radio))))))
 
 (defmethod snr2ber(rx-mode snr-db &optional bpnb)
-  (declare (ignore bpnb) (double-float snr-db))
+  (declare (ignore bpnb) (float snr-db))
   (snr2ber (modulation rx-mode) snr-db
            (/ (rx-mode-data-rate rx-mode)
               (rx-mode-noise-bandwidth rx-mode))))

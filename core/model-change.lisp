@@ -2,7 +2,8 @@
 
 (defclass model-change-notification()
   ()
-  (:documentation " Common base class for data objects that accompany PRE_MODEL_CHANGE and POST_MODEL_CHANGE notifications (signals).)"))
+  (:documentation " Common base class for data objects that accompany
+  PRE_MODEL_CHANGE and POST_MODEL_CHANGE notifications (signals).)"))
 
 (defmacro def-change-notification(name (&rest classes) fields &rest rest)
   (unless classes (setf classes  '(model-change-notification)))
@@ -27,7 +28,8 @@
 
 (def-change-notification pre-module-delete-notification()
   (module)
-  (:documentation "Fired at the top of cModule::deleteModule(). The module still exists at this point."))
+  (:documentation "Fired at the top of cModule::deleteModule(). The
+  module still exists at this point."))
 
 (def-change-notification post-module-delete-notification()
   (module parent-module vector-size index)
@@ -37,7 +39,8 @@
 
 (def-change-notification pre-module-reparent-notification()
   (module new-parent-module)
-  (:documentation "Fired at the top of cModule::changeParentTo(), before any changes have been done."))
+  (:documentation "Fired at the top of cModule::changeParentTo(),
+  before any changes have been done."))
 
 (def-change-notification post-module-reparent-notification()
   (module old-parent-module)
@@ -45,15 +48,18 @@
 
 (def-change-notification pre-gate-add-notification()
   (module gate-name gate-type vector-p)
-  (:documentation "This notification is fired at the top of cModule::addGate(), that is, when a gate or gate vector is added to the module.
+  (:documentation "This notification is fired at the top of
+  cModule::addGate(), that is, when a gate or gate vector is added to
+  the module.
 
 Note: this notification is fired for the gate or gate vector as a
 whole, and not for individual gate objects in it. That is, a single
 notification is fired for an inout gate (which is a gate pair) and
 for gate vectors as well.
 
-Fields in this class carry the module object on which the gate or gate vector
-being created, and the arguments of the addGate() method call."))
+Fields in this class carry the module object on which the gate or gate
+vector being created, and the arguments of the addGate() method
+call."))
 
 (def-change-notification post-gate-add-notification()
   (module gate-name)
@@ -107,7 +113,9 @@ listener to the parent module (as notifications propagate up)."))
 
 (def-change-notification post-gate-connect-notification()
   (gate)
-  (:documentation "This notification is fired at the end of cGate::connectTo(), to announce that a connection between the given gate and its peer (gate->getNextGate()) has been created.
+  (:documentation "This notification is fired at the end of
+  cGate::connectTo(), to announce that a connection between the given
+  gate and its peer (gate->getNextGate()) has been created.
 
 This notification is fired on the module that contains the source
 gate.  of the connection. If you wish to listen on the target gate of
@@ -128,11 +136,12 @@ parent module (as notifications propagate up)."))
 
 (def-change-notification post-gate-disconnect-notification()
   (gate target-gate channel)
-  (:documentation "This notification is fired at the end of cGate::disconnect(), to announce that the connection between the given gates has been deleted.
-This notification is fired on the module that contains the source gate.
-of the connection. If you wish to listen on the target gate of the
-connection being disconnected, you should add the listener to the
- parent module (as notifications propagate up)."))
+  (:documentation "This notification is fired at the end of
+cGate::disconnect(), to announce that the connection between the given
+gates has been deleted.  This notification is fired on the module that
+contains the source gate.  of the connection. If you wish to listen on
+the target gate of the connection being disconnected, you should add
+the listener to the parent module (as notifications propagate up)."))
 
 (def-change-notification path-change-notification()
   (start-gate end-gate changed-gate)

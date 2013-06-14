@@ -1,9 +1,9 @@
 (in-package :lens.wsn)
 
 (defclass app-net-control-info()
-  ((RSSI :type double-float :initarg :RSSI :reader RSSI :initform nil
+  ((RSSI :type float :initarg :RSSI :reader RSSI :initform nil
          :documentation "the RSSI of the received packet")
-   (LQI :type double-float :initarg :LQI :reader LQI :initform nil
+   (LQI :type float :initarg :LQI :reader LQI :initform nil
         :documentation "the LQI of the received packet")
    (source :initarg :source :reader source
            :documentation "the routing layer source of the received packet")
@@ -26,7 +26,7 @@
    (sequence-number :initarg :seqnum :initarg :sequence-number
                     :reader sequence-number :reader sequence-number
                     :documentation "a field to distinguish between packets")
-   (byte-length :initarg :byte-length :reader byte-length
+   (byte-length :type fixnum :initarg :byte-length :reader byte-length
                 :initform 20))
   (:documentation "A generic application packet. If defining your own
   packet you have to extend from this packewt. You do not have to use

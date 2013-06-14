@@ -1,21 +1,17 @@
 (in-package :lens.wsn)
 
-(declaim (inline ratio-to-db db-to-ratio dbm+ dbm-))
+(declaim (inline ratio-to-db db-to-ratio))
 
 (defun ratio-to-db(ratio)
-  (declare (double-float ratio))
-  (* 10.0d0 (log ratio 10.0d0)))
+  (* 10.0 (log ratio 10.0)))
 
 (defun db-to-ratio(db)
-  (declare (double-float db))
-  (expt 10.0d0 (* db 0.1d0)))
+  (expt 10.0 (* db 0.1)))
 
 (defun dbm+(a b)
-  (declare (double-float a b))
   (ratio-to-db (+ (db-to-ratio a) (db-to-ratio b))))
 
 (defun dbm-(a b)
-  (declare (double-float a b))
   (ratio-to-db (- (db-to-ratio a) (db-to-ratio b))))
 
 (defvar +ideal-modulation-threshold+ 5.0)
@@ -208,26 +204,26 @@
 		0.00001404308722
 		0.00000905258912	;; BER for SNR 12.0dB
 		0.00000572139679)	;; BER for SNR 12.2dB  PER(4000bits) = 0.9773
-  '(array double-float 1))))
+  '(array float 1))))
 (defmethod snr2ber((encoding (eql 'dqpsk)) snr-db &optional bpnb)
-  (declare (ignore bpnb) (double-float snr-db))
+  (declare (ignore bpnb) (float snr-db))
 	;; The values of the SNR parameter should be within 6.0 and 12.2 dB if not
 	;; we should issue a warning. here we just return appropriate values
   (cond
-    ((< snr-db 6.0d0) 1.0d0)
-    ((>= snr-db 12.2d0) 0.0d0)
+    ((< snr-db 6.0) 1.0)
+    ((>= snr-db 12.2) 0.0)
     (t
-     (multiple-value-bind(index a) (floor (- snr-db 6.0d0) 0.2d0)
+     (multiple-value-bind(index a) (floor (- snr-db 6.0) 0.2)
        (+ (* a (aref ber-array index))
           (* (- 1 a) (aref ber-array (1+ index)))))))))
 
 (defmethod snr2ber((custom array) snr-db &optional bpnb)
-  (declare (ignore bpnb) (type double-float snr-db))
+  (declare (ignore bpnb) (type float snr-db))
   (let ((n (1- (length custom))))
     (flet ((snr(i) (custom-modulation-snr (aref custom i))))
       (cond
-        ((> (snr 0) snr-db) 0.0d0)
-        ((< (snr n) snr-db) 1.0d0)
+        ((> (snr 0) snr-db) 0.0)
+        ((< (snr n) snr-db) 1.0)
         (t
          (dotimes(i n)
            (when (>= (snr (1+ i)) snr-db)

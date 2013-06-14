@@ -14,7 +14,7 @@
   ((owner :reader node)
    (power-consumption
     :parameter t :initform 0.02 :reader power-consumption
-    :initarg :power-consumption
+    :initarg :power-consumption :type float
     :documentation "Power consumption for this sensor")
    (physical-process-id
     :parameter t :type integer :reader physical-process-id :initform 0
@@ -28,22 +28,22 @@
     :documentation "Type of sensor e.g. humidity, temperature, light etc")
    (bias
     :parameter t :initform (uniform 0 0.1) :reader bias :initarg :bias
-    :properties (:format 'eval)
+    :properties (:format 'eval) :type float
     :documentation "Device offset reading")
    (noise
     :parameter t ::volatile t :initform #'(lambda() (normal 0 0.1))
-    :reader noise :initarg :noise
+    :reader noise :initarg :noise :type float
     :documentation "stddev of Gaussian Noise for device")
    (sensitivity
-    :parameter t :initform 0 :reader sensitivity :type real
+    :parameter t :initform 0 :reader sensitivity :type float
     :documentation "holds the minimum value which can be sensed by
     each sensing device.")
    (resolution
-    :parameter t :initform 0.001 :reader resolution :type real
+    :parameter t :initform 0.001 :reader resolution :type float
     :documentation "holds the sensing resolution. the returned value
      will always be a multiple of number, given here")
    (saturation
-    :parameter t :initform  1 :reader saturation :type real
+    :parameter t :initform  1 :reader saturation :type float
     :documentation "holds the saturation value for each sensing device")
    (last-measurement :type measurement :accessor last-measurement)
    (sample-interval
@@ -83,7 +83,8 @@ thern the message will correspond to the last sampled time."))
      (setf (slot-value sensor 'physical-process)
           (submodule (network sensor)
                       'physical-processes
-                      :index (physical-process-id sensor)))))
+                      :index (physical-process-id sensor)))
+     (emit sensor 'power-changer (power-consumption sensor))))
   (call-next-method))
 
 (defmethod startup((instance sensor))

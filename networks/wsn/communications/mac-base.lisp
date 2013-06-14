@@ -62,9 +62,9 @@
   (:method((module mac) (command communications-control-command))
     (assert (typep module 'radio-control-command))
     (send module command 'radio))
-  (:method((module routing) (packet mac-packet))
+  (:method((module mac) (packet mac-packet))
     (send module packet 'radio))
-  (:method((module routing) (message message))
+  (:method((module mac) (message message))
     (error "Mac module ~A attempting to send ~A to RADIO"
            module message)))
 
