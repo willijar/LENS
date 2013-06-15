@@ -45,6 +45,10 @@
     :documentation "in bytes"))
   (:metaclass module-class))
 
+(defmethod print-object((m comms-module) os)
+  (print-unreadable-object(m os :type t :identity t)
+    (format os "~A ~A" (name m) (nodeid (node m)))))
+
 (defmethod build-submodules((module comms-module))
   (let ((buffer-size (slot-value module 'buffer-size)))
     (setf (slot-value module 'buffer)

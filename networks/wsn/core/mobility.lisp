@@ -34,7 +34,7 @@
 
 (defmethod configure :after ((instance mobility))
   (parse-deployment instance)
-  (eventlog "~A initial location is ~A" (node instance) (location instance)))
+  (eventlog "initial location is ~A" (location instance)))
 
 (defun parse-deployment(instance)
   (let* ((node (node instance))

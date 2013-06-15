@@ -36,6 +36,10 @@
   ((disabled-p :initform nil :initarg :disabled-p :reader disabled-p))
   (:metaclass module-class))
 
+(defmethod print-object((m wsn-module) os)
+  (print-unreadable-object(m os :type t :identity t)
+    (format os "~A ~A" (name m) (nodeid (node m)))))
+
 (defmethod initialize-instance :after ((module wsn-module)
                                        &key &allow-other-keys)
   (subscribe (node module) 'node-shutdown module)

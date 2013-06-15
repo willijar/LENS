@@ -127,7 +127,7 @@ appended onto end of list1 value"
   "Given a function and a set of coordinates apply op to each set of ordinates"
   (apply
    #'make-coord
-   (mapcar #'(lambda(f) (apply op (mapcar f coords)))
+   (mapcar #'(lambda(f) (coerce (apply op (mapcar f coords)) 'float))
            (load-time-value (list #'coord-x #'coord-y #'coord-z)))))
 
 (defgeneric distance(a b)
