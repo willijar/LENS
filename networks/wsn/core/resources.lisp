@@ -9,7 +9,7 @@
  'power-change
  "Sent by a module to indicate a new power consumption level (in W)")
 
-(defclass resources(module)
+(defclass resources(wsn-module)
   ((ram-size
     :parameter t :type integer :initform 0 :initarg :ram-size
     :documentation "in kB")
@@ -44,8 +44,8 @@
     :type hash-table :initform (make-hash-table) :reader power-levels
     :documentation "Last power drawn indexed by module")
    (update-interval
-    :parameter t :type time-type :reader update-interval :initform 1d-3
-    :documentation "Interval for position updates along trajectory")
+    :parameter t :type time-type :reader update-interval :initform 1d0
+    :documentation "Interval for periodic updates in energy")
    (periodic-update-message
     :type message :reader periodic-update-message
     :initform (make-instance 'message :name 'resource-periodic-update))
@@ -69,23 +69,28 @@
     (assert (>= baseline-node-power 0.0)
             ()
             "Baseline node power must be >=0")
-    (setf current-node-power baseline-node-power))
-  (subscribe (parent-module module) 'power-change module))
+    (setf current-node-power baseline-node-power)))
+
+(defmethod initialize and ((module resources) &optional (stage 0))
+  (case stage
+    (0 (subscribe (node module) 'power-change module)))
+  t)
 
 (defun calculate-energy-spent(instance)
   (with-slots(remaining-energy time-of-last-calculation current-node-power
               periodic-update-message update-interval)
       instance
     (when (> remaining-energy 0.0)
-      (let* ((time-passed (- time-of-last-calculation (simulation-time)))
-             (energy-consumed (* time-passed current-node-power)))
-        (eventlog "Energy consumed in last ~eS is ~eW"
+      (let* ((time-passed (- (simulation-time) time-of-last-calculation))
+             (energy-consumed
+              (coerce (* time-passed current-node-power) 'single-float)))
+        (eventlog "Energy consumed in last ~:/dfv:eng/S is ~:/dfv:eng/J"
                   time-passed energy-consumed)
         (consume-energy instance energy-consumed)
         (setf time-of-last-calculation (simulation-time))
         (cancel periodic-update-message)
         (schedule-at instance periodic-update-message
-                     :time (+ (simulation-time) update-interval))))))
+                     :delay update-interval)))))
 
 (defun consume-energy(instance amount)
   (with-slots(remaining-energy) instance
@@ -115,14 +120,14 @@
         t))))
 
 (defmethod get-simulation-time((instance resources) local-time)
-    (* local-time (clock-drift instance)))
+    (* local-time (+ 1d0 (clock-drift instance))))
 
 (defmethod receive-signal((instance resources) (signal (eql 'power-change))
                           source power)
    (calculate-energy-spent instance)
    (let* ((old-power (gethash source (power-levels instance) 0.0))
           (new-power (+ (current-node-power instance) (- power old-power))))
-     (eventlog "New power consumption oldpower=~A newpower=~A"
+     (eventlog "New power consumption ~:/dfv:eng/W --> ~:/dfv:eng/W"
                (current-node-power instance) new-power)
      (setf (current-node-power instance) new-power)
      (setf (gethash source (power-levels instance)) power)))

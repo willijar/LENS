@@ -22,12 +22,12 @@
    (radio :inout))
   (:metaclass module-class))
 
-(defmethod initialize ((instance mac) &optional stage)
+(defmethod initialize and ((instance mac) &optional stage)
   (case stage
     (0
      (unless (slot-boundp instance 'address)
        (setf (slot-value instance 'address) (nodeid (node instance))))))
-  (call-next-method))
+  t)
 
 (defmethod mac-address((node node))
   ;; currently one mac and radio per npode so this is OK - change if multiple

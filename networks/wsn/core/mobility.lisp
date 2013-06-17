@@ -28,7 +28,7 @@
     (assert (not (static-p instance))
             ()
             "Attempt to change location of static node ~A" (node instance))
-    (setf (location instance) location)
+    (setf (slot-value instance 'location) location)
     (emit instance 'node-move)
     location))
 

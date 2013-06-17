@@ -48,13 +48,14 @@
   (subscribe node 'out-of-memory node)
   (subscribe node 'out-of-energy node))
 
-(defmethod initialize((node node) &optional (stage 0))
+(defmethod initialize and ((node node) &optional (stage 0))
   (case stage
     (0
-     (schedule-at node (make-instance 'message :name 'node-startup)
-                  :delay  (+ (startup-offset node)
-                             (* (uniform 0 1) (startup-randomization node))))))
-  (call-next-method))
+     (schedule-at
+      node (make-instance 'message :name 'node-startup)
+      :delay  (+ (startup-offset node)
+                 (* (uniform 0 1) (startup-randomization node))))))
+  t)
 
 (defmethod handle-message((node node) message)
   (case (name message)

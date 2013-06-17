@@ -14,6 +14,10 @@
                     :documentation "a field to distinguish between packets"))
   (:documentation "Base class for network and link layer packets"))
 
+(defmethod print-object((pkt wsn-packet) stream)
+  (print-unreadable-object(pkt stream :type t :identity t)
+    (format stream "#~D (~D bytes)" (sequence-number pkt) (byte-length pkt))))
+
 (defmethod duplicate((packet wsn-packet) &optional duplicate)
   (call-next-method)
   (copy-slots
@@ -26,7 +30,7 @@
 
 (defmethod bit-length((packet wsn-packet)) (* 8 (byte-length packet)))
 
-(defclass comms-module(module)
+(defclass comms-module(wsn-module)
   ((buffer :type packet-buffer :reader buffer)
    (buffer-size :parameter t :initform 32 :type integer :initarg :buffer-size)
    (packet-history

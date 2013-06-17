@@ -30,20 +30,23 @@
 
 (defconstant broadcast-network-address -1)
 (defconstant broadcast-mac-address -1)
-(defvar *simulations* #p"/home/willijar/dev/lisp/src/lens/networks/wsn/simulations/")
+(defvar *simulations*
+  #p"/home/willijar/dev/lisp/src/lens/networks/wsn/simulations/")
 
 (defclass wsn-module(module)
-  ((disabled-p :initform nil :initarg :disabled-p :reader disabled-p))
+  ((disabled-p :initform t :initarg :disabled-p :reader disabled-p))
   (:metaclass module-class))
 
 (defmethod print-object((m wsn-module) os)
   (print-unreadable-object(m os :type t :identity t)
     (format os "~A ~A" (name m) (nodeid (node m)))))
 
-(defmethod initialize-instance :after ((module wsn-module)
-                                       &key &allow-other-keys)
-  (subscribe (node module) 'node-shutdown module)
-  (subscribe (node module) 'node-startup module))
+(defmethod initialize and ((module wsn-module) &optional (stage 0))
+  (case stage
+    (0
+     (subscribe (node module) 'node-shutdown module)
+     (subscribe (node module) 'node-startup module)))
+  t)
 
 (defgeneric startup(module)
   (:documentation "Called to start or restart a module")

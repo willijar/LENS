@@ -1,7 +1,8 @@
 (in-package :lens.wsn)
 
-(register-signal 'packets-received
-                 "Emitted with source address as valuie when pavket received by application")
+(register-signal
+ 'packets-received
+ "Emitted with source address as value when packet received by application")
 
 (defclass throughput-test (application)
   ((header-overhead :initform 5)
@@ -23,7 +24,7 @@
     producing packets")
    (packet-spacing :type real :reader packet-spacing)
    (timer-message :type message :reader timer-message
-                  :initform (make-instance 'message :name 'send-packet)))
+                  :initform (make-instance 'message :name 'send-packet-timer)))
   (:properties
    :statistic (latency
                :source (latency application-receive)
@@ -39,10 +40,12 @@
   (call-next-method)
   (with-slots(packet-spacing packet-rate startup-delay) application
     (setf packet-spacing (if (> packet-rate 0) (/ 1.0d0 packet-rate) 0))
-    (unless (eql (network-address (node application))
-                 (next-recipient application))
-      (set-timer application (timer-message application)
-                 (+ startup-delay packet-spacing)))))
+    (if (and (> packet-spacing 0)
+             (not (eql (network-address (node application))
+                       (next-recipient application))))
+        (set-timer application (timer-message application)
+                   (+ startup-delay packet-spacing))
+        (eventlog "Not sending Packets"))))
 
 (defmethod shutdown((application throughput-test))
   (call-next-method)
@@ -52,9 +55,8 @@
   (cond
     ((eql message (timer-message application))
      (to-network application nil  (next-recipient application))
-     (set-timer application
-                (timer-message application)
-                (packet-spacing application)))
+     (set-timer
+      application (timer-message application) (packet-spacing application)))
     (t (call-next-method))))
 
 (defmethod handle-message ((application throughput-test)
@@ -69,6 +71,8 @@
                            (rcvPacket application-packet))
   (if (eql (network-address (node application)) (next-recipient application))
       (progn
+        (eventlog "Received packet ~A from node ~A"
+                  (sequence-number rcvPacket) (source (control-info rcvPacket)))
         (emit application 'packets-received (source (control-info rcvPacket)))
         (call-next-method)) ;; log receipt
       (to-network application

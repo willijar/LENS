@@ -113,7 +113,8 @@ after having received the packet, and to act upon it."))
   (:documentation "Called to encapsulate one packet within another")
   (:method((packet packet) other)
     (assert (not (slot-boundp packet 'encapsulated-packet)))
-    (setf (slot-value packet 'encapsulated-packet) other)))
+    (setf (slot-value packet 'encapsulated-packet) other)
+    packet))
 
 (defgeneric decapsulate(packet)
   (:documentation "Users must use this to get encapsulated packet for

@@ -59,7 +59,11 @@
   (:documentation "An object which can received signals"))
 
 (defgeneric receive-signal(listener signal source-component value)
-  (:documentation "All listeners must implement this to carry out work"))
+  (:documentation "All listeners must implement this to carry out work")
+  (:method :around(listener signal source-component value)
+    (declare (ignore signal source-component value))
+    (let ((*context* listener))
+      (call-next-method))))
 
 (defmethod finish((listener listener)))
 
@@ -70,17 +74,25 @@
     :documentation "Hash by signal of lists of registered listeners
     for this entity")
    (has-local-listeners
-    :type bit-vector
+    :type simple-bit-vector
     :initform (make-array +SIGNAL-CACHE-SIZE+ :element-type 'bit
                           :initial-element 0)
     :documentation "bit[k]==1: signalID k has local listeners")
    (has-ancestor-listeners
-    :type bit-vector
-    :initform (make-array +SIGNAL-CACHE-SIZE+ :element-type 'bit
-                          :initial-element 0)
+    :type simple-bit-vector
     :documentation "bit[k]==1: signalID k has listeners in any
     ancestor component"))
   (:documentation "An entity which can register listeners"))
+
+(defmethod initialize-instance :after ((instance entity-with-signals)
+                                       &key &allow-other-keys)
+  (let ((owner (owner instance)))
+    (setf (slot-value instance 'has-ancestor-listeners)
+          (if (typep owner 'entity-with-signals)
+              (bit-ior (slot-value owner 'has-ancestor-listeners)
+                       (slot-value owner 'has-local-listeners))
+              (make-array +SIGNAL-CACHE-SIZE+ :element-type 'bit
+                          :initial-element 0)))))
 
 (defgeneric listeners(entity signal)
   (:documentation "Return list of listeners for a particular signal -
@@ -99,7 +111,7 @@
   (declare (fixnum signal-id))
   (or (>= signal-id +SIGNAL-CACHE-SIZE+)
       (= 1 (bit (slot-value entity 'has-local-listeners) signal-id))
-      (= 1(bit (slot-value entity 'has-ancestor-listeners) signal-id))))
+      (= 1 (bit (slot-value entity 'has-ancestor-listeners) signal-id))))
 
 (defun may-have-local-listeners(entity signal-id)
   (declare (fixnum signal-id))

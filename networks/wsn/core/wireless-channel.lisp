@@ -102,82 +102,84 @@ channel module"
 (defun (setf location-cell)(index channel instance)
   (setf (gethash instance (slot-value channel 'location-cells)) index))
 
-(defmethod initialize((wireless wireless-channel) &optional (stage 0))
+(defmethod initialize and ((wireless wireless-channel) &optional (stage 0))
   (let* ((nodes (nodes (network *simulation*))))
-    (when (= 0 stage)
-      (call-next-method)
-      (map 'nil #'(lambda(node) (subscribe node 'node-move wireless)) nodes)
-      (return-from initialize nil))
-    (if (every #'(lambda(node) (static-p (submodule node 'mobility)))
+    (case stage
+      (0
+       (map 'nil #'(lambda(node) (subscribe node 'node-move wireless)) nodes)
+       nil)
+      (1
+       (if (every #'(lambda(node) (static-p (submodule node 'mobility)))
                nodes)
-        (progn  ;; all static then one node per cell
-          (setf (slot-value wireless 'cells) (make-array (length nodes)))
-          (dolist(node nodes)
-            (let ((idx (index node)))
-              (setf (location-cell wireless node) idx)
-              (setf (aref (cells wireless) idx)
-                    (make-cell :coord (location node)
-                               :occupation (list node))))))
-        (with-slots(field cell-size cells) wireless
-          (setf field
-                (coord-op #'(lambda(f) (if (<= f 0.0) 1.0 f))
+           (progn  ;; all static then one node per cell
+             (setf (slot-value wireless 'cells) (make-array (length nodes)))
+             (dolist(node nodes)
+               (let ((idx (index node)))
+                 (setf (location-cell wireless node) idx)
+                 (setf (aref (cells wireless) idx)
+                       (make-cell :coord (location node)
+                                  :occupation (list node))))))
+           (with-slots(field cell-size cells) wireless
+             (setf field
+                   (coord-op #'(lambda(f) (if (<= f 0.0) 1.0 f))
                           (field (network wireless))))
-          (setf cell-size
-                (coord-op #'(lambda(f c)  (if (<= c 0.0) f (min f c)))
-                          field cell-size))
-          (let ((dimensions
-                 (let ((d (coord-op #'/ field cell-size)))
-                   (mapcar #'ceiling
-                           (list (coord-x d) (coord-y d) (coord-z d))))))
-                 (setf (slot-value wireless 'cells) (make-array dimensions))
-                 (dotimes(i (first dimensions))
-                   (let ((x (* i (coord-x cell-size))))
-                     (dotimes(j (second dimensions))
-                       (let ((y (* j (coord-y cell-size))))
-                         (dotimes(k (third dimensions))
-                           (let ((z (* k (coord-z cell-size))))
-                             (setf (aref cells i j k)
-                                   (make-cell
-                                    :coord (make-coord x y z)))))))))
-                 (map 'nil
-                      #'(lambda(node)
-                          (let ((cell (coord-cell (location node) wireless)))
-                            (setf (location-cell wireless node) cell)
-                            (push node (cell-occupation cell))))
-                      nodes))))
-    (with-slots(max-tx-power signal-delivery-threshold
-                d0 PLd0 sigma path-loss-exponent bidirectional-sigma)
-        wireless
-      (let* ((distance-threshold
-              (expt 10 (/ (- max-tx-power signal-delivery-threshold PLd0
-                             (* -3 sigma))
-                          (* 10.0 path-loss-exponent))))
-             (cells (cells wireless))
-             (no-cells (reduce #'* (array-dimensions cells))))
-        (dotimes(i no-cells)
-          (let ((celli (row-major-aref cells i)))
-            ;; path loss to self is zero
-            (push (make-path-loss :destination celli :avg-path-loss 0.0)
-                  (cell-path-loss (row-major-aref cells i)))
-            (dotimes(j no-cells)
-              (let* ((cellj (row-major-aref cells j))
-                     (distance (distance (cell-coord celli)
-                                         (cell-coord cellj))))
-                (when (<= distance distance-threshold)
-                  (multiple-value-bind(PLd bidirection-pathloss-jitter)
-                      (if (< distance (/ d0 10.0))
-                          (values 0.0 0.0)
-                          (values (+ PLd0 (* 10.0 path-loss-exponent
-                                             (log (/ distance 10.0) 10.0))
-                                     (normal 0.0 sigma))
-                                  (/ (normal 0.0 bidirectional-sigma) 2.0)))
-                    (when (>= (- max-tx-power Pld bidirection-pathloss-jitter)
+             (setf cell-size
+                   (coord-op #'(lambda(f c)  (if (<= c 0.0) f (min f c)))
+                             field cell-size))
+             (let ((dimensions
+                    (let ((d (coord-op #'/ field cell-size)))
+                      (mapcar #'ceiling
+                              (list (coord-x d) (coord-y d) (coord-z d))))))
+               (setf (slot-value wireless 'cells) (make-array dimensions))
+               (dotimes(i (first dimensions))
+                 (let ((x (* i (coord-x cell-size))))
+                   (dotimes(j (second dimensions))
+                     (let ((y (* j (coord-y cell-size))))
+                       (dotimes(k (third dimensions))
+                         (let ((z (* k (coord-z cell-size))))
+                           (setf (aref cells i j k)
+                                 (make-cell
+                                  :coord (make-coord x y z)))))))))
+               (map 'nil
+                    #'(lambda(node)
+                        (let ((cell (coord-cell (location node) wireless)))
+                          (setf (location-cell wireless node) cell)
+                          (push node (cell-occupation cell))))
+                    nodes))))
+       (with-slots(max-tx-power signal-delivery-threshold
+                   d0 PLd0 sigma path-loss-exponent bidirectional-sigma)
+           wireless
+         (let* ((distance-threshold
+                 (expt 10 (/ (- max-tx-power signal-delivery-threshold PLd0
+                                (* -3 sigma))
+                             (* 10.0 path-loss-exponent))))
+                (cells (cells wireless))
+                (no-cells (reduce #'* (array-dimensions cells))))
+           (for (i 0 no-cells)
+             (let ((celli (row-major-aref cells i)))
+               ;; path loss to self is zero
+               (push (make-path-loss :destination celli :avg-path-loss 0.0)
+                     (cell-path-loss (row-major-aref cells i)))
+               (for (j (1+ i) no-cells)
+                 (let* ((cellj (row-major-aref cells j))
+                        (distance (distance (cell-coord celli)
+                                            (cell-coord cellj))))
+                   (when (<= distance distance-threshold)
+                     (multiple-value-bind(PLd bidirection-pathloss-jitter)
+                         (if (< distance (/ d0 10.0))
+                             (values 0.0 0.0)
+                             (values (+ PLd0 (* 10.0 path-loss-exponent
+                                                (log (/ distance 10.0) 10.0))
+                                        (normal 0.0 sigma))
+                                     (/ (normal 0.0 bidirectional-sigma) 2.0)))
+                       (when (>=
+                              (- max-tx-power Pld bidirection-pathloss-jitter)
                               signal-delivery-threshold)
-                      (push (make-path-loss
-                             :destination cellj
-                             :avg-path-loss
-                             (+ Pld bidirection-pathloss-jitter))
-                            (cell-path-loss (row-major-aref cells i))))
+                         (push (make-path-loss
+                                :destination cellj
+                                :avg-path-loss
+                                (+ Pld bidirection-pathloss-jitter))
+                               (cell-path-loss (row-major-aref cells i))))
                        (when (>= (- max-tx-power
                                     (- Pld bidirection-pathloss-jitter))
                                  signal-delivery-threshold)
@@ -185,10 +187,15 @@ channel module"
                                 :destination celli
                                 :avg-path-loss
                                 (- Pld bidirection-pathloss-jitter))
-                             (cell-path-loss (row-major-aref cells j))))))))))))
-    (parse-path-loss-map wireless))
-    ;; TODO temporal model
-  (call-next-method))
+                               (cell-path-loss (row-major-aref cells j))))))))))
+           (eventlog "Number of space cells: ~A" no-cells)
+           (eventlog "Each cells affects ~f other cells on average."
+                     (/ (loop :for i :from 0 :below no-cells
+                           :sum (length  (cell-path-loss (row-major-aref cells i))))
+                        no-cells))))
+       (parse-path-loss-map wireless)
+       ;; TODO temporal model and maybe generate on demand.
+       t))))
 
 (defun parse-path-loss-map(wireless-channel)
   "Format is list of lists of transmitter id and cons's of receiver id

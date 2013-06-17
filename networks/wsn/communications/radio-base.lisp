@@ -229,19 +229,18 @@
                 (rx-mode-data-rate (rx-mode radio)))))
     (setf (last-transition-time radio) 0.0d0)))
 
-(defmethod initialize((radio radio) &optional (stage 0))
-  (case stage
-    (0
-     ;; determine address based on node index if undefined
-     (unless (slot-boundp radio 'address)
-       (setf (slot-value radio 'address) (nodeid (node radio))))
-      ;; complete initialisation according to starting state
-     (setf (changing-to-state radio) (state radio)
-           (state radio) 'rx)
-     (complete-state-transition radio)))
-  (call-next-method))
+(defmethod initialize and ((radio radio) &optional stage)
+  (declare (ignore stage))
+  ;; determine address based on node index if undefined
+  (unless (slot-boundp radio 'address)
+    (setf (slot-value radio 'address) (nodeid (node radio))))
+  t)
 
 (defmethod startup((radio radio))
+  ;; complete initialisation according to starting state
+  (setf (changing-to-state radio) (state radio)
+           (state radio) 'rx)
+  (complete-state-transition radio)
   (setf (time-of-last-signal-change radio) (simulation-time))
   (push (make-total-power-received
          :start-time (simulation-time)

@@ -17,10 +17,10 @@
  packet."))
 
 (defclass application-packet(packet)
-  ((applicationid
+  ((name
     :initarg :applicationid :reader applicationid
     :documentation "virtual app uses application ID to filter packet delivery.")
-   (encapsulated-packet
+   (lens::encapsulated-packet
     :type t :initarg :payload :reader payload
     :documentation "Higher level encapsulated protocol packet.")
    (sequence-number :initarg :seqnum :initarg :sequence-number
@@ -32,6 +32,10 @@
   packet you have to extend from this packewt. You do not have to use
   the fields already defined, and you can always define your own
   size."))
+
+(defmethod print-object((pkt application-packet) stream)
+  (print-unreadable-object(pkt stream :type t :identity t)
+    (format stream "#~D (~D bytes)" (sequence-number pkt) (byte-length pkt))))
 
 (defmethod bit-length((pkt application-packet))
   (* 8 (byte-length pkt)))
@@ -113,13 +117,17 @@
                 ()
                 "Destination not specified for packet send"))
     (emit application 'application-send packet)
-    (send application packet 'network))
+    (send application packet 'network)
+    (eventlog "Sending ~A  to communication layer"
+              packet (byte-length packet)))
   (:method((application application) (message message) &optional destination)
     (declare (ignore destination))
     (error "Application ~A attempting to send ~A to network"
            application message))
   (:method((application application) data &optional destination)
-    (to-network application (encapsulate application data) destination)))
+    (let ((packet (encapsulate application data)))
+      (eventlog "sending packet #~A" (sequence-number packet))
+      (to-network application packet destination))))
 
 (defmethod encapsulate((application application) data)
   (make-instance

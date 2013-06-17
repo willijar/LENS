@@ -41,3 +41,9 @@ and send data to 'SINK over network"))
      (send application (measurement message) (sink-address application)))
     (t (warn 'unknown-message :message message :module application))))
 
+(defmethod handle-message((application value-reporting) (pkt application-packet))
+  (when (eql (network-address (node application))
+             (sink-address application))
+    (eventlog "Sink received from ~A value ~A"
+              (source (control-info pkt))
+              (payload pkt))))

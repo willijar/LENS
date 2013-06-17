@@ -32,14 +32,14 @@
      :sensitivity -95.0
      :power-consumed 62e-3))
  (tx-levels
-  #s(tx-level :output-power   0.0 :power-consumed 57.42d-3) ;; dBm, and Watts
-  #s(tx-level :output-power  -1.0 :power-consumed 55.18d-3) ;; dBm, and Watts
-  #s(tx-level :output-power  -3.0 :power-consumed 50.69d-3) ;; dBm, and Watts
-  #s(tx-level :output-power  -5.0 :power-consumed 46.2d-3) ;; dBm, and Watts
-  #s(tx-level :output-power  -7.0 :power-consumed 42.24d-3) ;; dBm, and Watts
-  #s(tx-level :output-power -10.0 :power-consumed 36.3d-3) ;; dBm, and Watts
-  #s(tx-level :output-power -15.0 :power-consumed 32.67d-3) ;; dBm, and Watts
-  #s(tx-level :output-power -25.0 :power-consumed 29.04d-3)) ;; dBm, and Watts
+  #s(tx-level :output-power   0.0 :power-consumed 57.42e-3) ;; dBm, and Watts
+  #s(tx-level :output-power  -1.0 :power-consumed 55.18e-3) ;; dBm, and Watts
+  #s(tx-level :output-power  -3.0 :power-consumed 50.69e-3) ;; dBm, and Watts
+  #s(tx-level :output-power  -5.0 :power-consumed 46.2e-3) ;; dBm, and Watts
+  #s(tx-level :output-power  -7.0 :power-consumed 42.24e-3) ;; dBm, and Watts
+  #s(tx-level :output-power -10.0 :power-consumed 36.3e-3) ;; dBm, and Watts
+  #s(tx-level :output-power -15.0 :power-consumed 32.67e-3) ;; dBm, and Watts
+  #s(tx-level :output-power -25.0 :power-consumed 29.04e-3)) ;; dBm, and Watts
  (sleep-levels
   #s(sleep-level :name idle :power 1.4e-3))
  (transitions

@@ -77,15 +77,18 @@ thern the message will correspond to the last sampled time."))
             "Sample interval ~A is less than measurement time of ~A"
             sample-interval measurement-delay)))
 
-(defmethod initialize((sensor sensor) &optional (stage 0))
+(defmethod initialize :and ((sensor sensor) &optional (stage 0))
   (case stage
     (0
      (setf (slot-value sensor 'physical-process)
           (submodule (network sensor)
                       'physical-processes
                       :index (physical-process-id sensor)))
-     (emit sensor 'power-changer (power-consumption sensor))))
-  (call-next-method))
+     nil)
+    (1
+     ;; emit must be stage 1 so all listeners subscribed
+     (emit sensor 'power-changer (power-consumption sensor))
+     t)))
 
 (defmethod startup((instance sensor))
   (when (not (zerop (sample-interval instance)))

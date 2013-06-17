@@ -11,7 +11,7 @@
    (speed :parameter t :type real :initform 1 :initarg :speed
           :documentation "Speed of motion")
    (update-interval
-    :parameter t :type time-type :reader update-interval :initform 1d-3
+    :parameter t :type time-type :reader update-interval :initform 1d0
     :documentation "Interval for position updates along trajectory")
    (periodic-update-message
     :type message :reader periodic-update-message
@@ -27,9 +27,7 @@
              delta          (coord- destination location))))
 
 (defmethod startup((instance line-mobility))
-  (schedule-at instance (periodic-update-message instance) :delay 0)
-  (schedule-at instance (periodic-update-message instance)
-               :delay (update-interval instance)))
+  (schedule-at instance (periodic-update-message instance) :delay 0))
 
 (defmethod shutdown((instance line-mobility))
   (cancel (periodic-update-message instance)))
@@ -39,7 +37,7 @@
       (with-slots(start-location distance speed delta) instance
         (let ((distance-travelled (* (simulation-time) speed)))
           (multiple-value-bind(n d)
-              (floor distance-travelled distance)
+              (floor (/ distance-travelled distance))
             (setf (location instance)
                   (coord+ start-location
                           (coord* delta (if (evenp n) d (1- d)))))))

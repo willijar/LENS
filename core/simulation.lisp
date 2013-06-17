@@ -152,7 +152,7 @@
          (cond
            ((> pa pb))
            ((= pa pb)
-            (< (slot-value a 'event-id) (slot-value b 'event-id)))))))))
+            (< (slot-value a 'schedule-id) (slot-value b 'schedule-id)))))))))
 
 (defmethod (setf arrival-time) :before ((event event) time)
   (assert (not (scheduled-p event))))
@@ -177,7 +177,9 @@
 
 (defmethod print-object((event event) stream)
   (print-unreadable-object (event stream :type t :identity nil)
-    (format stream "T=~,5f ~D"(arrival-time event)  (uid event) )))
+    (if (>= (uid event) 0)
+        (format stream "T=~,5f ~D"(arrival-time event)  (uid event) )
+        (format stream "Unscheduled"))))
 
 (defgeneric handle(entity)
   (:documentation "Method called by simulation on a scheduled entity")
@@ -267,16 +269,17 @@ are dispatched in current thread"
 (defgeneric initialize(component &optional stage)
   (:documentation "Allowed depth-first staged initialization. Return
   true on final stage")
+  (:method-combination and)
   (:method :around(component &optional stage)
     (declare (ignore stage))
     (or (initialized-p component)
         (let ((*context* component))
           (setf (slot-value component 'initialized-p)
                 (call-next-method)))))
-  (:method(instance &optional stage)
+  (:method and (instance &optional stage)
     (declare (ignore instance stage))
     t)
-  (:method((simulation simulation) &optional stage)
+  (:method and ((simulation simulation) &optional stage)
     (assert (not stage))
     (dolist(hook *simulation-init-hooks*) (funcall hook simulation))
     (let ((stage -1))
