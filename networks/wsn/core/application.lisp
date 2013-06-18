@@ -34,7 +34,7 @@
   size."))
 
 (defmethod print-object((pkt application-packet) stream)
-  (print-unreadable-object(pkt stream :type t :identity t)
+  (print-unreadable-object(pkt stream :type t :identity nil)
     (format stream "#~D (~D bytes)" (sequence-number pkt) (byte-length pkt))))
 
 (defmethod bit-length((pkt application-packet))
@@ -43,8 +43,7 @@
 (defmethod duplicate((pkt application-packet)
                      &optional (duplicate (make-instance 'application-packet)))
   (call-next-method)
-  (copy-slots '(applicationid sequence-number byte-length)
-   pkt duplicate))
+  (copy-slots '(sequence-number byte-length) pkt duplicate))
 
 (defgeneric latency(packet)
   (:documentation "Given a packet return it's latency")
@@ -118,7 +117,7 @@
                 "Destination not specified for packet send"))
     (emit application 'application-send packet)
     (send application packet 'network)
-    (eventlog "Sending ~A  to communication layer"
+    (eventlog "Sending ~A to communication layer"
               packet (byte-length packet)))
   (:method((application application) (message message) &optional destination)
     (declare (ignore destination))
@@ -126,7 +125,6 @@
            application message))
   (:method((application application) data &optional destination)
     (let ((packet (encapsulate application data)))
-      (eventlog "sending packet #~A" (sequence-number packet))
       (to-network application packet destination))))
 
 (defmethod encapsulate((application application) data)

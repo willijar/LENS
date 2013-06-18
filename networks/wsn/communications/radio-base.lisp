@@ -110,7 +110,7 @@
     :accessor carrier-frequency
     :properties (:units "Hz")
     :documentation "the carrier frequency (in Hz) to begin with.")
-   (encoding :type encoding-type :reader encoding)
+   (encoding :initform 'NRZ :type encoding-type :reader encoding)
    (collision-model
     :type symbol :parameter t :initform 'additive-interference-model
     :reader collision-model
@@ -230,10 +230,15 @@
     (setf (last-transition-time radio) 0.0d0)))
 
 (defmethod initialize and ((radio radio) &optional stage)
-  (declare (ignore stage))
-  ;; determine address based on node index if undefined
-  (unless (slot-boundp radio 'address)
-    (setf (slot-value radio 'address) (nodeid (node radio))))
+  (case stage
+    (0
+     ;; determine address based on node index if undefined
+     (unless (slot-boundp radio 'address)
+       (setf (slot-value radio 'address) (nodeid (node radio))))
+     (setf (slot-value radio 'wireless-channel)
+           (gate (submodule (network radio) 'wireless-channel)
+                 'fromNodes
+                 :direction :input))))
   t)
 
 (defmethod startup((radio radio))
@@ -303,7 +308,8 @@
                 (bit-errors ber num-of-bits max-errors)))
         ;; update current-interference in the received signal structure
         (unless (eql signal interferance)
-          (update-interference radio signal interferance))))))
+          (update-interference radio signal interferance)))))
+  (received-signals radio))
 
 (defmethod handle-message((radio radio) (message wireless-signal-start))
   ;; if carrier doesn't match ignore messge - may want to calculate
@@ -315,6 +321,7 @@
   ;; because when we go back in RX we might have some signals active
   ;; from before, acting as interference to the new (fully received
   ;; signals)
+  (eventlog "~A arrived at ~A" message radio)
   (when (or (changing-to-state radio) (not (eql (state radio) 'rx)))
     (push
      (make-received-signal
@@ -348,7 +355,7 @@
               (if (> (total-power-received-power-dbm
                       (first (total-power-received radio)))
                      (rx-mode-noise-floor rx-mode))
-                  0.0d0 ;; a large value in dBm
+                  0.0 ;; a large value in dBm
                   (rx-mode-noise-floor rx-mode))))))
          #+nil(complex-interference-model ;; not implemented
                (rx-mode-noise-floor (rx-mode radio))))
@@ -370,6 +377,7 @@
     (setf (time-of-last-signal-change radio) (simulation-time))))
 
 (defmethod handle-message((radio radio) (message wireless-signal-end))
+  (eventlog "~A arrived at ~A" message radio)
   (let ((ending-signal (find (src message) (received-signals radio)
                              :key #'received-signal-src)))
     (unless ending-signal
@@ -391,12 +399,13 @@
         ((<= (received-signal-bit-errors ending-signal)
              (max-errors-allowed
               radio (received-signal-encoding ending-signal)))
-         (let* ((mac-pkt (decapsulate message))
-                (info (control-info mac-pkt)))
-           (setf (rssi info) (read-rssi radio)
-                 (lqi info)
-                 (- (received-signal-power-dbm ending-signal)
-                    (received-signal-max-interference ending-signal)))
+         (let* ((mac-pkt (decapsulate message)))
+           (setf (control-info mac-pkt)
+                 (make-instance
+                  'mac-radio-control-info
+                  :rssi (read-rssi radio)
+                  :lqi (- (received-signal-power-dbm ending-signal)
+                          (received-signal-max-interference ending-signal))))
            (send radio mac-pkt 'mac :delay (processing-delay radio)))
          (if (= (received-signal-max-interference ending-signal)
                 (rx-mode-noise-floor (rx-mode radio)))
@@ -494,7 +503,7 @@
                :until (eql (car a) (sleep-level radio))
                :do (accumulate-level (car a) #'sleep-level-down)))))
        (emit radio 'power-change transition-power)
-       (eventlog "Set state to ~A, delay=~A, power=~A"
+       (eventlog "Set state to ~A, delay=~:/dfv:eng/s, power=~:/dfv:eng/W"
                  changing-to-state transition-delay transition-power)
        (delay-state-transition radio transition-delay))))
 
@@ -590,7 +599,7 @@
           (incf avg-busy ratio))
         (setf last-transition-time now)))
     (setf state changing-to-state)
-    (eventlog "completing transition to ~A" state)
+    (eventlog "Completing transition to ~A" state)
     (setf changing-to-state nil)
     (ecase state
       (tx
@@ -630,7 +639,7 @@
     ((empty-p (buffer radio))
      ;; buffer empty so send command to change to rx
      (schedule-at radio
-                  (make-instance 'radio-command-message
+                  (make-instance 'radio-control-command
                                  :command 'set-state
                                  :argument (state-after-tx radio)))
      (eventlog "TX finished - changing to ~A" (state-after-tx radio))
@@ -647,21 +656,24 @@
   (let* ((mac-pkt (dequeue (buffer radio)))
          (begin
           (make-instance 'wireless-signal-start
-                         :src (node radio)
+                         :src radio
                          :power-dbm (tx-level-output-power (tx-level radio))
                          :carrier-frequency (carrier-frequency radio)
                          :bandwidth (rx-mode-bandwidth (rx-mode radio))
                          :modulation (rx-mode-modulation (rx-mode radio))
                          :encoding (encoding radio)))
          (end (make-instance 'wireless-signal-end
-                             :src (node radio)
+                             :src radio
                              :byte-length (header-overhead radio))))
     (encapsulate end mac-pkt)
-    (let ((tx-time (/ (bit-length end) (rx-mode-data-rate (rx-mode radio)))))
-      (send radio begin (wireless-channel radio))
-      (send radio end (wireless-channel radio) :delay tx-time)
+    (let ((tx-time (/ (bit-length mac-pkt)
+                      (rx-mode-data-rate (rx-mode radio)))))
+      (send-direct radio (wireless-channel radio) begin)
+      (send-direct radio (wireless-channel radio) end
+                   :propagation-delay tx-time)
       (emit radio 'tx)
-      (eventlog "Sending packet, transmission will last ~A secs" tx-time)
+      (eventlog "Sending packet, transmission will last ~:/dfv:eng/s"
+                tx-time)
       tx-time)))
 
 (defgeneric update-total-power-received(radio value)
@@ -810,7 +822,7 @@
 
 (defmethod snr2ber(rx-mode snr-db &optional bpnb)
   (declare (ignore bpnb) (float snr-db))
-  (snr2ber (modulation rx-mode) snr-db
+  (snr2ber (rx-mode-modulation rx-mode) snr-db
            (/ (rx-mode-data-rate rx-mode)
               (rx-mode-noise-bandwidth rx-mode))))
 
@@ -821,21 +833,20 @@
         (if (< value (cca-threshold radio)) t nil))))
 
 (defun bit-errors(ber num-of-bits max-bit-errors-allowed)
-  (flet((prob(n) (probability-of-exactly-n-errors ber n num-of-bits)))
-    (do*((bit-errors 0 (1+ bit-errors))
-        (prob (prob bit-errors) (prob bit-errors))
-        (c 0.0)) ;cumulativeProbabilityOfUnrealizedEvents
-       ((or (= bit-errors max-bit-errors-allowed)
-            (<= (lens::%gendblrand 0) (/ prob (- 1.0 c))))
-        (if (= bit-errors max-bit-errors-allowed) (1+ bit-errors) bit-errors))
-      (setf c (+ c prob)))))
+  (let ((c 0.0)) ;cumulativeProbabilityOfUnrealizedEvents
+    (loop
+       :for bit-errors :from 0 :upto max-bit-errors-allowed
+       :for prob = (probability-of-exactly-n-errors ber bit-errors num-of-bits)
+       :when (<= (lens::%gendblrand 0) (/ prob (- 1.0 c)))
+       :do (return bit-errors)
+       :do (incf c prob)
+       :finally (return (1+ bit-errors)))))
 
 (defgeneric max-errors-allowed(radio encoding)
   (:documentation "Return the maximum number of bit errors acceptable for given encoding")
   (:method(radio encoding)
     (declare (ignore radio encoding))
     0))
-
 
 (defun max-tx-power-consumed(radio)
   (reduce #'max (mapcar #'tx-level-power-consumed (tx-levels radio))))

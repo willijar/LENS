@@ -84,7 +84,7 @@
       (let* ((time-passed (- (simulation-time) time-of-last-calculation))
              (energy-consumed
               (coerce (* time-passed current-node-power) 'single-float)))
-        (eventlog "Energy consumed in last ~:/dfv:eng/S is ~:/dfv:eng/J"
+        (eventlog "Energy consumed in last ~:/dfv:eng/s is ~:/dfv:eng/J"
                   time-passed energy-consumed)
         (consume-energy instance energy-consumed)
         (setf time-of-last-calculation (simulation-time))
@@ -102,9 +102,7 @@
 (defmethod handle-message((instance resources) message)
   (cond
     ((eql message (periodic-update-message instance))
-     (calculate-energy-spent instance)
-     (schedule-at instance message
-                  :delay (update-interval instance)))
+     (calculate-energy-spent instance))
     (t
      (call-next-method))))
 
@@ -127,7 +125,7 @@
    (calculate-energy-spent instance)
    (let* ((old-power (gethash source (power-levels instance) 0.0))
           (new-power (+ (current-node-power instance) (- power old-power))))
-     (eventlog "New power consumption ~:/dfv:eng/W --> ~:/dfv:eng/W"
+     (eventlog "Power consumption changed ~:/dfv:eng/W --> ~:/dfv:eng/W"
                (current-node-power instance) new-power)
      (setf (current-node-power instance) new-power)
      (setf (gethash source (power-levels instance)) power)))

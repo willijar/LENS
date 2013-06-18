@@ -30,7 +30,7 @@
 
 (in-package :lens)
 
-(defclass message(owned-object event)
+(defclass message(event owned-object)
   ((creation-time
     :type time-type :initform (simulation-time) :reader creation-time
     :documentation "The creation time of the message. With cloned
@@ -44,7 +44,6 @@ retransmissions and/or segmentation/reassembly.")
    (to :accessor to
        :documentation  "Module or Gate to receive message after delay")
    (sent-time :type time-type :accessor sent-time)
-   (event-time :accessor arrival-time)
    (timestamp :type time-type :initarg :timestamp :initform 0.0d0
                :accessor timestamp
                :documentation "Utility time stamp field fror programmer"))
@@ -52,13 +51,22 @@ retransmissions and/or segmentation/reassembly.")
 commands, jobs, customers or other kinds of entities, depending on the
 model domain."))
 
+(defmethod print-object((instance message) stream)
+  (print-unreadable-object(instance stream :type t)
+    (when (slot-boundp instance 'name)
+      (format stream "~A " (name instance)))
+    (if (>= (slot-value instance 'rank) 0)
+      (format stream "(~D) t=~@?"
+              (uid instance) *time-format* (arrival-time instance))
+      (write-string "unscheduled" stream))))
+
 (defmethod latency((message message))
   (- (timestamp message) (arrival-time message)))
 
 (defmethod duplicate((message message)
                       &optional (duplicate (make-instance (class-of message))))
   (call-next-method message duplicate)
-  (copy-slots '(creation-time to from sent-time event-time timestamp)
+  (copy-slots '(creation-time to from sent-time timestamp)
               message duplicate))
 
 (define-condition unknown-message(serious-condition)

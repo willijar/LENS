@@ -57,7 +57,6 @@
   The main computation evaluates near-minimax approximations
   from 'Rational Chebyshev approximations for the error function'
   by W. J. Cody, Math. Comp., 1969, PP. 631-638."
-  (declare (double-float x))
   (let* ((xbreak 0.46875d0)
 	 (y (abs x))
 	 (result

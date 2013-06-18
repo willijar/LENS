@@ -38,7 +38,7 @@
   (:metaclass module-class))
 
 (defmethod print-object((m wsn-module) os)
-  (print-unreadable-object(m os :type t :identity t)
+  (print-unreadable-object(m os :type t :identity nil)
     (format os "~A ~A" (name m) (nodeid (node m)))))
 
 (defmethod initialize and ((module wsn-module) &optional (stage 0))

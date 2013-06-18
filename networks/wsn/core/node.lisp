@@ -2,7 +2,7 @@
 
 (defclass node(compound-module)
   ((owner :reader network)
-   (nodeid :type integer :reader nodeid :initarg :nodeid)
+   (index :reader nodeid)
    (num-sensors :parameter t :initform 0 :type integer :reader num-sensors)
    (network-address :parameter t :reader network-address)
    (startup-offset
@@ -25,9 +25,12 @@
   (:metaclass compound-module-class))
 
 (defmethod print-object((node node) os)
-  (print-unreadable-object(node os :type t :identity t)
-    (when (slot-boundp node 'nodeid)
-      (format os "~D (~A)" (nodeid node) (network-address node)))))
+  (print-unreadable-object(node os :type t :identity nil)
+    (when (slot-boundp node 'index)
+      (format os "~D~:[(~A)~;~]"
+              (nodeid node)
+              (eql (nodeid node) (network-address node))
+              (network-address node) ))))
 
 (defmethod build-connections((node node))
   (call-next-method)
@@ -41,8 +44,6 @@
          (submodule node 'sensor))))
 
 (defmethod initialize-instance :after ((node node) &key &allow-other-keys)
-  (unless (slot-boundp node 'nodeid)
-    (setf (slot-value node 'nodeid) (index node)))
   (unless (slot-boundp node 'network-address)
     (setf (slot-value node 'network-address) (nodeid node)))
   (subscribe node 'out-of-memory node)

@@ -71,7 +71,7 @@
    #:component #:module-class #:module #:compound-module-class #:compound-module
    #:build-gates #:build-submodules #:build-connections #:build-inside
    #:arrived #:for-each-gate #:for-each-submodule #:for-each-channel
-   #:submodule #:schedule-at #:send #:<= #:=> #:<=>
+   #:submodule #:schedule-at #:send #:send-direct #:<= #:=> #:<=>
    ;; RNG
    #:uint #:rand #:urandom #:mt-random-state #:seed #:rng-map
    #:uniform #:exponential #:normal #:lognormal #:truncnormal #:gamma-d #:beta

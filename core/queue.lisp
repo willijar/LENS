@@ -13,11 +13,14 @@
   (average-timestamp 0.0d0 :type time-type))
 
 (defmethod enqueue(x (q timestamped-queue))
-  (let ((record (make-timestamped :value x)))
+  (let ((record (make-timestamped :value x))
+        (size (size q)))
     (setf (timestamped-queue-average-timestamp q)
-          (/ (+ (timestamped-time record)
-                (* (size q) (timestamped-queue-average-timestamp q)))
-             (1+ (size q))))
+          (if (zerop size)
+              (timestamped-time record)
+              (/ (+ (timestamped-time record)
+                    (* size (timestamped-queue-average-timestamp q)))
+                 (1+ (size q)))))
     (call-next-method record q)))
 
 (defmethod dequeue((q timestamped-queue))
@@ -52,7 +55,7 @@
   (setf (slot-value buffer 'queue)
         (if (buffer-size buffer)
             (make-timestamped-queue
-             :vector (make-array (buffer-size buffer)  :fill-pointer 0)
+             :vector (make-array (buffer-size buffer))
              :extend-size nil)
             (make-timestamped-queue))))
 

@@ -327,11 +327,11 @@ function."
   (deliver message to-gate (+ (simulation-time) propagation-delay)))
 
 (defmethod schedule-at((module module) (message message)
-                       &key delay (time (+ (simulation-time) delay)))
+                       &key (delay 0) (time (+ (simulation-time) delay)))
   "Schedule a self message"
   (assert (not (scheduled-p message))
           ()
-          "Already schedule Message ~A cannot be rescheduled." message)
+          "Already scheduled Message ~A cannot be rescheduled." message)
   (assert (or (not (owner message)) (eql (owner message) module))
           ()
           "~A cannot schedule message ~A currently owned by ~A."

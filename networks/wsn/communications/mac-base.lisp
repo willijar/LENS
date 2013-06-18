@@ -1,9 +1,9 @@
 (in-package :lens.wsn)
 
 (defclass mac-radio-control-info()
-  ((RSSI :type double-float :initarg :RSSI :accessor RSSI
+  ((rssi :type double-float :initarg :rssi :accessor rssi
          :documentation "the RSSI of the received packet")
-   (LQI :type double-float :initarg :LQI :accessor LQI
+   (lqi :type double-float :initarg :lqi :accessor lqi ;
         :documentation "the LQI of the received packet")))
 
 (defclass mac-packet(wsn-packet)
@@ -60,7 +60,7 @@
 (defgeneric to-radio(mac entity)
   (:documentation "Send packet to radio layer")
   (:method((module mac) (command communications-control-command))
-    (assert (typep module 'radio-control-command))
+    (assert (typep command 'radio-control-command))
     (send module command 'radio))
   (:method((module mac) (packet mac-packet))
     (send module packet 'radio))
@@ -68,7 +68,7 @@
     (error "Mac module ~A attempting to send ~A to RADIO"
            module message)))
 
-(defmethod encapsulate((module mac) (packet application-packet))
+(defmethod encapsulate((module mac) packet)
   (encapsulate
    (make-instance 'mac-packet
                   :name (class-name (class-of module))

@@ -169,7 +169,7 @@ definitions as per let"
                   (timestamped-time value) (timestamped-value value)))
 
 (defmethod receive-signal((listener statistic-listener) signal
-                          source (value number))
+                          source value)
   (receive-signal listener signal (simulation-time) value))
 
 (defmethod receive-signal((listener statistic-listener) signal (time real)

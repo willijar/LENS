@@ -43,7 +43,7 @@
     :documentation "how variable is the average fade for link B->A if
     we know the fade of link A->B. std of a gaussian random variable")
    (signal-delivery-threshold
-    :parameter t :type real :initform -100 :initarg :signal-delivery-threshold
+    :parameter t :type real :initform -100.0 :initarg :signal-delivery-threshold
     :accessor signal-delivery-threshold
     :documentation "threshold in dBm above which, wireless channel
     module is delivering signal messages to radio modules of
@@ -62,7 +62,7 @@
    (receivers
     :type array :reader receivers
     :documentation "an array of lists of receiver gateways affected by
-    ongoing transmission from node i.")
+    ongoing transmission.")
    (cells
     :type array :reader cells
     :documentation "an array of cell entities with node occupation and
@@ -107,6 +107,8 @@ channel module"
     (case stage
       (0
        (map 'nil #'(lambda(node) (subscribe node 'node-move wireless)) nodes)
+       (setf (slot-value wireless 'receivers)
+             (make-array (length nodes) :element-type 'list :initial-element nil))
        nil)
       (1
        (if (every #'(lambda(node) (static-p (submodule node 'mobility)))
@@ -236,8 +238,8 @@ and pathloss e.g. ((transmitterid (receiverid . loss) (receiverid
    (encoding :initarg :encoding :reader encoding)))
 
 (defmethod print-object((msg wireless-signal-start) os)
-  (print-unreadable-object(msg os :type t :identity t)
-    (format os "~A dBm from ~A" (power-dbm msg)  (node msg))))
+  (print-unreadable-object(msg os :type t :identity nil)
+    (format os "~6,2fdBm from ~A" (power-dbm msg)  (src msg))))
 
 (defmethod duplicate((original wireless-signal-start) &optional
                      (duplicate (make-instance 'wireless-signal-start)))
@@ -251,8 +253,8 @@ and pathloss e.g. ((transmitterid (receiverid . loss) (receiverid
         :documentation "Source ID must match signal start source id")))
 
 (defmethod print-object((msg wireless-signal-end) os)
-  (print-unreadable-object(msg os :type t :identity t)
-    (format os "from ~A"  (node msg))))
+  (print-unreadable-object(msg os :type t :identity nil)
+    (format os "from ~A"  (src msg))))
 
 (defmethod duplicate((original wireless-signal-end) &optional
                      (duplicate (make-instance 'wireless-signal-end)))
@@ -262,41 +264,46 @@ and pathloss e.g. ((transmitterid (receiverid . loss) (receiverid
 (defmethod receive-signal((wireless wireless-channel) (signal (eql 'node-move))
                           (mobility mobility) value)
   (declare (ignore value))
-  (let* ((location (location mobility))
-         (old-cell (location-cell wireless (node mobility)))
-         (new-cell (coord-cell location wireless)))
+  (let* ((node (node mobility))
+         (old-cell (location-cell wireless node))
+         (new-cell (coord-cell (location mobility) wireless)))
     (unless (eql old-cell new-cell)
       (setf (cell-occupation old-cell)
-            (delete mobility (cell-occupation old-cell)))
-      (push mobility (cell-occupation new-cell))
+            (delete node (cell-occupation old-cell)))
+      (push node (cell-occupation new-cell))
       (setf (location-cell wireless (node mobility)) new-cell))))
 
 (defmethod handle-message((wireless wireless-channel)
                           (message wireless-signal-start))
-  (let ((cell-tx (location-cell wireless (node message)))
-        (nodeid (nodeid (node message))))
+  (let* ((src-node (node (src message)))
+         (cell-tx (location-cell wireless src-node))
+         (nodeid (nodeid src-node))
+         (reception-count 0))
     (dolist(path-loss (cell-path-loss cell-tx))
-      (unless (cell-occupation (path-loss-destination path-loss)) (go next))
+      (unless (cell-occupation (path-loss-destination path-loss))
+        (go next))
       (let ((current-signal-received
-             (- (power-dbm message)
-                (path-loss-avg-path-loss path-loss))))
+             (- (power-dbm message) (path-loss-avg-path-loss path-loss))))
         ;; TODO temporal model
-        (when (< current-signal-received
-                 (signal-delivery-threshold wireless)) (go next))
+        (when (< current-signal-received (signal-delivery-threshold wireless))
+          (go next))
             ;; go through all nodes in that cell and send copy of message
-        (dolist(module (cell-occupation (path-loss-destination path-loss)))
-          (let ((msgcopy (duplicate message))
-                (receiver (gate (node module) 'receive :direction :input)))
-            (setf (power-dbm msgcopy) current-signal-received)
-                  (send wireless msgcopy receiver)
-                  (push receiver (aref (receivers wireless) nodeid)))))
-      next)))
+        (dolist(node (cell-occupation (path-loss-destination path-loss)))
+          (unless (eql node src-node)
+            (incf reception-count)
+            (let ((msgcopy (duplicate message))
+                  (receiver (gate node 'receive :direction :input)))
+              (setf (power-dbm msgcopy) current-signal-received)
+              (send-direct wireless receiver  msgcopy)
+              (push receiver (aref (receivers wireless) nodeid))))))
+      next)
+    (when (> reception-count 0)
+      (eventlog "Signal from ~A reached ~D other nodes."
+                src-node reception-count))))
 
 (defmethod handle-message((wireless wireless-channel)
                           (message wireless-signal-end))
-  (dolist(receiver (aref (receivers wireless) (nodeid (node message))))
-    (send wireless (duplicate message) receiver ))
-  (setf (aref (receivers wireless) (nodeid (node message)))
-        nil)) ;; since tx finished
-
-
+  (let ((src-node (node (src message))))
+    (dolist(receiver (aref (receivers wireless) (nodeid src-node)))
+      (send-direct wireless receiver (duplicate message)))
+    (setf (aref (receivers wireless) (nodeid src-node)) nil)))
