@@ -29,7 +29,6 @@
 
 (in-package :lens)
 
-
 (defconstant +SIGNAL-CACHE-SIZE+ 64
   "Length of bit vectors for caching signal listeners")
 
@@ -243,4 +242,7 @@
                    (slot-value parent 'has-local-listeners)))))))
 
 (defmethod finish((instance entity-with-signals))
-  (map nil #'finish (listeners instance t)))
+  (map nil #'(lambda(listener)
+               (when (typep listener 'listener)
+                 (finish listener)))
+       (listeners instance t)))

@@ -118,8 +118,9 @@ definitions as per let"
       (values
        (eval
         `(flet((signal-value(name)
-                 (or (getf (signal-values ,instance) name)
-                     (throw 'filter-abort name))))
+                 (let ((v (getf (signal-values ,instance) name 'no-value)))
+                   (when (eql v 'no-value) (throw 'filter-abort nil))
+                   v)))
            (lambda() ,(do-expand expression))))
        signals))))
 

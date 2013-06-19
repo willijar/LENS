@@ -17,8 +17,8 @@
   (:documentation "base classe for all transmission channels"))
 
 (defstruct channel-result
-  (delay 0.0 :type time-type)
-  (duration 0.0 :type time-type)
+  (delay 0.0d0 :type time-type)
+  (duration 0.0d0 :type time-type)
   (discard nil :type boolean))
 
 (defgeneric process-message(channel message time)
@@ -74,7 +74,7 @@ Note that there is no requirement that processMessage() relies on this
 method to calculated the packet duration. That is, to change the
 duration computation algorithm via subclassing you need to redefine
 BOTH the processMessage() and calculateDuration() methods.")
-  (:method(channel message) (declare (ignore message)) 0))
+  (:method(channel message) (declare (ignore message)) 0.0d0))
 
 (defgeneric transmission-finish-time(channel)
   (:documentation "For transmission channels: Returns the simulation time

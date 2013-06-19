@@ -231,7 +231,8 @@ function."
   (for-each-submodule module #'build-inside))
 
 (defmethod finish((module module))
-  (for-each-submodule module #'finish))
+  (for-each-submodule module #'finish)
+  (call-next-method))
 
 (defun for-each-gate(module operator)
   (labels((over(slot direction)
@@ -540,7 +541,6 @@ return the gate given by spec. Validates spec based on class definitions"
 
 (defmethod finish((module compound-module))
   (for-each-channel module #'finish)
-  (for-each-submodule module #'finish)
   (call-next-method))
 
 (defmethod build-inside((module compound-module))

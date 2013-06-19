@@ -9,7 +9,7 @@
    (out :output))
   (:metaclass module-class))
 
-(defmethod initialize((module Txc1) &optional (stage 0))
+(defmethod initialize :around ((module Txc1) &optional (stage 0))
   (when (and (zerop stage) (eql (name module) 'tic))
     (send module (make-instance 'message :name 'TicTocMsg) 'out))
   t)
@@ -23,8 +23,8 @@
    (tic Txc1)
    (toc Txc1))
   (:connections
-   (=> (delay-channel :delay 0.1) (tic out) (toc in))
-   (=> (delay-channel :delay 0.1) (toc out) (tic in)))
+   (=> (delay-channel :delay 0.1d0) (tic out) (toc in))
+   (=> (delay-channel :delay 0.1d0) (toc out) (tic in)))
   (:metaclass compound-module-class))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -34,7 +34,7 @@
   (:properties :display (:icon "block/routing"))
   (:metaclass module-class))
 
-(defmethod initialize((module Txc2) &optional (stage 0))
+(defmethod initialize :around ((module Txc2) &optional (stage 0))
   (when (and (zerop stage) (eql (name module) 'tic))
     (write-line "Sending initial message" *trace-output*)
     (send module (make-instance 'message :name 'TicTocMsg) 'out))
@@ -51,8 +51,8 @@
    (tic Txc2 :properties (:display (:color "cyan")))
    (toc Txc2 :properties (:display (:color "gold"))))
   (:connections
-   (=> (delay-channel :delay 0.1) (tic out) (toc in))
-   (=> (delay-channel :delay 0.1) (toc out) (tic in)))
+   (=> (delay-channel :delay 0.1d0) (tic out) (toc in))
+   (=> (delay-channel :delay 0.1d0) (toc out) (tic in)))
   (:metaclass compound-module-class))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -82,7 +82,7 @@
     :documentation "Whether module should send message on initialization"))
   (:metaclass module-class))
 
-(defmethod initialize((instance Txc4) &optional (stage 0))
+(defmethod initialize :around ((instance Txc4) &optional (stage 0))
   (let ((limit (read-parameter instance "limit" 'integer)))
     (when limit (setf (counter instance) limit)))
   (when (and (zerop stage) (send-msg-on-init instance))
@@ -96,8 +96,8 @@
    (tic Txc4 :send-msg-on-init t :properties (:display (:color "cyan")))
    (toc Txc4 :send-msg-on-init nil :properties (:display (:color "gold"))))
   (:connections
-   (=> (delay-channel :delay 0.1) (tic out) (toc in))
-   (=> (delay-channel :delay 0.1) (toc out) (tic in)))
+   (=> (delay-channel :delay 0.1d0) (tic out) (toc in))
+   (=> (delay-channel :delay 0.1d0) (toc out) (tic in)))
   (:metaclass compound-module-class))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -115,7 +115,7 @@
     :type message :documentation "To remeber message until we send it again"))
   (:metaclass module-class))
 
-(defmethod initialize((instance Txc6)  &optional stage)
+(defmethod initialize :around ((instance Txc6)  &optional stage)
   (when (zerop stage)
     (with-slots(event tictocmsg) instance
       (setf event (make-instance 'message :name 'event))
@@ -156,7 +156,7 @@
        (eventlog "Wait period is over, sending back message")
        (send instance tictocmsg 'out)
        (setf tictocmsg nil))
-      ((< (uniform 0 1) 0.1) ;; lose message with 0.1 probability
+      ((< (uniform 0 1) 0.1d0) ;; lose message with 0.1d0 probability
        (eventlog "Losing Message"))
       (t ;;The "delayTime" module parameter can be set to values like
             ;; "exponential(5)" and then here
@@ -192,11 +192,11 @@
    (tic Tic8 :properties (:display (:color "cyan")))
    (toc Toc8 :properties (:display (:color "gold"))))
   (:connections
-   (=> (delay-channel :delay 0.1) (tic out) (toc in))
-   (=> (delay-channel :delay 0.1) (toc out) (tic in)))
+   (=> (delay-channel :delay 0.1d0) (tic out) (toc in))
+   (=> (delay-channel :delay 0.1d0) (toc out) (tic in)))
   (:metaclass compound-module-class))
 
-(defmethod initialize((instance Tic8) &optional stage)
+(defmethod initialize :around ((instance Tic8) &optional stage)
   (when (zerop stage)
     (eventlog "Sending initial message")
     (send instance (make-instance 'message :name 'tictoc) 'out)
@@ -221,7 +221,7 @@
 
 (defmethod handle-message((instance Toc8) message)
   (cond
-    ((< (uniform 0 1) 0.1)
+    ((< (uniform 0 1) 0.1d0)
      (eventlog "Losing message"))
     (t
      (eventlog "Sending back same message as acknowledgement.")
@@ -244,7 +244,7 @@
 (defun send-message-copy(instance)
   (send instance (duplicate (slot-value instance 'message)) 'out))
 
-(defmethod initialize((instance Tic9) &optional stage)
+(defmethod initialize :around ((instance Tic9) &optional stage)
   (when (zerop stage)
     (eventlog "Sending initial message")
     (with-slots(message) instance
@@ -273,7 +273,7 @@
 
 (defmethod handle-message((instance Toc9) message)
   (cond
-    ((< (uniform 0 1) 0.1)
+    ((< (uniform 0 1) 0.1d0)
      (eventlog "Losing message"))
     (t
      (eventlog "~A received, sending back acknowledgement." message)
@@ -292,7 +292,7 @@
 (defclass Tictoc10(network)
   ()
   (:types
-   (C delay-channel :delay 0.1))
+   (C delay-channel :delay 0.1d0))
   (:submodules
    (tic 6 Tic10))
   (:connections
@@ -312,7 +312,7 @@
    (<= C (tic 5 in ++) (tic 4 out ++)))
   (:metaclass compound-module-class))
 
-(defmethod initialize((instance Tic10) &optional stage)
+(defmethod initialize :around ((instance Tic10) &optional stage)
   (when (and (zerop stage) (zerop (index instance)))
     ;; boot process with initial self message
     (schedule-at instance
@@ -327,7 +327,7 @@
       (eventlog "Message ~A arrived" message)
       (let* ((n (gate-size instance 'out))
              (k (intuniform 0 (1- n))))
-        (eventlog "~A Forwarding message ~A on port out[~D]"
+        (eventlog "Forwarding message ~A on port out[~D]"
                   instance message k)
         (send instance message `(out ,k)))))
 
@@ -344,7 +344,7 @@
 (defclass Tictoc12(network)
   ()
   (:types
-   (C delay-channel :delay 0.1))
+   (C delay-channel :delay 0.1d0))
   (:submodules
    (tic 6 Tic12))
   (:connections
@@ -355,7 +355,7 @@
    (<=> C (tic 4 gate ++) (tic 5 gate ++)))
   (:metaclass compound-module-class))
 
-(defmethod initialize((instance Tic12) &optional stage)
+(defmethod initialize :around ((instance Tic12) &optional stage)
   (when (and (zerop stage) (zerop (index instance)))
     ;; boot process with initial self message
     (schedule-at instance
@@ -370,7 +370,7 @@
       (eventlog "Message ~A arrived" message)
       (let* ((n (gate-size instance 'gate))
              (k (intuniform 0 (1- n))))
-        (eventlog "~A Forwarding message ~A on port out[~D]"
+        (eventlog "Forwarding message ~A on port out[~D]"
                   instance message k)
         (send instance message `(gate ,k)))))
 
@@ -385,7 +385,7 @@
   ()
   (:metaclass module-class))
 
-(defmethod initialize((instance Tic13) &optional stage)
+(defmethod initialize :around ((instance Tic13) &optional stage)
   (when (and (zerop stage) (zerop (index instance)))
     ;; boot process with initial self message
     (schedule-at instance
@@ -417,8 +417,8 @@
     (incf (hop-count message))
     (let* ((n (gate-size instance 'gate))
            (k (intuniform 0 (1- n))))
-        (eventlog "~A Forwarding message ~A on gate[~D]"
-                  instance message k)
+        (eventlog "Forwarding message ~A on gate[~D]"
+                  message k)
         (send instance message `(gate ,k)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
