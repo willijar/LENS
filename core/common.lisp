@@ -26,7 +26,7 @@
   "Current global context in which evaluation (e.g. random functions)
   is to be done.")
 
-(defvar *time-format* "~8,3f"  "Time output format control")
+(defvar *time-format* "~3,3f"  "Time output format control")
 
 ;; base class for in simulation errors (not program errors)
 (define-condition simulation-condition(condition)())
@@ -100,9 +100,10 @@ appended onto end of list1 value"
 
 (defstruct (coord (:constructor make-coord(&optional x y z))
                   (:print-object (lambda(c os)
-                                   (format os "(~A,~A,~A)"
+                                   (format os "~,2f,~,2f~:[,~,2f~;~]"
                                            (coord-x c)
                                            (coord-y c)
+                                           (zerop (coord-z c))
                                            (coord-z c)))))
   (x 0.0 :type float :read-only t)
   (y 0.0 :type float :read-only t)

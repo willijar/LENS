@@ -314,14 +314,16 @@
 (defmethod handle-message((radio radio) (message wireless-signal-start))
   ;; if carrier doesn't match ignore messge - may want to calculate
   ;; spectral overlap interference in future taking account of bandwidth
+  (tracelog "~A arrived at ~A" message radio)
   (unless (= (carrier-frequency radio) (carrier-frequency message))
+    (tracelog "~A ignored, different carrier frequency.")
     (return-from handle-message))
   ;; if we are not in RX state or we are changing state, then process
   ;; the signal minimally. We still need to keep a list of signals
   ;; because when we go back in RX we might have some signals active
   ;; from before, acting as interference to the new (fully received
   ;; signals)
-  (eventlog "~A arrived at ~A" message radio)
+
   (when (or (changing-to-state radio) (not (eql (state radio) 'rx)))
     (push
      (make-received-signal
@@ -330,6 +332,7 @@
       :bit-errors t)
      (received-signals radio))
     (emit radio 'rx-fail-no-rx-state)
+    (tracelog "~A delivery failed, radio not in RX state" message)
     (return-from handle-message))
   ;; If we are in RX state, go throught the list of received signals
   ;; and update bit-errors and current-interference
@@ -364,10 +367,12 @@
     (when (not (eql (rx-mode-modulation rx-mode)
                     (received-signal-modulation new-signal)))
       (setf (received-signal-bit-errors new-signal) t)
+      (tracelog "~A delivery failed, wrong modulation.")
       (emit radio 'rx-fail-modulation))
     (when (< (received-signal-power-dbm new-signal)
              (rx-mode-sensitivity rx-mode))
       (setf (received-signal-bit-errors new-signal) t)
+      (tracelog "~A delivery failed, below sensitivity." message)
       (emit radio 'rx-fail-sensitivity))
     (push new-signal (received-signals radio))
     (update-total-power-received radio (received-signal-power-dbm new-signal))
@@ -377,16 +382,17 @@
     (setf (time-of-last-signal-change radio) (simulation-time))))
 
 (defmethod handle-message((radio radio) (message wireless-signal-end))
-  (eventlog "~A arrived at ~A" message radio)
+  (tracelog "~A arrived" message)
   (let ((ending-signal (find (src message) (received-signals radio)
                              :key #'received-signal-src)))
     (unless ending-signal
-      (eventlog "End signal ignored - mo matching start signal, probably due to carrier frequency change")
+      (tracelog "End signal ignored - mo matching start signal, probably due to carrier frequency change")
       (return-from handle-message))
     ;; if not in RX state or are changing state just delete signal
     (when (or (changing-to-state radio) (not (eql (state radio) 'rx)))
       (when (numberp (received-signal-bit-errors ending-signal))
         (emit radio 'rx-fail-no-rx-state))
+      (tracelog "~A delivery failed, no RX state" message)
       (setf (received-signals radio)
             (delete ending-signal (received-signals radio)))
       (return-from handle-message))
@@ -395,26 +401,37 @@
     (update-total-power-received radio ending-signal)
     (setf (time-of-last-signal-change radio) (simulation-time))
     (when (numberp (received-signal-bit-errors ending-signal))
-      (cond
-        ((<= (received-signal-bit-errors ending-signal)
-             (max-errors-allowed
-              radio (received-signal-encoding ending-signal)))
-         (let* ((mac-pkt (decapsulate message)))
-           (setf (control-info mac-pkt)
-                 (make-instance
-                  'mac-radio-control-info
-                  :rssi (read-rssi radio)
-                  :lqi (- (received-signal-power-dbm ending-signal)
-                          (received-signal-max-interference ending-signal))))
-           (send radio mac-pkt 'mac :delay (processing-delay radio)))
-         (if (= (received-signal-max-interference ending-signal)
+       (cond
+         ((<= (received-signal-bit-errors ending-signal)
+              (max-errors-allowed
+               radio (received-signal-encoding ending-signal)))
+          ;; message delivered
+          (let* ((mac-pkt (decapsulate message)))
+            (setf (control-info mac-pkt)
+                  (make-instance
+                   'mac-radio-control-info
+                   :rssi (read-rssi radio)
+                   :lqi (- (received-signal-power-dbm ending-signal)
+                           (received-signal-max-interference ending-signal))))
+            (send radio mac-pkt 'mac :delay (processing-delay radio)))
+          (cond
+            ((= (received-signal-max-interference ending-signal)
                 (rx-mode-noise-floor (rx-mode radio)))
-             (emit radio 'rx-succeed-no-interference)
-             (emit radio 'rx-succeed-interference)))
-        ((= (received-signal-max-interference ending-signal)
-            (rx-mode-noise-floor (rx-mode radio)))
-         (emit radio 'rx-fail-no-interference))
-        (t (emit radio 'rx-fail-interference))))
+             (tracelog "~A received, no interference" message)
+             (emit radio 'rx-succeed-no-interference))
+            (t
+             (tracelog "~A received despite ~/dfv:eng/dBm interference" message
+                       (received-signal-max-interference ending-signal))
+             (emit radio 'rx-succeed-interference))))
+         (t
+          (cond
+           ((= (received-signal-max-interference ending-signal)
+               (rx-mode-noise-floor (rx-mode radio)))
+            (tracelog "~A failed, no interference" message)
+            (emit radio 'rx-fail-no-interference))
+           (t
+            (tracelog "~A failed, interference" message)
+            (emit radio 'rx-fail-interference))))))
     (setf (received-signals radio)
           (delete ending-signal (received-signals radio)))))
 
@@ -422,7 +439,7 @@
   (when (and (> (max-phy-frame-size radio) 0)
              (> (+ (byte-length packet) (header-overhead radio))
                 (max-phy-frame-size radio)))
-    (eventlog
+    (tracelog
      "WARNING: MAC set to radio an oversized packet of ~A bytes. Packet Dropped"
      (+ (byte-length packet) (header-overhead radio)))
     (return-from handle-message))
@@ -430,7 +447,7 @@
     (send radio
           (make-instance 'radio-control-message :name 'radio-buffer-full)
           'mac :delay (processing-delay radio))
-    (eventlog "WARNING: Buffer FULL, discarding ~A" packet)))
+    (tracelog "WARNING: Buffer FULL, discarding ~A" packet)))
 
 (defmethod handle-message((radio radio) (message radio-control-message))
   ;; A self-(and external) message used for carrier sense interrupt.
@@ -503,7 +520,7 @@
                :until (eql (car a) (sleep-level radio))
                :do (accumulate-level (car a) #'sleep-level-down)))))
        (emit radio 'power-change transition-power)
-       (eventlog "Set state to ~A, delay=~:/dfv:eng/s, power=~:/dfv:eng/W"
+       (tracelog "Set state to ~A, delay=~:/dfv:eng/s, power=~:/dfv:eng/W"
                  changing-to-state transition-delay transition-power)
        (delay-state-transition radio transition-delay))))
 
@@ -526,7 +543,7 @@
        (setf rx-mode (find (argument message) rx-modes :key #'rx-mode-name))
        (assert rx-mode()
                "No radio mode named ~A found" (argument message))
-       (eventlog "Changed rx mode to ~A" rx-mode)
+       (tracelog "Changed rx mode to ~A" rx-mode)
        (setf rssi-integration-time
              (* symbols-for-rssi
                   (/ (rx-mode-bits-per-symbol rx-mode)
@@ -541,7 +558,7 @@
                             :key #'tx-level-output-power))
        (assert tx-level ()
                "Invalid tx output power level ~A" (argument message))
-       (eventlog "Changed TX power output to ~A dBm consuming ~A W"
+       (tracelog "Changed TX power output to ~A dBm consuming ~A W"
                  (tx-level-output-power tx-level)
                  (tx-level-power-consumed tx-level))))
 
@@ -551,13 +568,13 @@
                                :key #'sleep-level-name))
        (assert sleep-level ()
                "Invalid sleep level ~A" (argument message))
-       (eventlog "Changed default sleep level to ~A"
+       (tracelog "Changed default sleep level to ~A"
                  (sleep-level-name sleep-level))))
 
     (set-carrier-freq
      (with-slots(carrier-frequency) radio
        (setf carrier-frequency (argument message))
-       (eventlog "Changed carrier frequency to ~A Hz" carrier-frequency)
+       (tracelog "Changed carrier frequency to ~A Hz" carrier-frequency)
        ;; clear received signals as they are no longer valid and don't create
        ;; interference with the new incoming signals
        (setf (received-signals radio) nil)))
@@ -565,15 +582,15 @@
     (set-cca-threshold
      (with-slots(cca-threshold) radio
        (setf cca-threshold (argument message))
-       (eventlog "Changed CCA threshold to ~A dBm" cca-threshold)))
+       (tracelog "Changed CCA threshold to ~A dBm" cca-threshold)))
 
     (set-cs-interrupt-on
      (setf (slot-value radio 'carrier-sense-interrupt-enabled) t)
-     (eventlog "CS interrupt turned ON"))
+     (tracelog "CS interrupt turned ON"))
 
     (set-cs-interrupt-off
      (setf (slot-value radio 'carrier-sense-interrupt-enabled) nil)
-     (eventlog "CS interrupt turned OFF"))
+     (tracelog "CS interrupt turned OFF"))
 
     (set-encoding
      (with-slots(encoding) radio
@@ -583,7 +600,7 @@
 (defun delay-state-transition(radio delay)
   (let ((msg (state-transition-message radio)))
     (when (scheduled-p msg)
-      (eventlog "WARNING: command to change to a new state was received before previous state transition was completed")
+      (tracelog "WARNING: command to change to a new state was received before previous state transition was completed")
       (cancel msg))
     (schedule-at radio msg :delay delay)))
 
@@ -599,7 +616,7 @@
           (incf avg-busy ratio))
         (setf last-transition-time now)))
     (setf state changing-to-state)
-    (eventlog "Completing transition to ~A" state)
+    (tracelog "Completing transition to ~A" state)
     (setf changing-to-state nil)
     (ecase state
       (tx
@@ -610,7 +627,7 @@
                        (make-instance 'radio-command-message
                                       :command 'set-state
                                       :argument 'rx))
-          (eventlog "WARNING: just changed to TX but buffer is empty - changing to RX"))
+          (tracelog "WARNING: just changed to TX but buffer is empty - changing to RX"))
          (t
           (let ((time-to-tx-packet (debuffer-and-send radio)))
             (emit radio 'power-change (tx-level-power-consumed (tx-level radio)))
@@ -642,7 +659,7 @@
                   (make-instance 'radio-control-command
                                  :command 'set-state
                                  :argument (state-after-tx radio)))
-     (eventlog "TX finished - changing to ~A" (state-after-tx radio))
+     (tracelog "TX finished - changing to ~A" (state-after-tx radio))
      (setf (state-after-tx radio) 'rx)) ;; return to default behaviour
     (t
      (let ((time-to-tx-packet (debuffer-and-send radio)))
@@ -672,7 +689,7 @@
       (send-direct radio (wireless-channel radio) end
                    :propagation-delay tx-time)
       (emit radio 'tx)
-      (eventlog "Sending packet, transmission will last ~:/dfv:eng/s"
+      (tracelog "Sending packet, transmission will last ~:/dfv:eng/s"
                 tx-time)
       tx-time)))
 
@@ -704,7 +721,9 @@
       (when (numberp (received-signal-bit-errors received-signal))
         (setf (received-signal-bit-errors received-signal) t)
         (emit radio 'rx-fail-no-rx-state)
-        (eventlog "Just entered RX, existing signal from ~A cannot be received." (src received-signal))))
+        (tracelog
+         "Just entered RX, existing signal from ~A cannot be received."
+         (src received-signal))))
     (push
      (make-total-power-received
       :start-time (simulation-time)

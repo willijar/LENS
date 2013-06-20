@@ -44,6 +44,6 @@ and send data to 'SINK over network"))
 (defmethod handle-message((application value-reporting) (pkt application-packet))
   (when (eql (network-address (node application))
              (sink-address application))
-    (eventlog "Sink received from ~A value ~A"
+    (tracelog "Sink received from ~A value ~A"
               (source (control-info pkt))
               (payload pkt))))

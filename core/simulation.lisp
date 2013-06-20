@@ -42,9 +42,6 @@
    (configuration :reader configuration :initarg :configuration
                   :initform nil
                   :documentation "Configuration data used for simulation")
-   (initialized-p
-    :initform nil :reader initialized-p
-    :documentation "True if this component has been initialized.")
    (rng-map :type array :reader rng-map
             :documentation "Top level rng-map.")
    (num-rngs :parameter t :type fixnum :initform 1 :reader num-rngs
@@ -61,6 +58,7 @@
                    :reader sim-time-limit)
    (network :parameter t :type symbol
             :documentation "Specified Network type parameter")
+   (initialized-p :type boolean :initform nil)
    (network-instance
     :reader network
     :documentation "Actual network instance in this simulation")
@@ -314,16 +312,19 @@ are dispatched in current thread"
 (defvar *simulation-trace-stream* *standard-output*)
 
 (let ((last-context nil))
-  (defun eventlog(&rest args)
-    (when *simulation-trace-stream*
-      (unless (eql *context* last-context)
-        (setf last-context *context*)
-        (format *simulation-trace-stream* "~A~%" last-context))
-      (write-char #\space *simulation-trace-stream*)
-      (format *simulation-trace-stream* *time-format* (simulation-time))
-      (write-char #\space *simulation-trace-stream*)
-      (apply #'format *simulation-trace-stream* args)
-      (write-char #\newline *simulation-trace-stream*))))
+  (defun %tracelog(&rest args)
+    (unless (eql *context* last-context)
+      (setf last-context *context*)
+      (format *simulation-trace-stream* "~A~%" last-context))
+    (write-char #\space *simulation-trace-stream*)
+    (format *simulation-trace-stream* *time-format* (simulation-time))
+    (write-char #\space *simulation-trace-stream*)
+    (apply #'format *simulation-trace-stream* args)
+    (write-char #\newline *simulation-trace-stream*)))
+
+(defmacro tracelog(&rest args)
+  `(when (slot-value *context* 'collect-trace-info)
+     (%tracelog ,@args)))
 
 (defstruct timestamped
   (time (simulation-time) :type time-type)

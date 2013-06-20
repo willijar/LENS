@@ -93,6 +93,11 @@
   (declare (ignore time value))
   (incf (recorded-value recorder)))
 
+(defmethod report((r count-recorder) stream)
+  (declare (ignore stream))
+  (unless (zerop (recorded-value r))
+    (call-next-method)))
+
 (defclass sum(scalar-recorder)
   ((sum :accessor recorded-value :initform 0)))
 
@@ -205,7 +210,7 @@
       (incf sqrsum (* value value))))
 
 (defmethod report((r stddev) stream)
-  (format stream "statistic ~A ~A~%" (full-path-string (owner r)) (title r))
+  (format stream "statistic ~A ~A~%" (full-path-string (owner (owner r))) (title r))
   (with-slots(min max sum count sqrsum) r
     (format stream "field count ~A~%field mean ~A~%field stddev ~A~%field sum ~A~%field sqrsum ~A~%field min ~A~%field max ~A~%"
             (result-count r)
@@ -447,7 +452,7 @@
     (t ;; simply return sample from stored ones
      (aref (cells instance)  (%genintrand (result-count instance) rng))))))
 
-(defclass indexed-count-recorder(result-recorder)
+(defclass indexed-count-recorder(scalar-recorder)
   ((count :initform (make-hash-table) :accessor recorded-value )))
 
 (define-result-recorder 'indexed-count-recorder 'indexed-count)
@@ -459,10 +464,11 @@
   (incf (gethash (car value) (recorded-value recorder) 0) (cdr value)))
 
 (defmethod report((r indexed-count-recorder) os)
-  (format os "statistic ~A ~A~%" (full-path-string (owner r)) (title r))
-  (maphash
-   #'(lambda(k v)
-       (format os "field ~A ~A~%" k v))
-   (recorded-value r)))
+  (when (not (zerop (hash-table-count (recorded-value r))))
+    (format os "statistic ~A ~A~%" (full-path-string (owner (owner r))) (title r))
+    (maphash
+     #'(lambda(k v)
+         (format os "field ~A ~A~%" k v))
+     (recorded-value r))))
 
 

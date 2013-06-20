@@ -49,5 +49,6 @@
                (:file "channel" :depends-on ("signals" "component"))
                (:file "module" :depends-on
                       ("message" "gate" "component" "parameters" "simulation"))
-               (:file "statistics" :depends-on ("simulation" "parameters"))
+               (:file "statistics" :depends-on
+                      ("simulation" "parameters" "signals"))
                (:file "statistics-impl" :depends-on ("statistics"))))))

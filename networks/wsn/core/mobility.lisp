@@ -18,6 +18,7 @@
              :documentation "current location initalized from parameter file")
    (orientation
     :type orientation :parameter t :initarg :orientation :reader orientation
+    :initform (make-orientation)
     :documentation "current orientation initialized from parameter gile")
    (static-p :initform t :initarg :static-p :reader static-p))
   (:metaclass module-class))
@@ -28,13 +29,14 @@
     (assert (not (static-p instance))
             ()
             "Attempt to change location of static node ~A" (node instance))
+    (tracelog "changed location to ~A" location)
     (setf (slot-value instance 'location) location)
     (emit instance 'node-move)
     location))
 
 (defmethod configure :after ((instance mobility))
   (parse-deployment instance)
-  (eventlog "initial location is ~A" (location instance)))
+  (tracelog "initial location is ~A" (location instance)))
 
 (defun parse-deployment(instance)
   (let* ((node (node instance))

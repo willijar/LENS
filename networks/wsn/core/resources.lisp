@@ -9,6 +9,10 @@
  'power-change
  "Sent by a module to indicate a new power consumption level (in W)")
 
+(register-signal
+ 'energy-consumed
+ "Sent every time an energy consumption is calculated")
+
 (defclass resources(wsn-module)
   ((ram-size
     :parameter t :type integer :initform 0 :initarg :ram-size
@@ -52,6 +56,8 @@
    (clock-drift :reader clock-drift
                 :documentation "Actual clock drift for this module")
    (disabled-p :type boolean :initform t :accessor disabled-p))
+  (:properties
+     :statistic (energy-consumed :title "energy consumed" :default (sum)))
   (:metaclass module-class))
 
 (defmethod initialize-instance :after
@@ -84,8 +90,9 @@
       (let* ((time-passed (- (simulation-time) time-of-last-calculation))
              (energy-consumed
               (coerce (* time-passed current-node-power) 'single-float)))
-        (eventlog "Energy consumed in last ~:/dfv:eng/s is ~:/dfv:eng/J"
+        (tracelog "Energy consumed in last ~:/dfv:eng/s is ~:/dfv:eng/J"
                   time-passed energy-consumed)
+        (emit instance 'energy-consumed energy-consumed)
         (consume-energy instance energy-consumed)
         (setf time-of-last-calculation (simulation-time))
         (cancel periodic-update-message)
@@ -125,7 +132,7 @@
    (calculate-energy-spent instance)
    (let* ((old-power (gethash source (power-levels instance) 0.0))
           (new-power (+ (current-node-power instance) (- power old-power))))
-     (eventlog "Power consumption changed ~:/dfv:eng/W --> ~:/dfv:eng/W"
+     (tracelog "Power consumption changed ~:/dfv:eng/W --> ~:/dfv:eng/W"
                (current-node-power instance) new-power)
      (setf (current-node-power instance) new-power)
      (setf (gethash source (power-levels instance)) power)))

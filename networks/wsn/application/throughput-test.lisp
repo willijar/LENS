@@ -9,7 +9,7 @@
    (payload-overhead :initform 100)
    (priority :parameter t :initform 1 :reader priority :initarg :priority)
    (next-recipient
-    :parameter t :initform 0 :reader next-recipient
+    :parameter t :reader next-recipient :initform 0
     :properties (:format read)
     :documentation "Destination address for packets produced in this
     node. This parameter can be used to create an application-level
@@ -26,13 +26,9 @@
    (timer-message :type message :reader timer-message
                   :initform (make-instance 'message :name 'send-packet-timer)))
   (:properties
-   :statistic (latency
-               :source (latency application-receive)
-               :title "application latency"
-               :record (histogram))
    :statistic (packets-received
                :title "packets received per node"
-               :record (indexed-count)))
+               :default (indexed-count)))
   (:metaclass module-class)
   (:documentation "Application that will generate packets at specified rate"))
 
@@ -45,7 +41,7 @@
                        (next-recipient application))))
         (set-timer application (timer-message application)
                    (+ startup-delay packet-spacing))
-        (eventlog "Not sending Packets"))))
+        (tracelog "Not sending Packets"))))
 
 (defmethod shutdown((application throughput-test))
   (call-next-method)
@@ -63,15 +59,16 @@
                            (message radio-control-message))
   (case (command message)
     (carrier-sense-interrupt
-     (eventlog "CS Interrupt received! current RSSI value is ~A"
+     (tracelog "CS Interrupt received! current RSSI value is ~A"
                (read-rssi
                 (submodule (node application) '(communications radio)))))))
 
 (defmethod handle-message ((application throughput-test)
                            (rcvPacket application-packet))
-  (if (eql (network-address (node application)) (next-recipient application))
+  (if (eql (network-address (node application))
+           (next-recipient application))
       (progn
-        (eventlog "Received packet ~A from node ~A"
+        (tracelog "Received packet #~A from node ~A"
                   (sequence-number rcvPacket) (source (control-info rcvPacket)))
         (emit application 'packets-received (source (control-info rcvPacket)))
         (call-next-method)) ;; log receipt

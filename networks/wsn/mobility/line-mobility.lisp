@@ -3,7 +3,7 @@
 (defclass line-mobility(mobility)
   ((start-location :type coord :reader start-location)
    (destination
-    :parameter t :type coord :initform (make-coord 1.0d0 1.0d0)
+    :parameter t :type coord :initform (make-coord 1.0 1.0)
     :initarg :destination-location)
    (delta :type coord :documentation "Vector delta from start to end")
    (distance :type real
@@ -35,12 +35,13 @@
 (defmethod handle-message((instance line-mobility) message)
   (if (eql message (periodic-update-message instance))
       (with-slots(start-location distance speed delta) instance
-        (let ((distance-travelled (* (simulation-time) speed)))
+        (let ((distance-travelled
+               (coerce (* (simulation-time) speed) 'single-float)))
           (multiple-value-bind(n d)
               (floor (/ distance-travelled distance))
             (setf (location instance)
                   (coord+ start-location
-                          (coord* delta (if (evenp n) d (1- d)))))))
+                          (coord* delta (if (evenp n) d (- 1 d)))))))
         (schedule-at instance message :delay (update-interval instance)))
       (warn 'unknown-message :module instance :message message)))
 

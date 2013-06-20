@@ -73,7 +73,8 @@
   (with-slots(max-net-frame-size header-overhead) module
     (if (and (> max-net-frame-size 0)
              (> (+ (byte-length packet) header-overhead) max-net-frame-size))
-        (eventlog "Oversized packet ~A dropped. Size ~A, network layer overhead ~A, max network packet size ~A" (byte-length packet) header-overhead max-net-frame-size)
+        (tracelog "Oversized packet ~A dropped. Size ~A, network layer overhead ~A, max network packet size ~A"
+                  (byte-length packet) header-overhead max-net-frame-size)
         (call-next-method))))
 
 (defgeneric to-mac(routing entity &optional next-hop-mac-address)

@@ -54,7 +54,7 @@
   (with-slots(max-mac-frame-size header-overhead) module
     (if (and (> max-mac-frame-size 0)
              (> (+ (byte-length packet) header-overhead) max-mac-frame-size))
-        (eventlog "Oversized packet ~A dropped. Size ~A, mac layer overhead ~A, max mac packet size ~A" (byte-length packet) header-overhead max-mac-frame-size)
+        (tracelog "Oversized packet ~A dropped. Size ~A, mac layer overhead ~A, max mac packet size ~A" (byte-length packet) header-overhead max-mac-frame-size)
         (call-next-method))))
 
 (defgeneric to-radio(mac entity)

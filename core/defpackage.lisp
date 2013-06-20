@@ -48,7 +48,7 @@
    #:simulation-time #:schedule #:scheduled-p #:cancel #:stop
    #:run-simulation
    #:sent-time #:arrival-time
-   #:root-event #:*simulation-trace-stream* #:eventlog
+   #:root-event #:*simulation-trace-stream* #:tracelog
    #:timestamped #:timestamped-time #:timestamped-value #:latency
    ;; signals and listeners
    #:register-signal #:signal-id #:receive-signal #:entity-with-signals

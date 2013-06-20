@@ -71,7 +71,7 @@
    :statistic (latency
                :source (latency application-receive)
                :title "application latency"
-               :record (histogram)))
+               :default (histogram)))
   (:metaclass module-class)
   (:documentation "Application connects to sensors for measurements
   and to communication module for sending/receiving data."))
@@ -117,7 +117,7 @@
                 "Destination not specified for packet send"))
     (emit application 'application-send packet)
     (send application packet 'network)
-    (eventlog "Sending ~A to communication layer"
+    (tracelog "Sending ~A to communication layer"
               packet (byte-length packet)))
   (:method((application application) (message message) &optional destination)
     (declare (ignore destination))

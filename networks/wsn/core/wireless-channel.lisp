@@ -73,7 +73,7 @@
   (:gates
    (fromNodes :input))
   (:properties
-   (:statistic (fade-depth :record (histogram))))
+   (:statistic (fade-depth :default (histogram))))
   (:metaclass module-class)
   (:documentation "The wireless channel module simulates the wireless
   medium. Nodes sent packets to it and according to various
@@ -171,7 +171,7 @@ channel module"
                          (if (< distance (/ d0 10.0))
                              (values 0.0 0.0)
                              (values (+ PLd0 (* 10.0 path-loss-exponent
-                                                (log (/ distance 10.0) 10.0))
+                                                (log (/ distance d0) 10.0))
                                         (normal 0.0 sigma))
                                      (/ (normal 0.0 bidirectional-sigma) 2.0)))
                        (when (>=
@@ -190,8 +190,8 @@ channel module"
                                 :avg-path-loss
                                 (- Pld bidirection-pathloss-jitter))
                                (cell-path-loss (row-major-aref cells j))))))))))
-           (eventlog "Number of space cells: ~A" no-cells)
-           (eventlog "Each cells affects ~f other cells on average."
+           (tracelog "Number of space cells: ~A" no-cells)
+           (tracelog "Each cells affects ~f other cells on average."
                      (/ (loop :for i :from 0 :below no-cells
                            :sum (length  (cell-path-loss (row-major-aref cells i))))
                         no-cells))))
@@ -282,6 +282,8 @@ and pathloss e.g. ((transmitterid (receiverid . loss) (receiverid
     (dolist(path-loss (cell-path-loss cell-tx))
       (unless (cell-occupation (path-loss-destination path-loss))
         (go next))
+      #+nil(break "location cell ~A = ~A" src-node cell-tx)
+      #+nil(break "occupied path-loss=~A" path-loss)
       (let ((current-signal-received
              (- (power-dbm message) (path-loss-avg-path-loss path-loss))))
         ;; TODO temporal model
@@ -298,7 +300,7 @@ and pathloss e.g. ((transmitterid (receiverid . loss) (receiverid
               (push receiver (aref (receivers wireless) nodeid))))))
       next)
     (when (> reception-count 0)
-      (eventlog "Signal from ~A reached ~D other nodes."
+      (tracelog "Signal from ~A reached ~D other nodes."
                 src-node reception-count))))
 
 (defmethod handle-message((wireless wireless-channel)

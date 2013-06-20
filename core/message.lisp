@@ -27,7 +27,6 @@
 
 ;;; Code:
 
-
 (in-package :lens)
 
 (defclass message(event owned-object)
@@ -54,11 +53,10 @@ model domain."))
 (defmethod print-object((instance message) stream)
   (print-unreadable-object(instance stream :type t)
     (when (slot-boundp instance 'name)
-      (format stream "~A " (name instance)))
+      (format stream "~A" (name instance)))
     (if (>= (slot-value instance 'rank) 0)
-      (format stream "(~D) t=~@?"
-              (uid instance) *time-format* (arrival-time instance))
-      (write-string "unscheduled" stream))))
+      (format stream " (~D) t=~@?"
+              (uid instance) *time-format* (arrival-time instance)))))
 
 (defmethod latency((message message))
   (- (timestamp message) (arrival-time message)))

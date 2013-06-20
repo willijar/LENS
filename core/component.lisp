@@ -1,7 +1,10 @@
 (in-package :lens)
 
 (defclass component(parameter-object entity-with-signals)
-  ((rng-map :type array :reader rng-map
+  ((collect-trace-info
+    :type boolean :initform nil :parameter t
+    :documentation "If true evenlog outputs will be traced for this component")
+   (rng-map :type array :reader rng-map
             :documentation "RNG map for this component")
    (initialized-p
     :initform nil :reader initialized-p

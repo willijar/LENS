@@ -142,6 +142,7 @@ definitions as per let"
        :when (eql (car a) '-)
        :do (setf recording-modes
                  (delete (second a) recording-modes :test #'equal)))
+
     (setf (slot-value instance 'recorders)
             (mapcar
              #'(lambda(recorder-mode)
@@ -199,7 +200,7 @@ definitions as per let"
 
 (defmethod report((r scalar-recorder) stream)
   (format stream "scalar ~A ~A ~A~%"
-          (full-path-string (owner r)) (title r) (recorded-value r)))
+          (full-path-string (owner (owner r))) (title r) (recorded-value r)))
 
 (defun add-statistics(sim)
   (labels((do-add-statistics(module)
