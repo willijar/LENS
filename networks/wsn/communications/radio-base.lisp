@@ -146,7 +146,7 @@
     :type list :reader transitions
     :documentation "Power and delay for transitions between states stored in p-list of p-lists - access is (getf (getf args to) from)")
    (tx-level :type tx-level :accessor tx-level)
-   (rx-mode :type rx-mode :accessor rx-mode)
+   (rx-mode :type rx-mode :reader rx-mode)
    (sleep-level :type sleep-level :accessor sleep-level)
    (last-transition-time
     :type time-type :initform 0d0 :accessor last-transition-time)
@@ -208,26 +208,32 @@
                :title "packets failed, radio not in RX" :default (count)))
   (:metaclass module-class))
 
+(defmethod (setf rx-mode)((new-mode rx-mode) (radio radio))
+  "If we change rx-mode we may change data rate and need to inform upper levels"
+  (let ((old-data-rate
+         (when (slot-boundp radio 'rx-mode)
+           (rx-mode-data-rate (rx-mode radio)))))
+    (with-slots(rx-mode rx-modes rssi-integration-time symbols-for-rssi state)
+         radio
+      (setf rx-mode new-mode)
+       (tracelog "Changed rx mode to ~A" rx-mode)
+       (setf rssi-integration-time
+             (* symbols-for-rssi
+                  (/ (rx-mode-bits-per-symbol rx-mode)
+                     (rx-mode-data-rate rx-mode))))
+       ;; if in rx mode change drawn power
+       (when (eql state 'rx)
+         (emit radio 'power-change (rx-mode-power-consumed rx-mode)))
+       ;; if data rate changed inform upper levels
+       (unless (eql (rx-mode-data-rate new-mode) old-data-rate)
+         (send radio
+               (make-instance 'radio-control-message
+                              :name 'change-data-rate
+                              :argument  (rx-mode-data-rate new-mode))
+               'mac)))))
+
 (defmethod initialize-instance :after ((radio radio) &key &allow-other-keys)
-  (parse-radio-parameter-file radio)
-  (with-slots(initial-mode initial-tx-output-power initial-sleep-level
-              rssi-integration-time) radio
-    (setf (rx-mode radio)
-          (or (find initial-mode (rx-modes radio) :key #'rx-mode-name)
-              (elt (rx-modes radio) 0)))
-    (setf (tx-level radio)
-          (or (find initial-tx-output-power (tx-levels radio)
-                    :key #'tx-level-output-power :test #'=)
-              (elt (tx-levels radio) 0)))
-    (setf (sleep-level radio)
-          (or (find initial-sleep-level (sleep-levels radio)
-                    :key #'sleep-level-name)
-              (elt (sleep-levels radio) 0)))
-    (setf rssi-integration-time
-          (* (symbols-for-rssi radio)
-             (/ (rx-mode-bits-per-symbol (rx-mode radio))
-                (rx-mode-data-rate (rx-mode radio)))))
-    (setf (last-transition-time radio) 0.0d0)))
+  (parse-radio-parameter-file radio))
 
 (defmethod initialize and ((radio radio) &optional stage)
   (case stage
@@ -238,7 +244,26 @@
      (setf (slot-value radio 'wireless-channel)
            (gate (submodule (network radio) 'wireless-channel)
                  'fromNodes
-                 :direction :input))))
+                 :direction :input))
+     ;; initialize modes here as we may send control messages to upper levels
+     (with-slots(initial-mode initial-tx-output-power initial-sleep-level
+                 rssi-integration-time) radio
+       (setf (rx-mode radio)
+          (or (find initial-mode (rx-modes radio) :key #'rx-mode-name)
+              (elt (rx-modes radio) 0)))
+       (setf (tx-level radio)
+             (or (find initial-tx-output-power (tx-levels radio)
+                       :key #'tx-level-output-power :test #'=)
+                 (elt (tx-levels radio) 0)))
+       (setf (sleep-level radio)
+             (or (find initial-sleep-level (sleep-levels radio)
+                       :key #'sleep-level-name)
+                 (elt (sleep-levels radio) 0)))
+       (setf rssi-integration-time
+             (* (symbols-for-rssi radio)
+                (/ (rx-mode-bits-per-symbol (rx-mode radio))
+                   (rx-mode-data-rate (rx-mode radio)))))
+       (setf (last-transition-time radio) 0.0d0))))
   t)
 
 (defmethod startup((radio radio))
@@ -460,10 +485,13 @@
 	;; to avoid message deletion in the end;
   (send radio message 'mac))
 
-(defmethod handle-message((radio radio) (message radio-control-command))
-  (ecase (command message)
-    (set-state
-     (check-type (argument message) radio-state)
+(defmethod handle-message((instance radio)
+                          (message radio-control-command))
+  (handle-control-command instance (command message) (argument message)))
+
+(defmethod handle-control-command((radio radio) (command (eql 'set-state))
+                                  (new-state symbol))
+     (check-type new-state radio-state)
      ;; The command changes the basic state of the radio. Because of
 		 ;; the transition delay and other restrictions we need to create a
 		 ;; self message and schedule it in the apporpriate time in the future.
@@ -474,16 +502,16 @@
      (with-slots(state changing-to-state) radio
      ;; If we are asked to change to the current (stable) state,
      ;; or the state we are changing to anyway, do nothing
-       (when (eql (argument message) (or changing-to-state state))
-         (return-from handle-message))
+       (when (eql new-state (or changing-to-state state))
+         (return-from handle-control-command))
      ;; If we are asked to change from TX, and this is an external
      ;; command, and we are not changing already, then just record the
      ;; intended target state. Otherwise proceed with the change.
      (when (and (eql state 'tx) (not (self-message-p message))
                 (not changing-to-state))
-       (setf (state-after-tx radio) (argument message))
-       (return-from handle-message))
-     (setf changing-to-state (argument message))
+       (setf (state-after-tx radio) new-state)
+       (return-from handle-control-command))
+     (setf changing-to-state new-state)
      (let* ((transition
              (getf (getf (transitions radio) changing-to-state) state))
             (transition-delay (transition-element-delay transition))
@@ -524,6 +552,7 @@
                  changing-to-state transition-delay transition-power)
        (delay-state-transition radio transition-delay))))
 
+
     ;; For the rest of the control commands we do not need to take any
     ;; special measures, or create new messages. We just parse the
     ;; command and assign the new value to the appropriate variable. We
@@ -536,66 +565,63 @@
     ;; even though we keep receiving currently received signals as with
     ;; the old mode. We could go and make all bitErrors = ALL_ERRORS,
     ;; but not worth the trouble I think.
+(defmethod handle-control-command((radio radio) (command (eql 'set-mode))
+                                  (label symbol))
+  (let ((new-mode (find label (rx-modes radio) :key #'rx-mode-name)))
+    (assert new-mode()
+            ()
+            "No radio mode named ~A found" label)
+    (setf (rx-mode radio) new-mode)))
 
-    (set-mode
-     (with-slots(rx-mode rx-modes rssi-integration-time symbols-for-rssi state)
-         radio
-       (setf rx-mode (find (argument message) rx-modes :key #'rx-mode-name))
-       (assert rx-mode()
-               "No radio mode named ~A found" (argument message))
-       (tracelog "Changed rx mode to ~A" rx-mode)
-       (setf rssi-integration-time
-             (* symbols-for-rssi
-                  (/ (rx-mode-bits-per-symbol rx-mode)
-                     (rx-mode-data-rate rx-mode))))
-       ;; if in rx mode change drawn power
-       (when (eql state 'rx)
-         (emit radio 'power-change (rx-mode-power-consumed rx-mode)))))
+(defmethod handle-control-command((radio radio) (command (eql 'set-tx-output))
+                                  (label symbol))
+  (with-slots(tx-level tx-levels) radio
+    (setf tx-level (find label tx-levels :key #'tx-level-output-power))
+    (assert tx-level ()
+            "Invalid tx output power level ~A" label)
+    (tracelog "Changed TX power output to ~A dBm consuming ~A W"
+              (tx-level-output-power tx-level)
+              (tx-level-power-consumed tx-level))))
 
-    (set-tx-output
-     (with-slots(tx-level tx-levels) radio
-       (setf tx-level (find (argument message) tx-levels
-                            :key #'tx-level-output-power))
-       (assert tx-level ()
-               "Invalid tx output power level ~A" (argument message))
-       (tracelog "Changed TX power output to ~A dBm consuming ~A W"
-                 (tx-level-output-power tx-level)
-                 (tx-level-power-consumed tx-level))))
-
-    (set-sleep-level
-     (with-slots(sleep-level sleep-levels) radio
-       (setf sleep-level (find (argument message) sleep-levels
-                               :key #'sleep-level-name))
+(defmethod handle-control-command((radio radio) (command (eql 'set-sleep-level))
+                                  (label symbol))
+  (with-slots(sleep-level sleep-levels) radio
+    (setf sleep-level (find label sleep-levels
+                            :key #'sleep-level-name))
        (assert sleep-level ()
-               "Invalid sleep level ~A" (argument message))
+               "Invalid sleep level ~A" label)
        (tracelog "Changed default sleep level to ~A"
                  (sleep-level-name sleep-level))))
 
-    (set-carrier-freq
-     (with-slots(carrier-frequency) radio
-       (setf carrier-frequency (argument message))
-       (tracelog "Changed carrier frequency to ~A Hz" carrier-frequency)
-       ;; clear received signals as they are no longer valid and don't create
-       ;; interference with the new incoming signals
-       (setf (received-signals radio) nil)))
+(defmethod handle-control-command((radio radio)
+                                  (command (eql 'set-carrier-frequency))
+                                  (frequency real))
+  (with-slots(carrier-frequency) radio
+    (setf carrier-frequency frequency)
+    (tracelog "Changed carrier frequency to ~A Hz" carrier-frequency)
+    ;; clear received signals as they are no longer valid and don't create
+    ;; interference with the new incoming signals
+    (setf (received-signals radio) nil)))
 
-    (set-cca-threshold
-     (with-slots(cca-threshold) radio
-       (setf cca-threshold (argument message))
-       (tracelog "Changed CCA threshold to ~A dBm" cca-threshold)))
+(defmethod handle-control-command((radio radio)
+                                  (command (eql 'set-cca-threshold))
+                                  (value real))
+  (with-slots(cca-threshold) radio
+    (setf cca-threshold value)
+    (tracelog "Changed CCA threshold to ~A dBm" cca-threshold)))
 
-    (set-cs-interrupt-on
-     (setf (slot-value radio 'carrier-sense-interrupt-enabled) t)
-     (tracelog "CS interrupt turned ON"))
+(defmethod handle-control-command((radio radio)
+                                  (command (eql 'set-cs-interrupt))
+                                  (value symbol))
+  (check-type value boolean)
+  (setf (slot-value radio 'carrier-sense-interrupt-enabled) value)
+  (tracelog "CS interrupt turned ~:[OFF~;ON~]" value))
 
-    (set-cs-interrupt-off
-     (setf (slot-value radio 'carrier-sense-interrupt-enabled) nil)
-     (tracelog "CS interrupt turned OFF"))
-
-    (set-encoding
-     (with-slots(encoding) radio
-       (check-type (argument message) encoding-type)
-       (setf encoding (argument message))))))
+(defmethod handle-control-command((radio radio)
+                                  (command (eql 'set-encoding))
+                                  (new-coding symbol))
+   (check-type new-coding encoding-type)
+   (setf (slot-value radio 'encoding) new-coding))
 
 (defun delay-state-transition(radio delay)
   (let ((msg (state-transition-message radio)))
@@ -845,7 +871,7 @@
            (/ (rx-mode-data-rate rx-mode)
               (rx-mode-noise-bandwidth rx-mode))))
 
-(defun is-channel-clear(radio)
+(defun channel-clear-p(radio)
   (let ((value (read-rssi radio)))
     (if (symbolp value)
         value

@@ -11,10 +11,7 @@
   (let ((mac-packet (encapsulate instance packet)))
     (setf (destination mac-packet) (next-hop (control-info packet)))
     (to-radio instance mac-packet)
-    (to-radio instance
-              (make-instance 'radio-control-command
-                             :command 'set-state
-                             :argument 'tx))))
+    (to-radio instance '(set-state . tx))))
 
 (defmethod handle-message((instance bypass-mac) (packet mac-packet))
   ;; from radio layer

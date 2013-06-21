@@ -76,6 +76,9 @@
   (emit buffer 'buffer-length buffer)
   p)
 
+(defmethod peek((buffer packet-buffer))
+  (peek (queue buffer)))
+
 (defmethod dequeue((buffer packet-buffer))
   (multiple-value-bind(p timestamp) (dequeue (queue buffer))
     (decf (slot-value buffer 'byte-length) (byte-length p))

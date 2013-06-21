@@ -26,7 +26,9 @@
 
 (defmethod byte-length((packet wsn-packet))
   (+ (header-overhead packet)
-     (byte-length (slot-value packet 'lens::encapsulated-packet))))
+     (if (slot-bound-p packet 'lens::encapsulated-packet)
+         (byte-length (slot-value packet 'lens::encapsulated-packet))
+         0)))
 
 (defmethod bit-length((packet wsn-packet)) (* 8 (byte-length packet)))
 

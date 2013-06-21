@@ -30,13 +30,9 @@
   t)
 
 (defmethod mac-address((node node))
-  ;; currently one mac and radio per npode so this is OK - change if multiple
+  ;; currently one mac and radio per node so this is OK - change if multiple
   ;; interfaces per node
   (mac-address (submodule node '(communications mac))))
-
-(defmethod handle-message((instance mac)
-                          (message communications-control-command))
-  (warn 'unknown-message :module instance :message message))
 
 (defmethod handle-message((instance mac)
                           (message radio-control-command))
@@ -49,6 +45,9 @@
 (defmethod handle-message((instance mac)
                           (message radio-control-message))
   (send instance message 'routing))
+
+(defmethod handle-message((instance mac) (message mac-control-message))
+  (handle-control-command instance (command message) (argument message)))
 
 (defmethod handle-message :around ((module mac) (packet mac-packet))
   (with-slots(max-mac-frame-size header-overhead) module
@@ -66,7 +65,12 @@
     (send module packet 'radio))
   (:method((module mac) (message message))
     (error "Mac module ~A attempting to send ~A to RADIO"
-           module message)))
+           module message))
+  (:method((module mac) (command cons))
+    (to-radio module
+              (make-instance 'radio-control-command
+                             :command (first command)
+                             :argument (rest command)))))
 
 (defmethod encapsulate((module mac) packet)
   (encapsulate
@@ -76,3 +80,16 @@
                   :source (mac-address module)
                   :sequence-number (next-sequence-number module))
    packet))
+
+(defmethod enqueue(packet (instance mac))
+  (cond
+    ((enqueue packet (buffer instance))
+     ;; success
+     (eventlog "Packet buffered from network layer, buffer state : ~D/~D"
+               (size (buffer instance)) (buffer-size (buffer instance)))
+     t)
+    (t ;; failure
+     (send instance
+           (make-instance 'mac-control-message :command 'mac-buffer-full)
+           'routing)
+     nil)))

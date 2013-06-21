@@ -52,10 +52,6 @@
 ;; by specialising handle-message main method
 
 (defmethod handle-message((instance routing)
-                          (message network-control-command))
-  (warn 'unknown-message :module instance :message message))
-
-(defmethod handle-message((instance routing)
                           (message communications-control-command))
   (send instance message 'mac))
 
@@ -66,6 +62,9 @@
 (defmethod handle-message((instance routing)
                           (message communications-control-message))
   (send instance message 'application))
+
+(defmethod handle-message((instance routing) (msg network-control-command))
+  (handle-control-command instance (command msg) (argument msg)))
 
 (defmethod node((instance comms-module)) (owner (owner instance)))
 

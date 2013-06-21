@@ -81,9 +81,11 @@
   (:method(instance local-time)
     (get-simulation-time (submodule (node instance) 'resources) local-time)))
 
-(defgeneric set-timer(module timer interval)
+(defgeneric set-timer(module timer interval &optional message-name)
   (:documentation "Schedule a timer using local time to determine interval")
-  (:method(module (timer message) interval)
+  (:method(module (timer message) interval  &optional name)
+    (assert (not (scheduled-p timer)))
+    (when name (setf (name message) name))
     (schedule-at module timer
                  :delay (get-simulation-time module interval))))
 

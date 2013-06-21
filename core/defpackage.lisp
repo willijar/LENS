@@ -30,7 +30,7 @@
    #:coord+ #:coord- #:coord* #:coord-op #:distance
    #:while #:until #:filter #:for #:copy-slots
    #:range-getf #:range-list-p
-   #:queue #:make-queue #:enqueue #:dequeue #:average-queue-time #:size
+   #:queue #:make-queue #:enqueue #:dequeue #:peek #:average-queue-time #:size
    #:timestamped-queue #:packet-buffer
    #:buffer-size #:buffer-size-bytes #:empty-p
    #:history-buffer #:duplicate-p
