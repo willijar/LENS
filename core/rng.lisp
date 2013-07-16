@@ -62,22 +62,37 @@ Modeling and Computer Simulation, Vol. 8, No. 1, January 1998, pp 3-30."))
   (seed mt seed))
 
 (defmethod seed((mt mt-random-state) (n integer))
-     "Use the single integer to expand into a bunch of
-integers to use as an MT-RANDOM-STATE.
-Copied from the 'sgenrand' function in mt19937int.c.
-This is mostly an internal function.  I recommend using
-MAKE-MT-RANDOM-STATE unless specific circumstances dictate otherwise."
-     (setf (slot-value mt 'mti) +mt-n+)
-     (labels
-         ((next-seed (n) (mod (1+ (* 69069 n)) +mt-k2^32+))
-          (get-hi16 (n) (logand n #xFFFF0000))
-          (next-elt (n)
-            (logior (get-hi16 n)
-                    (ash (get-hi16 (next-seed n)) -16))))
-       (do ((i 0 (1+ i))
-            (sd n (next-seed (next-seed sd))))
-           ((>= i +mt-n+))
-         (setf (aref (slot-value mt 'arr) i) (next-elt sd)))))
+    ;; Initialize generator state with seed
+    ;; See Knuth TAOCP Vol 2, 3rd Ed, p.106 for multiplier.
+    ;; In previous versions, most significant bits (MSBs) of the seed affect
+    ;; only MSBs of the state array.  Modified 9 Jan 2002 by Makoto Matsumoto.
+  (setf (slot-value mt 'mti) +mt-n+)
+  (let ((state (slot-value mt 'arr)))
+    (setf (aref state 0) (logand n #xFFFFFFFF))
+    (dotimes(i (1- +mt-n+))
+      (let((r (aref state i)))
+        (setf (aref state (1+ i))
+              (logand
+               (+ (* 1812433253 (logxor r (ash r -30))) (1+ i))
+               #xFFFFFFFF))))))
+
+;; (defmethod seed((mt mt-random-state) (n integer))
+;;      "Use the single integer to expand into a bunch of
+;; integers to use as an MT-RANDOM-STATE.
+;; Copied from the 'sgenrand' function in mt19937int.c.
+;; This is mostly an internal function.  I recommend using
+;; MAKE-MT-RANDOM-STATE unless specific circumstances dictate otherwise."
+;;      (setf (slot-value mt 'mti) +mt-n+)
+;;      (labels
+;;          ((next-seed (n) (mod (1+ (* 69069 n)) +mt-k2^32+))
+;;           (get-hi16 (n) (logand n #xFFFF0000))
+;;           (next-elt (n)
+;;             (logior (get-hi16 n)
+;;                     (ash (get-hi16 (next-seed n)) -16))))
+;;        (do ((i 0 (1+ i))
+;;             (sd n (next-seed (next-seed sd))))
+;;            ((>= i +mt-n+))
+;;          (setf (aref (slot-value mt 'arr) i) (next-elt sd)))))
 
 (defmethod seed((mt mt-random-state) (state sequence))
    (assert (eql (length state) +mt-n+))
@@ -148,21 +163,21 @@ MT-GENRAND function for clarity."
   (let ((mt-tempering-mask-b #x9d2c5680)
         (mt-tempering-mask-c #xefc60000))
      (with-slots(mti arr) mt-random-state
-    (when (>= mti +mt-n+) (mt-refill mt-random-state))
-    (let ((y (aref arr mti)))
-      (incf mti)
+       (when (>= mti +mt-n+) (mt-refill mt-random-state))
+       (let ((y (aref arr mti)))
+         (incf mti)
       ;; The following separate, explicit SETQ & other expressions
       ;; could be compacted/optimized into a single arithmetic expression
       ;; that does not store into any temporary variables.  That could be
       ;; more efficient at run-time, but I have chosen instead of immitate
       ;; the statements in the C program, mt19937int.c.
-      (setf y (logxor y (mt-tempering-shift-u y)))
-      (setf y (logxor y (logand (mt-tempering-shift-s y)
-                                mt-tempering-mask-b)))
-      (setf y (logxor y (logand (mt-tempering-shift-t y)
-                                mt-tempering-mask-c)))
-      (setf y (logxor y (mt-tempering-shift-l y)))
-      y))))
+         (setf y (logxor y (mt-tempering-shift-u y)))
+         (setf y (logxor y (logand (mt-tempering-shift-s y)
+                                   mt-tempering-mask-b)))
+         (setf y (logxor y (logand (mt-tempering-shift-t y)
+                                   mt-tempering-mask-c)))
+         (setf y (logxor y (mt-tempering-shift-l y)))
+         y))))
 
 (defmethod rand((state mt-random-state) &optional (n 1.0d0))
   (assert (plusp n))

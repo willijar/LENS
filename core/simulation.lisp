@@ -92,22 +92,34 @@
   (configuration *simulation*))
 
 (defmethod initialize-instance :after
-    ((sim simulation) &key configuration run-number &allow-other-keys)
+    ((sim simulation) &key configuration (run-number 0) (repetition 0) &allow-other-keys)
   ;; initialise global rng-map - use either seed-n or run-number
   (with-slots(rng-map num-rngs rng-class ) sim
     (setf (slot-value sim 'rng-map) (make-array num-rngs))
-    (dotimes(i num-rngs)
-      (multiple-value-bind(seed found-p)
-          (read-parameter
-           (list (intern (format nil "SEED-~D" i)))
-           configuration
-           `(integer :min 0 :max ,(1- num-rngs) ))
-        (setf (aref rng-map i)
-              (make-instance
-               rng-class
-               :seed (cond (found-p seed)
-                           (run-number (* (1+ run-number) num-rngs))
-                           (t t)))))))
+    (let ((seed-set
+           (read-parameter 'SEED-SET configuration 'read)))
+      (setf seed-set
+            (etypecase seed-set
+              (integer seed-set)
+              (symbol
+               (ecase seed-set
+                 (repetition repetition)
+                 (run-number run-number)))
+              (sequence (elt seed-set repetition))))
+      (dotimes(i num-rngs)
+        (let ((seed
+               (read-parameter
+                (list (intern (format nil "SEED-~D" (1+ i))))
+                configuration
+                'read)))
+          (setf (aref rng-map i)
+                (make-instance
+                 rng-class
+                 :seed (typecase seed
+                         (integer seed)
+                         (sequence (elt seed repetition))
+                         (null (+ (1+ i) (* seed-set num-rngs)))
+                         (t t))))))))
   (setf (slot-value sim 'network-instance)
         (make-instance (slot-value sim 'network)
                        :name (slot-value sim 'network)
