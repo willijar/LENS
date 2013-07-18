@@ -11,6 +11,10 @@
     :documentation "True if this component has been initialized."))
   (:metaclass parameter-class))
 
+(defmethod print-object((m component) os)
+  (print-unreadable-object(m os :type t :identity nil)
+    (write-string (lens::full-path-string m) os)))
+
 (defmethod initialize-instance :around
     ((component component) &key &allow-other-keys)
   (let ((*context* component))

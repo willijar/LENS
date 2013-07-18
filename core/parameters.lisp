@@ -152,7 +152,6 @@
   (:documentation "Metaclass for classes which have slots initialised
   from an external source"))
 
-
 (defmethod shared-initialize :after((class parameter-class) slot-names
                                     &key properties
                                     direct-superclasses &allow-other-keys)
@@ -178,18 +177,19 @@ it is a parameter direct slot"
   "Only if the highest priority direct slot is a parameter slot do we need
 any parameter initargs - they aren't inherited."
   (let ((initargs (call-next-method))
-        (slot (first direct-slot-definitions)))
+        (slot (first direct-slot-definitions))
+        (parameter-slot-definitions
+         (mapcan
+          #'(lambda(slot)
+              (when (typep slot 'parameter-slot)
+                (list (slot-definition-properties slot))))
+          direct-slot-definitions)))
     (cond
-      ((typep slot 'parameter-direct-slot-definition)
+      (parameter-slot-definitions
        (setf (getf initargs :parameter) t)
        (setf (getf initargs :properties)
-             (reduce #'property-union
-                 (mapcan
-                  #'(lambda(slot)
-                      (when (typep slot 'parameter-slot)
-                        (list (slot-definition-properties slot))))
-                  direct-slot-definitions)))
-       (when (slot-definition-volatile slot)
+             (reduce #'property-union parameter-slot-definitions))
+       (when (and (typep slot 'parameter-slot) (slot-definition-volatile slot))
          (setf (getf initargs :volatile) t)
          (setf (getf initargs :type) 'function)))
       (t

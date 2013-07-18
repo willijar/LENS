@@ -97,7 +97,7 @@
   (with-slots(rng-map num-rngs rng-class ) sim
     (setf (slot-value sim 'rng-map) (make-array num-rngs))
     (let ((seed-set
-           (read-parameter 'SEED-SET configuration 'read)))
+           (read-parameter '(nil SEED-SET) configuration '(read :package :lens))))
       (setf seed-set
             (etypecase seed-set
               (integer seed-set)
@@ -109,16 +109,16 @@
       (dotimes(i num-rngs)
         (let ((seed
                (read-parameter
-                (list (intern (format nil "SEED-~D" (1+ i))))
+                (list nil (intern (format nil "SEED-~D" i)))
                 configuration
-                'read)))
+                '(read :package :lens))))
           (setf (aref rng-map i)
                 (make-instance
                  rng-class
                  :seed (typecase seed
                          (integer seed)
+                         (null (+ i (* seed-set num-rngs)))
                          (sequence (elt seed repetition))
-                         (null (+ (1+ i) (* seed-set num-rngs)))
                          (t t))))))))
   (setf (slot-value sim 'network-instance)
         (make-instance (slot-value sim 'network)

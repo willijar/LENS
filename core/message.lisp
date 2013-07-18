@@ -67,7 +67,7 @@ model domain."))
   (copy-slots '(creation-time to from sent-time timestamp)
               message duplicate))
 
-(define-condition unknown-message(serious-condition)
+(define-condition unknown-message(warning)
   ((module :reader module :initarg :module)
    (message :reader message :initarg :message))
   (:report (lambda(c os)
