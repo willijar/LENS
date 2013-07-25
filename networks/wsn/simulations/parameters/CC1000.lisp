@@ -6,8 +6,8 @@
      :data-rate 19.2d3 ;;Hz
      :modulation FSK
      :bits-per-symbol 1
-     :bandwidth 10d6 ;; Hz
-     :noise-bandwidth 30d6 ;;Hz
+     :bandwidth 10d3 ;; Hz
+     :noise-bandwidth 30d3 ;;Hz
      :noise-floor -105 ;; dBm
      :sensitivity -98 ;;dBm
      :power-consumed 22.2d-3) ;;W
@@ -16,8 +16,8 @@
      :data-rate 19.2d3 ;;Hz
      :modulation ideal
      :bits-per-symbol 1
-     :bandwidth 10d6 ;; Hz
-     :noise-bandwidth 30d6 ;;Hz
+     :bandwidth 10d3 ;; Hz
+     :noise-bandwidth 30d3 ;;Hz
      :noise-floor -105 ;; dBm
      :sensitivity -98 ;;dBm
      :power-consumed 22.2d-3)) ;;W

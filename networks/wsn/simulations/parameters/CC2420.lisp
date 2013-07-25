@@ -17,7 +17,7 @@
      :modulation PSK
      :bits-per-symbol 4
      :bandwidth 20e6
-     :noise-bandwidth 194e6
+     :noise-bandwidth 194e3
      :noise-floor -100.0
      :sensitivity -95.0
      :power-consumed 62e-3)
@@ -27,7 +27,7 @@
      :modulation ideal
      :bits-per-symbol 4
      :bandwidth 20e6
-     :noise-bandwidth 194e6
+     :noise-bandwidth 194e3
      :noise-floor -100.0
      :sensitivity -95.0
      :power-consumed 62e-3))
@@ -45,7 +45,7 @@
  (transitions
   rx
    (rx nil
-    tx #s(transition-element :delay 0.01d0 :power 62e-3)
+    tx #s(transition-element :delay 0.01d-3 :power 62e-3)
     sleep #s(transition-element :delay 0.194d0 :power 62e-3))
   tx
    (rx #s(transition-element :delay 0.01d-3 :power 62e-3)

@@ -250,7 +250,16 @@ and pathloss e.g. ((transmitterid (receiverid . loss) (receiverid
 
 (defclass wireless-signal-end(packet)
   ((src :initarg :src :reader src
-        :documentation "Source ID must match signal start source id")))
+        :documentation "Source ID must match signal start source id")
+   (header-overhead :type integer :initform 0 :reader header-overhead
+                    :initarg :header-overhead)))
+
+(defmethod byte-length((pkt wireless-signal-end))
+  (+ (header-overhead pkt)
+     (byte-length (slot-value pkt 'lens::encapsulated-packet))))
+
+(defmethod bit-length((pkt wireless-signal-end))
+  (* 8 (byte-length pkt)))
 
 (defmethod print-object((msg wireless-signal-end) os)
   (print-unreadable-object(msg os :type t :identity nil)

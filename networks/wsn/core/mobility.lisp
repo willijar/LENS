@@ -35,8 +35,12 @@
     location))
 
 (defmethod configure :after ((instance mobility))
-  (parse-deployment instance)
-  (tracelog "initial location is ~A" (location instance)))
+  (parse-deployment instance))
+
+(defmethod initialize and ((instance mobility) &optional (stage 0))
+  (case stage
+    (0  (tracelog "initial location is ~A" (location instance))))
+  t)
 
 (defun parse-deployment(instance)
   (let* ((node (node instance))

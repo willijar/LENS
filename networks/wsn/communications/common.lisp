@@ -15,7 +15,7 @@
   (:documentation "Base class for network and link layer packets"))
 
 (defmethod print-object((pkt wsn-packet) stream)
-  (print-unreadable-object(pkt stream :type t :identity t)
+  (print-unreadable-object(pkt stream :type t :identity nil)
     (format stream "#~D (~D bytes)" (sequence-number pkt) (byte-length pkt))))
 
 (defmethod duplicate((packet wsn-packet) &optional duplicate)
@@ -26,7 +26,7 @@
 
 (defmethod byte-length((packet wsn-packet))
   (+ (header-overhead packet)
-     (if (slot-bound-p packet 'lens::encapsulated-packet)
+     (if (slot-boundp packet 'lens::encapsulated-packet)
          (byte-length (slot-value packet 'lens::encapsulated-packet))
          0)))
 

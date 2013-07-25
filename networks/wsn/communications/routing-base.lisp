@@ -76,6 +76,12 @@
                   (byte-length packet) header-overhead max-net-frame-size)
         (call-next-method))))
 
+(defmethod handle-message ((instance routing) (packet routing-packet))
+  ;; from mac layer
+  (when (or (eql (destination packet) (network-address (node instance)))
+            (eql (destination packet) broadcast-network-address))
+    (send instance (decapsulate packet) 'application)))
+
 (defgeneric to-mac(routing entity &optional next-hop-mac-address)
   (:documentation "Send packet to mac layer")
   (:method((module routing) (command communications-control-command)
@@ -96,14 +102,15 @@
     (error "Network module ~A attempting to send ~A to mac"
            module message)))
 
-(defmethod encapsulate((module routing) (packet application-packet))
-  (encapsulate
-   (make-instance 'routing-packet
-                  :name (class-name (class-of module))
-                  :header-overhead (header-overhead module)
-                  :source (network-address (node module))
-                  :sequence-number (next-sequence-number module))
-   packet))
+(defmethod decapsulate((packet routing-packet))
+  (let ((application-packet (call-next-method)))
+    (setf (control-info application-packet)
+          (make-instance 'app-net-control-info
+                         :rssi (rssi (control-info packet))
+                         :lqi (lqi (control-info packet))
+                         :source (source packet)
+                         :destination (destination packet)))
+    application-packet))
 
 (defgeneric resolve-network-address(routing network-address)
   (:documentation "Return  resolved mac address from given network address")
@@ -111,3 +118,19 @@
     (declare (ignore routing))
     ;; by default mac address and network address have same values in WSN
     network-address))
+
+(defmethod sink-p((instance routing))
+  (sink-p (submodule (parent (parent instance)) 'application)))
+
+(defmethod enqueue(packet (instance routing))
+  (cond
+    ((enqueue packet (buffer instance))
+     ;; success
+     (eventlog "Packet buffered from application layer, buffer state : ~D/~D"
+               (size (buffer instance)) (buffer-size (buffer instance)))
+     t)
+    (t ;; failure
+     (send instance
+           (make-instance 'net-control-message :command 'net-buffer-full)
+           'application)
+     nil)))

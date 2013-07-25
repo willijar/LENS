@@ -57,11 +57,11 @@
    (priority :parameter t :type integer :initarg :priority :initform 1)
    (header-overhead
     :parameter t  :initform 8
-    :type fixnum :initarg :header-overhead :reader header-overhead
+    :type integer :initarg :header-overhead :reader header-overhead
     :documentation "in bytes")
    (payload-overhead
     :parameter t :initform 12
-    :type fixnum :initarg :payload-overhead :reader payload-overhead
+    :type integer :initarg :payload-overhead :reader payload-overhead
     :documentation "in bytes")
    (last-sequence-number :initform -1 :type integer))
   (:gates
@@ -117,8 +117,7 @@
                 "Destination not specified for packet send"))
     (emit application 'application-send packet)
     (send application packet 'network)
-    (tracelog "Sending ~A to communication layer"
-              packet (byte-length packet)))
+    (tracelog "Sending ~A to communication layer" packet))
   (:method((application application) (message message) &optional destination)
     (declare (ignore destination))
     (error "Application ~A attempting to send ~A to network"
@@ -149,3 +148,6 @@
 
 (defmethod handle-message((application application) (message sensor-message))
   (handle-sensor-reading application (measurement message)))
+
+(defgeneric sink-p(entity)
+  (:documentation "Return true if an application (or router) is a sink"))

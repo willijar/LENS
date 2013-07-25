@@ -9,7 +9,8 @@
     :parameter t :type time-type :initform 0.0d0 :reader startup-offset
     :documentation "Node offset startup delay in seconds")
    (startup-randomization
-    :parameter t :type time-type :initform 0.05 :reader startup-randomization
+    :parameter t :type time-type :initform 0.05d0
+    :reader startup-randomization
     :documentation "node startup randomisation, in seconds"))
   (:gates
    (receive :input))

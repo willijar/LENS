@@ -12,11 +12,11 @@
          (routing-packet
           (encapsulate
            (make-instance 'routing-packet
-                          :name (class-name (class-of module))
-                          :header-overhead (header-overhead module)
-                          :source (network-address (node module))
+                          :name (class-name (class-of instance))
+                          :header-overhead (header-overhead instance)
+                          :source (network-address (node instance))
                           :destination destination
-                          :sequence-number (next-sequence-number module))
+                          :sequence-number (next-sequence-number instance))
            packet)))
     (to-mac instance routing-packet
             (resolve-network-address instance destination))))
