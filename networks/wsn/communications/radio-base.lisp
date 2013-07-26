@@ -324,7 +324,6 @@
                        radio (received-signal-encoding signal))))
       ;; only need to update bit-errors for an element that will be received
       (when (and (numberp bit-errors) (<= bit-errors max-errors))
-
         (let ((num-of-bits
                (ceiling (* (rx-mode-data-rate (rx-mode radio))
                            (- (simulation-time)
@@ -332,15 +331,11 @@
               (ber (snr2ber (rx-mode radio)
                             (- (received-signal-power-dbm signal)
                                (received-signal-current-interference signal)))))
-          (tracelog "~D bits, ber=~A,  margin=~A" num-of-bits ber
-                 (- (received-signal-power-dbm signal)
-                               (received-signal-current-interference signal)))
           (incf (received-signal-bit-errors signal)
                 (bit-errors ber num-of-bits max-errors)))
         ;; update current-interference in the received signal structure
         (unless (eql signal interferance)
-          (update-interference radio signal interferance))
-        (tracelog "Signal ~A" signal))))
+          (update-interference radio signal interferance)))))
   (received-signals radio))
 
 (defmethod handle-message((radio radio) (message wireless-signal-start))
@@ -393,8 +388,6 @@
                   (rx-mode-noise-floor rx-mode))))))
          #+nil(complex-interference-model ;; not implemented
                (rx-mode-noise-floor (rx-mode radio))))
-    (tracelog "New signal Current Interference= ~A"
-              (received-signal-current-interference new-signal))
     (setf (received-signal-max-interference new-signal)
           (received-signal-current-interference new-signal))
     (unless (eql (rx-mode-modulation rx-mode)
@@ -433,7 +426,6 @@
     (update-received-signals radio ending-signal)
     (update-total-power-received radio ending-signal)
     (setf (time-of-last-signal-change radio) (simulation-time))
-    (tracelog "~D bit errors" (received-signal-bit-errors ending-signal))
     (when (numberp (received-signal-bit-errors ending-signal))
        (cond
          ((<= (received-signal-bit-errors ending-signal)
@@ -737,14 +729,6 @@
   (:documentation "Update the history of total power received."))
 
 (defmethod update-total-power-received(radio (new-power number))
-  (tracelog "total power received ~A + ~A = ~A"
-            new-power
-            (total-power-received-power-dbm
-                      (first (total-power-received radio)))
-
-            (dbm+ (total-power-received-power-dbm
-                      (first (total-power-received radio)))
-                     new-power))
   (push
    (make-total-power-received
     :start-time (simulation-time)
@@ -762,10 +746,7 @@
      (make-total-power-received
       :start-time (simulation-time)
       :power-dbm p)
-     (total-power-received radio))
-  (tracelog "total power received =-100 -> ~A"
-            (total-power-received-power-dbm
-             (first (total-power-received radio))))))
+     (total-power-received radio))))
 
 (defmethod update-total-power-received(radio (dummy (eql nil)))
   (let((p (rx-mode-noise-floor (rx-mode radio))))
@@ -777,7 +758,6 @@
         (tracelog
          "Just entered RX, existing signal from ~A cannot be received."
          (src received-signal))))
-    (tracelog "total power received -> ~A" p)
     (push
      (make-total-power-received
       :start-time (simulation-time)
@@ -913,7 +893,7 @@
        :when (<= (lens::%gendblrand 0) (/ prob (- 1.0 c)))
        :do (return bit-errors)
        :do (incf c prob)
-       :finally (return (1+ bit-errors)))))
+       :finally (return bit-errors))))
 
 (defgeneric max-errors-allowed(radio encoding)
   (:documentation "Return the maximum number of bit errors acceptable for given encoding")

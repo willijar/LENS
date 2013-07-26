@@ -48,7 +48,7 @@
 (defgeneric latency(packet)
   (:documentation "Given a packet return it's latency")
   (:method ((packet application-packet))
-    (- (timestamp packet) (arrival-time packet))))
+    (- (arrival-time packet) (timestamp packet))))
 
 (defclass application(wsn-module)
   ((owner :reader node)
@@ -71,7 +71,7 @@
    :statistic (latency
                :source (latency application-receive)
                :title "application latency"
-               :default (histogram)))
+               :default ((histogram :min 0))))
   (:metaclass module-class)
   (:documentation "Application connects to sensors for measurements
   and to communication module for sending/receiving data."))
