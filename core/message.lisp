@@ -59,7 +59,7 @@ model domain."))
               (uid instance) *time-format* (arrival-time instance)))))
 
 (defmethod latency((message message))
-  (- (timestamp message) (arrival-time message)))
+  (- (arrival-time message) (timestamp message) ))
 
 (defmethod duplicate((message message)
                       &optional (duplicate (make-instance (class-of message))))

@@ -210,6 +210,7 @@
       (incf sqrsum (* value value))))
 
 (defmethod report((r stddev) stream)
+  (unless (zerop (result-count r))
   (format stream "statistic ~A ~A~%" (full-path-string (owner (owner r))) (title r))
   (with-slots(min max sum count sqrsum) r
     (format stream "field count ~A~%field mean ~A~%field stddev ~A~%field sum ~A~%field sqrsum ~A~%field min ~A~%field max ~A~%"
@@ -219,7 +220,7 @@
             (result-sum r)
             (result-sqrsum r)
             (result-min r)
-            (result-max r))))
+            (result-max r)))))
 
 (defclass weighted-stddev(stddev)
   ((sum-weights :type real :initform 0)
@@ -257,12 +258,13 @@
       (incf sum-weights-squared-vals (* weight value value)))))
 
 (defmethod report((r weighted-stddev) stream)
-  (call-next-method)
-  (with-slots(sum-weights sum-weighted-vals sum-squared-weights
-                          sum-weights-squared-vals) r
-  (format stream "field weights ~A~% field weightedSum ~A~%field sqrSumWeights ~A~%field weightedSqrSum ~A~%"
-          sum-weights sum-weighted-vals sum-squared-weights
-          sum-weights-squared-vals)))
+  (unless (zerop (result-count r))
+    (call-next-method)
+    (with-slots(sum-weights sum-weighted-vals sum-squared-weights
+                            sum-weights-squared-vals) r
+      (format stream "field weights ~A~% field weightedSum ~A~%field sqrSumWeights ~A~%field weightedSqrSum ~A~%"
+              sum-weights sum-weighted-vals sum-squared-weights
+              sum-weights-squared-vals))))
 
 (defclass histogram(stddev)
   ((range-min :initarg :min :initform nil :type real :reader range-min)
@@ -332,6 +334,17 @@
           (make-array num-cells :element-type 'integer
                             :initial-element 0))))
 
+(defun histogram-insert-to-cell(instance value)
+  (with-slots(range-min range-max num-cells cell-size) instance
+      (let ((k (floor (- value range-min) cell-size)))
+        (format t "~A->~A" value k)
+        (cond
+          ((or (< k 0) (< value range-min))
+           (incf (underflow-cell instance)))
+          ((or (>= k num-cells) (>= value range-max))
+           (incf (overflow-cell instance)))
+          (t (incf (aref (cells instance) k)))))))
+
 (defun histogram-transform(instance)
   (assert (not (histogram-transformed-p instance)))
   (with-slots(range-min range-max range-ext-factor cell-size array mode)
@@ -363,7 +376,7 @@
                 'integer
                 'float)))
       (histogram-setup-cells instance)
-      (map nil #'(lambda(v) (record instance 0 v)) firstvals))))
+      (map nil #'(lambda(v) (histogram-insert-to-cell instance v)) firstvals))))
 
 (defmethod initialize-instance :after
     ((instance histogram) &key (num-firstvals 100) &allow-other-keys)
@@ -374,11 +387,12 @@
                           :fill-pointer 0))))
 
 (defmethod record :before ((instance histogram) time (value number))
-  (assert (or (integerp value) (not (eql (histogram-mode instance) 'float)))
+  (assert (and (not (integerp value)) (not (eql (histogram-mode instance) 'integer)))
           ()
           "Histogram in INTEGER mode cannot accept a float value"))
 
 (defmethod record((instance histogram) time value)
+  (declare (ignore time))
   (call-next-method)
   (when (not (histogram-transformed-p instance))
     (let ((firstvals (slot-value instance 'array)))
@@ -387,26 +401,19 @@
             (vector-push value firstvals)
             (return-from record))
           (histogram-transform instance))))
-  (with-slots(range-min range-max num-cells cell-size) instance
-      (let ((k (floor (- value range-min) cell-size)))
-        (cond
-          ((or (< k 0) (< value range-min))
-           (incf (underflow-cell instance)))
-          ((or (>= k num-cells) (>= value range-max))
-           (incf (overflow-cell instance)))
-          (t (incf (aref (cells instance) k)))))))
+  (histogram-insert-to-cell instance value))
 
 (defmethod report((r histogram) stream)
-  (call-next-method)
-  (unless (histogram-transformed-p r)
-    (histogram-transform r))
-  (format stream "attr unit s~%") ;; TODO sllow specification of attributes in initargs
-  (format stream "bin -INF ~D~%" (underflow-cell r))
-  (let ((b (range-min r)))
-    (dotimes(k (length (cells r)))
-      (format stream "bin ~A ~D~%" b (aref (cells r) k))
-      (incf b (cell-size r))))
-  (format stream "bin +INF ~D~%" (overflow-cell r)))
+  (unless (zerop (result-count r))
+    (unless (histogram-transformed-p r) (histogram-transform r))
+    (call-next-method)
+    (format stream "attr unit s~%") ;; TODO allow specification of attributes in initargs
+    (format stream "bin -INF ~D~%" (underflow-cell r))
+    (let ((b (range-min r)))
+      (dotimes(k (length (cells r)))
+        (format stream "bin ~A ~D~%" b (aref (cells r) k))
+        (incf b (cell-size r))))
+    (format stream "bin +INF ~D~%" (overflow-cell r))))
 
 (defgeneric probability-density-function(instance x)
   (:documentation "Returns the estimated value of the Probability

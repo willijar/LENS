@@ -142,7 +142,6 @@ definitions as per let"
        :when (eql (car a) '-)
        :do (setf recording-modes
                  (delete (second a) recording-modes :test #'equal)))
-
     (setf (slot-value instance 'recorders)
             (mapcar
              #'(lambda(recorder-mode)
@@ -204,12 +203,17 @@ definitions as per let"
 
 (defun add-statistics(sim)
   (labels((do-add-statistics(module)
-            (loop :for a :on (properties module) :by #'cddr
-               :when (eql (car a) :statistic)
-               :do (make-instance 'statistic-listener
+            (let((names nil))
+              (loop :for a :on (properties module) :by #'cddr
+                 :when (eql (first a) :statistic)
+                 :do (let ((name (car (second a)))
+                           (statistic (rest (second a))))
+                       (unless (member name names)
+                         (push name names)
+                         (make-instance 'statistic-listener
                                   :owner module
-                                  :name (car (second a))
-                                  :statistic (rest (second a))))
+                                  :name name
+                                  :statistic statistic)))))
             (when (typep module 'compound-module)
               (for-each-submodule module #'do-add-statistics))))
     (do-add-statistics (network sim))))

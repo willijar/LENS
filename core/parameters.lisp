@@ -152,18 +152,6 @@
   (:documentation "Metaclass for classes which have slots initialised
   from an external source"))
 
-(defmethod shared-initialize :after((class parameter-class) slot-names
-                                    &key properties
-                                    direct-superclasses &allow-other-keys)
-  (setf (slot-value class 'properties)
-        (reduce #'property-union
-                (cons properties
-                      (mapcar
-                       #'(lambda(superclass)
-                           (when (typep superclass 'parameter-class)
-                             (properties superclass)))
-                       direct-superclasses)))))
-
 (defmethod direct-slot-definition-class ((class parameter-class)
                                          &rest initargs)
   "If we specify either :parameter or :volatile in a slot definition then
@@ -226,12 +214,11 @@ any parameter initargs - they aren't inherited."
             (funcall (call-next-method)))))))
   ;; deal with property inheritance from superclasses
   (setf (slot-value class 'properties)
-        (reduce #'property-union
-                (cons properties
-                      (mapcan #'(lambda(super)
-                                  (when (typep super class)
-                                    (list (properties class))))
-                              direct-superclasses)))))
+        (nconc properties
+              (mapcan #'(lambda(super)
+                          (when (typep super 'parameter-class)
+                            (copy-list (properties super))))
+                      direct-superclasses))))
 
 (defclass parameter-object()
   ((properties :initarg :properties :initform nil
