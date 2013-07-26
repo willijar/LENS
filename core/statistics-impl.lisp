@@ -337,7 +337,6 @@
 (defun histogram-insert-to-cell(instance value)
   (with-slots(range-min range-max num-cells cell-size) instance
       (let ((k (floor (- value range-min) cell-size)))
-        (format t "~A->~A" value k)
         (cond
           ((or (< k 0) (< value range-min))
            (incf (underflow-cell instance)))

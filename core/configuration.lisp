@@ -103,7 +103,8 @@
 
 (defmethod nmerge-trie(trie1 trie2)
   (flet ((do-merge(trie1 trie2)
-           (when (slot-boundp trie2 'trie-value)
+           (when (and (slot-boundp trie2 'trie-value)
+                      (not (slot-boundp trie1 'trie-value)))
              (setf (slot-value trie1 'trie-value)
                    (slot-value trie2 'trie-value)))
            (dolist(child (trie-children trie2))
@@ -112,6 +113,8 @@
     (restart-case
         (if (or (not (string-equal (trie-prefix trie1) (trie-prefix trie2)))
                 (and (slot-boundp trie2 'trie-value)
+                     (not (slot-boundp trie1 'trie-value)))
+                (and (not (slot-boundp trie2 'trie-value))
                      (slot-boundp trie1 'trie-value)))
             (error 'trie-merge-condition :trie trie1 :trie2 trie2)
             (do-merge trie1 trie2))
