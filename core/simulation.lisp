@@ -20,6 +20,14 @@
   layers which use signals such as statistical reporting or graphical
   presentation.")
 
+(defvar run 0 "Current run number")
+(defvar repetition 0 "Current repetition number")
+(defvar configname "General" "Current configuration name")
+(defvar datetime "" "Datetime string for current run")
+(defvar network nil "Network name for current run")
+(defvar runid "" "Runid for current run")
+(defvar iterationvars "" "String representation of current run")
+
 ;; time requires double precision - set this as default for reader too
 (deftype time-type() 'double-float)
 
@@ -44,6 +52,8 @@
                   :documentation "Configuration data used for simulation")
    (rng-map :type array :reader rng-map
             :documentation "Top level rng-map.")
+   (seed-set :type integer :documentation "Seed set used in this simulation"
+             :reader seed-set)
    (num-rngs :parameter t :type fixnum :initform 1 :reader num-rngs
              :documentation "Total number of rngs for this simulation")
    (rng-class  :parameter t :type symbol :initform 'mt-random-state
@@ -62,13 +72,9 @@
    (network-instance
     :reader network
     :documentation "Actual network instance in this simulation")
-   (vector-file :parameter t :type string :reader vector-file
-                :documentation "Destination for vector results")
-   (vector-stream :initform nil :reader vector-stream
+   (vector-stream :initform nil :reader vector-stream :initarg :vector-stream
                   :documentation "Destination stream for vector results")
-   (scalar-file :parameter t :type string :reader scalar-file
-                :documentation "Destination for scalar results")
-   (scalar-stream :initform nil :reader scalar-stream
+   (scalar-stream :initform nil :reader scalar-stream :initarg :scalar-stream
                   :documentation "Destination stream for scalar results"))
   (:metaclass parameter-class)
   (:default-initargs :name nil :owner nil :configuration-path (list nil))
@@ -92,20 +98,20 @@
   (configuration *simulation*))
 
 (defmethod initialize-instance :after
-    ((sim simulation) &key configuration (run-number 0) (repetition 0) &allow-other-keys)
+    ((sim simulation) &key configuration &allow-other-keys)
   ;; initialise global rng-map - use either seed-n or run-number
-  (with-slots(rng-map num-rngs rng-class ) sim
+  (with-slots(rng-map num-rngs rng-class seed-set) sim
     (setf (slot-value sim 'rng-map) (make-array num-rngs))
-    (let ((seed-set
-           (read-parameter '(nil SEED-SET) configuration '(read :package :lens))))
-      (setf seed-set
+    (setf seed-set
+          (let ((seed-set
+                 (read-parameter '(nil SEED-SET) configuration '(read :package :lens))))
             (etypecase seed-set
               (integer seed-set)
               (symbol
                (ecase seed-set
                  (repetition repetition)
-                 (run-number run-number)))
-              (sequence (elt seed-set repetition))))
+                 (run run)))
+              (sequence (elt seed-set repetition)))))
       (dotimes(i num-rngs)
         (let ((seed
                (read-parameter
@@ -119,7 +125,7 @@
                          (integer seed)
                          (null (+ i (* seed-set num-rngs)))
                          (sequence (elt seed repetition))
-                         (t t))))))))
+                         (t t)))))))
   (setf (slot-value sim 'network-instance)
         (make-instance (slot-value sim 'network)
                        :name (slot-value sim 'network)
@@ -305,21 +311,7 @@ are dispatched in current thread"
   (:documentation "Called depth first at end of simulation")
   (:method((simulation simulation))
     (stop simulation)
-    (when (scalar-recording simulation)
-      (setf (slot-value simulation 'scalar-stream)
-            (open (scalar-file simulation)
-                  :direction :output
-                  :if-exists :supersede
-                  :if-does-not-exist :create)))
-    (when (vector-recording simulation)
-      (setf (slot-value simulation 'vector-stream)
-            (open (vector-file simulation)
-                  :direction :output
-                  :if-exists :supersede
-                  :if-does-not-exist :create)))
-    (finish (network simulation))
-    (when (scalar-stream simulation) (close (scalar-stream simulation)))
-    (when (vector-stream simulation) (close (vector-stream simulation)))))
+    (finish (network simulation))))
 
 (defvar *simulation-trace-stream* *standard-output*)
 
@@ -346,27 +338,195 @@ are dispatched in current thread"
   (:method((entity timestamped))
     (- (simulation-time) (timestamped-time entity))))
 
-(defun run-simulation(pathname &optional (key "General"))
-  (let ((simulation
-         (setf *simulation*
-               (make-instance
-                'simulation
-                :configuration (read-configuration pathname key))))
-        (output-path
-         (merge-pathnames
-          (make-pathname
-           :name (format nil "~A-~A" (pathname-name pathname) key))
-          pathname)))
-    (unless (slot-boundp simulation 'scalar-file)
-      (setf (slot-value simulation 'scalar-file)
-            (merge-pathnames (make-pathname :type "sca") output-path))
-    (unless (slot-boundp simulation 'vector-file)
-      (setf (slot-value simulation 'vector-file)
-            (merge-pathnames (make-pathname :type "vec") output-path))))
-  (initialize simulation)
-  (run simulation :granularity nil)
-  (finish simulation)
-  simulation))
+;; TODO Parameter studies - looping Last one is innermost if unnamed
+;; given names 0,1,2 etc syntax is {form ... } if one form which is a
+;; symbol then the global symbol value is used if two forms and first
+;; one is a symbol second one is evaluated to give iteration values
+;; which are assigned in turn to global value if multiple values and
+;; first is a symbol then reamining values form iteration list; if
+;; first is not a symbol then it is just a list of values and a name
+;; will be allocated.
+
+;; structure to store lisp evaluations for parameters
+;; this should occur for each lisp form which occurs as in as trie-value
+;;
+(defstruct parameter-expansion
+  ;; global symbol name for variable if set
+  trie ;; trie where defined
+  (seq nil :type list) ;; list of strings and variable names to be substituted for value in this trie per iteration
+  (vars nil)) ;; list of cons of variabe name and forms to be evaluated
+            ;; to get itetation
+
+(defun parameter-expansion-value(pe)
+  (with-output-to-string(os)
+    (dolist(term (parameter-expansion-seq pe))
+       (if (symbolp term)
+           (write (symbol-value term) :stream os)
+           (write-string term os)))))
+
+(defun get-expansion(trie)
+  "return name and list of strings from an iteration value"
+  (let*((value (trie-value trie))
+        (matches (ppcre::all-matches "{[^\\}]+}" value)))
+    (when matches
+      (let ((upto 0)
+            seq vars)
+        (dotimes(x (/ (length matches) 2))
+          (let* ((start (elt matches (* 2 x)))
+                 (end (elt matches (1+ (* 2 x))))
+                 (expression (subseq value (1+ start) (1- end)))
+                 (forms (parse-input 'read
+                                     expression
+                                     :multiplep t
+                                     :package #.*package*)))
+            (when (<= upto (1- start))
+              (push (subseq value upto start) seq))
+            (setf upto end)
+            (cond
+              ((and (symbolp (first forms)) (not (rest forms)))
+               ;; simply a variable expansion
+               (push (first forms) seq))
+              (t ;; an iteration assignment
+               (multiple-value-bind(var assignment)
+                   (if (symbolp (first forms))
+                       (values (first forms) (rest forms))
+                       (values (gentemp "$" (find-package :lens)) forms))
+                 (push var seq)
+                 (push
+                  (cons var (if (rest assignment)
+                                (list 'quote assignment)
+                                (eval (first assignment))))
+                  vars ))))))
+        (when (< upto (length value))
+          (push (subseq value upto) seq))
+        (make-parameter-expansion
+         :trie trie
+         :seq (nreverse seq)
+         :vars (nreverse vars))))))
+
+(defun get-expansions(trie)
+  (nconc
+   (mapcan #'get-expansions (trie-children trie))
+   (when (slot-boundp trie 'trie-value)
+     (let ((exp (get-expansion trie)))
+       (when exp (list exp))))))
+
+(defun parameter-expansion-order(exp)
+  (parameter-source-line-number (trie-source (parameter-expansion-trie exp))))
+
+(defun run-simulations(pathname &key (config "General")
+                       (repeat 1) runnumber preview)
+  "Return list of simulation parameters for given
+configuration. Pathname is the path of parameter file for this
+configuration, config is the configuration name within that parameter
+file, repeat is how many times to repeat the simulation, runnumber
+specifies a single run within a sequence. If preview is true
+simulations are not run but vonfiguration parameters for each run are
+printed out."
+  (let* ((trie (read-configuration pathname config))
+         (exp (sort (get-expansions trie) #'<
+                    :key #'parameter-expansion-order))
+         (vars (mapcan #'parameter-expansion-vars exp))
+         (run 0)
+         (repetition 0)
+         (configname config)
+         (datetime
+          (multiple-value-bind (se mi ho da mo ye)
+              (decode-universal-time (get-universal-time))
+            (format nil "~4d~2,'0d~2,'0d-~2,'0d:~2,'0d:~2,'0d"
+                    ye mo da ho mi se)))
+         (runid (format nil "~A-~A-~A-~A"
+                        (pathname-name pathname) config run datetime))
+         (network (read-parameter '(nil network) trie 'symbol))
+         (output-path
+          (merge-pathnames
+           (make-pathname
+            :name (format nil "~A-~A" (pathname-name pathname)
+                          config))
+           pathname))
+         (scalar-path
+          (multiple-value-bind(v f-p)
+              (read-parameter '(nil scalar-recording) trie 'boolean)
+            (when (or v (not f-p))
+              (or (read-parameter '(nil scalar-file) trie 'pathname)
+                  (merge-pathnames (make-pathname :type "sca") output-path)))))
+         (vector-path
+          (multiple-value-bind(v f-p)
+              (read-parameter '(nil vector-recording) trie 'boolean)
+            (when (or v (not f-p))
+              (or (read-parameter '(nil vector-file) trie 'pathname)
+                  (merge-pathnames (make-pathname :type "vec") output-path)))))
+         (scalar-stream
+          (when scalar-path
+            (open  scalar-path
+                  :direction :output
+                  :if-exists :supersede
+                  :if-does-not-exist :create)))
+         (vector-stream
+          (when vector-path
+            (open vector-path
+                  :direction :output
+                  :if-exists :supersede
+                  :if-does-not-exist :create))))
+    (when scalar-stream (write-line "version 2" scalar-stream))
+    (labels
+       ((do-run()
+           (when (or (not runnumber) (= runnumber run))
+             (dolist(e exp) ;; setup trie expansions
+                 (setf (trie-value (parameter-expansion-trie e))
+                       (parameter-expansion-value e)))
+             (setq iterationvars
+                   (format nil "~{ ~A=~A~}"
+                           (mapcan #'(lambda(v) (list (car v)
+                                                      (symbol-value (car v))))
+                                   vars)))
+             (if preview
+                 (format t "~A ~A~%" run iterationvars)
+                 (let ((simulation
+                        (setq *simulation*
+                              (make-instance 'simulation
+                                        :configuration trie
+                                        :scalar-stream scalar-stream
+                                        :vector-stream vector-stream))))
+                   (initialize simulation)
+                   (when scalar-stream
+                     (format scalar-stream "run ~A~%~{attr ~A ~S~%~}"
+                             runid
+                             `("configname" ,config
+                               "inifile" ,(string pathname)
+                               "datetime" ,datetime
+                               "seedset" ,(seed-set simulation)
+                               "runnumber" ,run
+                               "repetition" ,repetition
+                               "iterationvars" ,iterationvars
+                               "experiment"
+                               ,(or (read-parameter '(nil experiment-label) trie nil)
+                                    configname)
+                               "measurement"
+                               ,(or (read-parameter '(nil measurement-label) trie nil)
+                                    iterationvars)
+                               "replications"
+                               ,(or (read-parameter '(nil replication-label) trie nil)
+                                    (format nil "~A,seed-set=~D" repetition (seed-set simulation))))))
+                   (run simulation :granularity nil)
+                   (finish simulation))))
+           (incf run))
+        (nested-loop(var inner)
+          (dolist(x (eval (cdr var)))
+            (setf (symbol-value (car var)) x)
+            (if inner
+                (nested-loop (car inner) (cdr inner))
+                (do-run) ))))
+      (dotimes(x repeat)
+        (setq repetition x)
+        (if vars
+            (nested-loop (car vars) (cdr vars))
+            (do-run)))
+      (when scalar-stream (close scalar-stream))
+      (when vector-stream (close vector-stream)))))
+
+
+
 
 #|
 (setf *simulation*

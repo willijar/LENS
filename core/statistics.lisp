@@ -159,9 +159,8 @@ definitions as per let"
   (:documentation "A base class for all result recorders"))
 
 (defmethod title((instance result-recorder))
-  (format nil "~A[~A]"
-          (title (owner instance))
-          (class-name (class-of instance))))
+         (title (owner instance)))
+
 
 ;; map listener receive-signal with source onto statistic receive-signal with time
 (defmethod receive-signal((listener statistic-listener) signal
@@ -198,7 +197,7 @@ definitions as per let"
       (report r os))))
 
 (defmethod report((r scalar-recorder) stream)
-  (format stream "scalar ~A ~A ~A~%"
+  (format stream "scalar ~S ~S ~A~%"
           (full-path-string (owner (owner r))) (title r) (recorded-value r)))
 
 (defun add-statistics(sim)

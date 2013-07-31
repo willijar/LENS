@@ -57,7 +57,7 @@
       (report r os))))
 
 (defmethod report((r vector-recorder) stream)
-  (format stream "vector ~A ~A~%" (full-path-string (owner r)) (title r))
+  (format stream "vector ~S ~S~%" (full-path-string (owner r)) (title r))
   (map nil
        #'(lambda(v)
            (format stream "~A~t~A~%"
@@ -211,7 +211,7 @@
 
 (defmethod report((r stddev) stream)
   (unless (zerop (result-count r))
-  (format stream "statistic ~A ~A~%" (full-path-string (owner (owner r))) (title r))
+  (format stream "statistic ~S ~S~%" (full-path-string (owner (owner r))) (title r))
   (with-slots(min max sum count sqrsum) r
     (format stream "field count ~A~%field mean ~A~%field stddev ~A~%field sum ~A~%field sqrsum ~A~%field min ~A~%field max ~A~%"
             (result-count r)
@@ -471,7 +471,7 @@
 
 (defmethod report((r indexed-count-recorder) os)
   (when (not (zerop (hash-table-count (recorded-value r))))
-    (format os "statistic ~A ~A~%" (full-path-string (owner (owner r))) (title r))
+    (format os "statistic ~S ~S~%" (full-path-string (owner (owner r))) (title r))
     (maphash
      #'(lambda(k v)
          (format os "field ~A ~A~%" k v))

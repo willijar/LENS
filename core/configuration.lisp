@@ -43,7 +43,7 @@
 (defclass trie()
   ((trie-prefix :initarg :prefix :reader trie-prefix
                 :documentation "The prefix matched by this branch")
-   (trie-value :initarg :value :reader trie-value
+   (trie-value :initarg :value :accessor trie-value
                :documentation "The value stored at this branch")
    (trie-children :initform nil
                   :initarg :children :type list :accessor trie-children
@@ -300,3 +300,8 @@ representing a value, a pathname for an extension file or nil if no
                          (do-merge-section "General")))))))
         (do-merge-section key))
       the-section)))
+
+(defun map-trie(func trie)
+  "Iterate through trie calling function with the trie-values"
+  (funcall func trie)
+  (dolist(child (trie-children trie)) (map-trie func child)))

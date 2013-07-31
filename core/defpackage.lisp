@@ -46,7 +46,7 @@
    #:*simulation* #:*simulation-init-hooks* #:*time-format* #:time-type
    #:configuration #:simulation #:network #:sim-time-limit #:cpu-time-limit
    #:simulation-time #:schedule #:scheduled-p #:cancel #:stop
-   #:run-simulation
+   #:run-simulations
    #:sent-time #:arrival-time
    #:root-event #:*simulation-trace-stream* #:tracelog
    #:timestamped #:timestamped-time #:timestamped-value #:latency
