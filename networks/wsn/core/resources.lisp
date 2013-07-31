@@ -39,7 +39,7 @@
    (remaining-energy
     :parameter t :type float :initform 18720 :accessor remaining-energy
                      :documentation "In joules - default is 2 AA batteries")
-   (time-of-last-calculation :type time-type :initform 0.0d0)
+   (time-of-last-calculation :type time-type)
    (baseline-node-power
     :parameter t :type real :initform 6e-3
     :documentation "Periodic power consumption")
@@ -75,7 +75,9 @@
     (assert (>= baseline-node-power 0.0)
             ()
             "Baseline node power must be >=0")
-    (setf current-node-power baseline-node-power)))
+    (setf current-node-power baseline-node-power))
+  (unless (slot-boundp module 'time-of-last-calculation)
+    (setf (slot-value module 'time-of-last-calculation) (simulation-time))))
 
 (defmethod initialize and ((module resources) &optional (stage 0))
   (case stage
@@ -83,8 +85,9 @@
   t)
 
 (defun calculate-energy-spent(instance)
-  (with-slots(remaining-energy time-of-last-calculation current-node-power
-              periodic-update-message update-interval)
+  (unless (slot-boundp instance 'time-of-last-calculation)
+    (setf (slot-value instance 'time-of-last-calculation) (simulation-time)))
+  (with-slots(remaining-energy time-of-last-calculation current-node-power)
       instance
     (when (> remaining-energy 0.0)
       (let* ((time-passed (- (simulation-time) time-of-last-calculation))
@@ -94,10 +97,11 @@
                   time-passed energy-consumed)
         (emit instance 'energy-consumed energy-consumed)
         (consume-energy instance energy-consumed)
-        (setf time-of-last-calculation (simulation-time))
-        (cancel periodic-update-message)
-        (schedule-at instance periodic-update-message
-                     :delay update-interval)))))
+        (setf time-of-last-calculation (simulation-time))))))
+
+(defmethod finish((instance resources))
+  (calculate-energy-spent instance)
+  (call-next-method))
 
 (defun consume-energy(instance amount)
   (with-slots(remaining-energy) instance
@@ -109,7 +113,9 @@
 (defmethod handle-message((instance resources) message)
   (cond
     ((eql message (periodic-update-message instance))
-     (calculate-energy-spent instance))
+     (calculate-energy-spent instance)
+     (schedule-at instance (periodic-update-message instance)
+                  :delay (update-interval instance)))
     (t
      (call-next-method))))
 
@@ -126,6 +132,12 @@
 
 (defmethod get-simulation-time((instance resources) local-time)
     (* local-time (+ 1d0 (clock-drift instance))))
+
+(defmethod startup((instance resources))
+  ;; note since power-change signal may be received before this we have to check
+  (unless (zerop (update-interval instance))
+    (schedule-at instance (periodic-update-message instance)
+                 :delay (update-interval instance))))
 
 (defmethod receive-signal((instance resources) (signal (eql 'power-change))
                           source power)

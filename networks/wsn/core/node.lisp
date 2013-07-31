@@ -56,7 +56,7 @@
      (schedule-at
       node (make-instance 'message :name 'node-startup)
       :delay  (+ (startup-offset node)
-                 (* (uniform 0 1) (startup-randomization node))))))
+                 (* (uniform 0.0 (startup-randomization node)))))))
   t)
 
 (defmethod handle-message((node node) message)

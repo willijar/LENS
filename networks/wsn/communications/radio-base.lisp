@@ -265,19 +265,22 @@
        (setf rssi-integration-time
              (* (symbols-for-rssi radio)
                 (/ (rx-mode-bits-per-symbol (rx-mode radio))
-                   (rx-mode-data-rate (rx-mode radio))))))
-     (setf (time-of-last-signal-change radio) (simulation-time))
-     (setf (last-transition-time radio) 0.0d0)
-     (setf (changing-to-state radio) (state radio)
-           (state radio) 'rx)
-     (push
-      (make-total-power-received
-       :start-time (simulation-time)
-       :power-dbm (rx-mode-noise-floor (rx-mode radio)))
-        (total-power-received radio))
-     nil)
-    (1 (complete-state-transition radio) t)
-    (t t)))
+                   (rx-mode-data-rate (rx-mode radio))))))))
+  t)
+
+(defmethod startup((radio radio))
+  (setf (time-of-last-signal-change radio) (simulation-time))
+  (setf (last-transition-time radio) (simulation-time))
+  (setf (changing-to-state radio) (state radio)
+        (state radio) 'rx)
+  (push
+   (make-total-power-received
+    :start-time (simulation-time)
+    :power-dbm (rx-mode-noise-floor (rx-mode radio)))
+   (total-power-received radio))
+  (complete-state-transition radio))
+
+
 
 (defun parse-radio-parameter-file(radio)
   (let ((parameters
