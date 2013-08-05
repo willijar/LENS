@@ -251,17 +251,21 @@
        (setf (slot-value radio 'rx-mode)
           (or (find initial-mode (rx-modes radio) :key #'rx-mode-name)
               (elt (rx-modes radio) 0)))
-       (tracelog "Initialized  RX mode to ~A" (rx-mode radio))
+       (tracelog "Initialized  RX mode to ~A" (rx-mode-name (rx-mode radio)))
        (setf (tx-level radio)
              (or (find initial-tx-output-power (tx-levels radio)
                        :key #'tx-level-output-power :test #'=)
                  (elt (tx-levels radio) 0)))
-       (tracelog "Initalized TX power output to ~A" (tx-level radio))
+       (tracelog
+        "Initalized TX power output to ~/dfv:eng/dBm consuming ~:/dfv:eng/W"
+        (tx-level-output-power (tx-level radio))
+        (tx-level-power-consumed (tx-level radio)))
        (setf (sleep-level radio)
              (or (find initial-sleep-level (sleep-levels radio)
                        :key #'sleep-level-name)
                  (elt (sleep-levels radio) 0)))
-       (tracelog "Default sleep level initialized to ~A" (sleep-level radio))
+       (tracelog "Default sleep level initialized to ~A"
+                 (sleep-level-name (sleep-level radio)))
        (setf rssi-integration-time
              (* (symbols-for-rssi radio)
                 (/ (rx-mode-bits-per-symbol (rx-mode radio))
@@ -279,8 +283,6 @@
     :power-dbm (rx-mode-noise-floor (rx-mode radio)))
    (total-power-received radio))
   (complete-state-transition radio))
-
-
 
 (defun parse-radio-parameter-file(radio)
   (let ((parameters
@@ -344,7 +346,7 @@
 (defmethod handle-message((radio radio) (message wireless-signal-start))
   ;; if carrier doesn't match ignore messge - may want to calculate
   ;; spectral overlap interference in future taking account of bandwidth
-  (tracelog "~A arrived at ~A" message radio)
+  (tracelog "~A arrived" message)
   (unless (= (carrier-frequency radio) (carrier-frequency message))
     (tracelog "~A ignored, different carrier frequency.")
     (return-from handle-message))
@@ -449,7 +451,7 @@
              (tracelog "~A received, no interference" message)
              (emit radio 'rx-succeed-no-interference))
             (t
-             (tracelog "~A received despite ~/dfv:eng/dBm interference" message
+             (tracelog "~A received despite ~:/dfv:eng/dBm interference" message
                        (received-signal-max-interference ending-signal))
              (emit radio 'rx-succeed-interference))))
          (t
@@ -834,10 +836,10 @@
            (when remaining (setf (cdr remaining) nil))
            rssi))
       (let* ((it (car remaining))
-             (fraction-time (- current-time
-                               (/ (max (total-power-received-start-time it)
-                                       limit-time)
-                                  rssi-integration-time))))
+             (fraction-time (/ (- current-time
+                                  (max (total-power-received-start-time it)
+                                       limit-time))
+                               rssi-integration-time)))
         (setf rssi (dbm+ (+ (total-power-received-power-dbm it)
                             (ratio-to-db fraction-time))
                          rssi))

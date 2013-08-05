@@ -3,7 +3,9 @@
 (declaim (inline ratio-to-db db-to-ratio))
 
 (defun ratio-to-db(ratio)
-  (* 10.0 (log ratio 10.0)))
+  (if (> ratio 1e-10)
+      (* 10.0 (log ratio 10.0))
+      -100.0))
 
 (defun db-to-ratio(db)
   (expt 10.0 (* db 0.1)))

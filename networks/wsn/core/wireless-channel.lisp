@@ -108,19 +108,23 @@ channel module"
       (0
        (map 'nil #'(lambda(node) (subscribe node 'node-move wireless)) nodes)
        (setf (slot-value wireless 'receivers)
-             (make-array (length nodes) :element-type 'list :initial-element nil))
+             (make-array (length nodes)
+                         :element-type 'list
+                         :initial-element nil))
        nil)
       (1
        (if (every #'(lambda(node) (static-p (submodule node 'mobility)))
-               nodes)
+                  nodes)
            (progn  ;; all static then one node per cell
              (setf (slot-value wireless 'cells) (make-array (length nodes)))
-             (dolist(node nodes)
-               (let ((idx (index node)))
-                 (setf (location-cell wireless node) idx)
-                 (setf (aref (cells wireless) idx)
-                       (make-cell :coord (location node)
-                                  :occupation (list node))))))
+             (map 'nil
+                  #'(lambda(node)
+                      (let ((idx (index node)))
+                        (setf (location-cell wireless node)
+                              (setf (aref (cells wireless) idx)
+                                    (make-cell :coord (location node)
+                                               :occupation (list node))))))
+                  nodes))
            (with-slots(field cell-size cells) wireless
              (setf field
                    (coord-op #'(lambda(f) (if (<= f 0.0) 1.0 f))
