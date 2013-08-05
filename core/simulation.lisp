@@ -435,8 +435,6 @@ printed out."
               (decode-universal-time (get-universal-time))
             (format nil "~4d~2,'0d~2,'0d-~2,'0d:~2,'0d:~2,'0d"
                     ye mo da ho mi se)))
-         (runid (format nil "~A-~A-~A-~A"
-                        (pathname-name pathname) config run datetime))
          (network (read-parameter '(nil network) trie 'symbol))
          (output-path
           (merge-pathnames
@@ -471,17 +469,19 @@ printed out."
     (when scalar-stream (write-line "version 2" scalar-stream))
     (labels
        ((do-run()
+          (setq runid (format nil "~A-~A-~A-~A"
+                              (pathname-name pathname) config run datetime))
            (when (or (not runnumber) (= runnumber run))
              (dolist(e exp) ;; setup trie expansions
                  (setf (trie-value (parameter-expansion-trie e))
                        (parameter-expansion-value e)))
              (setq iterationvars
-                   (format nil "~{ ~A=~A~}"
+                   (format nil "~{~A=~A~^ ~}"
                            (mapcan #'(lambda(v) (list (car v)
                                                       (symbol-value (car v))))
                                    vars)))
-             (if preview
-                 (format t "~A ~A~%" run iterationvars)
+             (format t "~%run~T#~A~T~A~%...~%" run iterationvars)
+             (unless preview
                  (let ((simulation
                         (setq *simulation*
                               (make-instance 'simulation
@@ -493,21 +493,27 @@ printed out."
                      (format scalar-stream "run ~A~%~{attr ~A ~S~%~}"
                              runid
                              `("configname" ,config
-                               "inifile" ,(string pathname)
+                               "inifile" ,(namestring pathname)
                                "datetime" ,datetime
                                "seedset" ,(seed-set simulation)
                                "runnumber" ,run
                                "repetition" ,repetition
-                               "iterationvars" ,iterationvars
                                "experiment"
-                               ,(or (read-parameter '(nil experiment-label) trie nil)
+                               ,(or (read-parameter '(nil experiment-label)
+                                                    trie nil)
                                     configname)
                                "measurement"
-                               ,(or (read-parameter '(nil measurement-label) trie nil)
+                               ,(or (read-parameter '(nil measurement-label)
+                                                    trie nil)
                                     iterationvars)
                                "replications"
-                               ,(or (read-parameter '(nil replication-label) trie nil)
-                                    (format nil "~A,seed-set=~D" repetition (seed-set simulation))))))
+                               ,(or (read-parameter '(nil replication-label)
+                                                    trie nil)
+                                    (format nil "~A,seed-set=~D"
+                                            repetition
+                                            (seed-set simulation)))))
+                     (format scalar-stream "attr iterationvars ~A~%"
+                             iterationvars))
                    (run simulation :granularity nil)
                    (finish simulation))))
            (incf run))
