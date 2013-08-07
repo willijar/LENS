@@ -276,7 +276,7 @@
          :documentation "integer or float mode for collection.")
    (rng :type fixnum :initform 0 :initarg :genk
          :documentation "Index of random number generator to use")
-   (num-cells :initarg :num-cells :initform 30 :reader num-cells :type fixnum
+   (num-cells :initarg :num-cells :initform 10 :reader num-cells :type fixnum
               :documentation "How many cells to use.")
    (cell-size :initform nil :reader cell-size :type real
               :reader histogram-transformed-p
@@ -459,7 +459,8 @@
      (aref (cells instance)  (%genintrand (result-count instance) rng))))))
 
 (defclass indexed-count-recorder(scalar-recorder)
-  ((count :initform (make-hash-table) :accessor recorded-value )))
+  ((count :initform (make-hash-table :test #'equal)
+          :accessor recorded-value)))
 
 (define-result-recorder 'indexed-count-recorder 'indexed-count)
 
@@ -474,7 +475,5 @@
     (format os "statistic ~S ~S~%" (full-path-string (owner (owner r))) (title r))
     (maphash
      #'(lambda(k v)
-         (format os "field ~A ~A~%" k v))
+         (format os "field ~S ~A~%" k v))
      (recorded-value r))))
-
-
