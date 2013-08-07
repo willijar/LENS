@@ -9,21 +9,8 @@
 
 ;; signals for statistic collection
 (register-signal 'tx
-                 "Transmissions")
-(register-signal 'rx-succeed-no-interference
-                 "Successfully Received packets")
-(register-signal 'rx-succeed-interference
-                 "Successfully Received packets despite interference")
-(register-signal 'rx-fail-no-interference
-                 "packets failed even without interference")
-(register-signal 'rx-fail-interference
-                 "packets failed with interference")
-(register-signal 'rx-fail-sensitivity
-                 "packets failed, below sensitivity")
-(register-signal 'rx-fail-modulation
-                 "packets failed, wrong modulation")
-(register-signal 'rx-fail-no-rx-state
-                 "packets failed, radio not in RX")
+                 "TXed pkts")
+(register-signal 'rx "RX pkt breakdown")
 
 (defstruct custom-modulation ;; element for storing custom snrtober.
   (snr 0.0 :type float)
@@ -188,24 +175,11 @@
    (mac :inout)
    (receive :input))
   (:properties
+   :statistic (rx
+               :title "RX pkt breakdown"
+               :default (indexed-count))
    :statistic (tx
-               :title "Transmissions" :default (count))
-   :statistic (rx-succeed-no-interference
-               :title "Successfully Received packets"  :default (count))
-   :statistic (rx-succeed-interference
-               :title "Successfully Received packets despite interference"
-               :default (count))
-   :statistic (rx-fail-no-interference
-               :title "packets failed even without interference"
-               :default (count))
-   :statistic (rx-fail-interference
-               :title "packets failed with interference" :default (count))
-   :statistic (rx-fail-sensitivity
-               :title "packets failed, below sensitivity" :default (count))
-   :statistic (rx-fail-modulation
-               :title "packets failed, wrong modulation" :default (count))
-   :statistic (rx-fail-no-rx-state
-               :title "packets failed, radio not in RX" :default (count)))
+               :title "TXed pkts" :default (count)))
   (:metaclass module-class))
 
 (defmethod (setf rx-mode)((new-mode rx-mode) (radio radio))
@@ -257,7 +231,7 @@
                        :key #'tx-level-output-power :test #'=)
                  (elt (tx-levels radio) 0)))
        (tracelog
-        "Initalized TX power output to ~/dfv:eng/dBm consuming ~:/dfv:eng/W"
+        "Initalized TX power output to ~1/dfv:eng/dBm consuming ~1:/dfv:eng/W"
         (tx-level-output-power (tx-level radio))
         (tx-level-power-consumed (tx-level radio)))
        (setf (sleep-level radio)
@@ -269,20 +243,20 @@
        (setf rssi-integration-time
              (* (symbols-for-rssi radio)
                 (/ (rx-mode-bits-per-symbol (rx-mode radio))
-                   (rx-mode-data-rate (rx-mode radio))))))))
-  t)
-
-(defmethod startup((radio radio))
-  (setf (time-of-last-signal-change radio) (simulation-time))
-  (setf (last-transition-time radio) (simulation-time))
-  (setf (changing-to-state radio) (state radio)
-        (state radio) 'rx)
-  (push
-   (make-total-power-received
-    :start-time (simulation-time)
-    :power-dbm (rx-mode-noise-floor (rx-mode radio)))
-   (total-power-received radio))
-  (complete-state-transition radio))
+                   (rx-mode-data-rate (rx-mode radio))))))
+       (setf (time-of-last-signal-change radio) (simulation-time))
+       (setf (last-transition-time radio) (simulation-time))
+       (setf (changing-to-state radio) (state radio)
+             (state radio) 'rx)
+       (push
+        (make-total-power-received
+         :start-time (simulation-time)
+         :power-dbm (rx-mode-noise-floor (rx-mode radio)))
+        (total-power-received radio))
+       nil)
+    (1
+     (complete-state-transition radio) t)
+    (t t)))
 
 (defun parse-radio-parameter-file(radio)
   (let ((parameters
@@ -362,7 +336,7 @@
       :power-dbm (power-dbm message)
       :bit-errors t)
      (received-signals radio))
-    (emit radio 'rx-fail-no-rx-state)
+    (emit radio 'rx "Failed, non RX state")
     (tracelog "~A delivery failed, radio not in RX state" message)
     (return-from handle-message))
   ;; If we are in RX state, go throught the list of received signals
@@ -399,12 +373,12 @@
                  (received-signal-modulation new-signal))
       (setf (received-signal-bit-errors new-signal) t)
       (tracelog "~A delivery failed, wrong modulation.")
-      (emit radio 'rx-fail-modulation))
+      (emit radio 'rx "Failed, wrong modulation"))
     (when (< (received-signal-power-dbm new-signal)
              (rx-mode-sensitivity rx-mode))
       (setf (received-signal-bit-errors new-signal) t)
       (tracelog "~A delivery failed, below sensitivity." message)
-      (emit radio 'rx-fail-sensitivity))
+      (emit radio 'rx "Failed, below sensitivity"))
     (push new-signal (received-signals radio))
     (update-total-power-received radio (received-signal-power-dbm new-signal))
     (when (and (carrier-sense-interrupt-enabled radio)
@@ -422,7 +396,7 @@
     ;; if not in RX state or are changing state just delete signal
     (when (or (changing-to-state radio) (not (eql (state radio) 'rx)))
       (when (numberp (received-signal-bit-errors ending-signal))
-        (emit radio 'rx-fail-no-rx-state)
+        (emit radio 'rx "Failed, non RX state")
         (tracelog "~A delivery failed, no RX state" message))
       (setf (received-signals radio)
             (delete ending-signal (received-signals radio)))
@@ -449,20 +423,20 @@
             ((= (received-signal-max-interference ending-signal)
                 (rx-mode-noise-floor (rx-mode radio)))
              (tracelog "~A received, no interference" message)
-             (emit radio 'rx-succeed-no-interference))
+             (emit radio 'rx "Received with NO interference"))
             (t
-             (tracelog "~A received despite ~:/dfv:eng/dBm interference" message
+             (tracelog "~A received despite ~1/dfv:eng/dBm interference" message
                        (received-signal-max-interference ending-signal))
-             (emit radio 'rx-succeed-interference))))
+             (emit radio 'rx "Received despite interference"))))
          (t
           (cond
            ((= (received-signal-max-interference ending-signal)
                (rx-mode-noise-floor (rx-mode radio)))
             (tracelog "~A failed, no interference" message)
-            (emit radio 'rx-fail-no-interference))
+            (emit radio 'rx "Failed with NO interference"))
            (t
             (tracelog "~A failed, interference" message)
-            (emit radio 'rx-fail-interference))))))
+            (emit radio 'rx "Failed with interference"))))))
     (setf (received-signals radio)
           (delete ending-signal (received-signals radio)))))
 
@@ -559,10 +533,9 @@
                :until (eql (car a) (sleep-level radio))
                :do (accumulate-level (car a) #'sleep-level-down)))))
        (emit radio 'power-change transition-power)
-       (tracelog "Set state to ~A, delay=~:/dfv:eng/s, power=~:/dfv:eng/W"
+       (tracelog "Set state to ~A, delay=~:/dfv:eng/s, power=~1:/dfv:eng/W"
                  changing-to-state transition-delay transition-power)
        (delay-state-transition radio transition-delay))))
-
 
     ;; For the rest of the control commands we do not need to take any
     ;; special measures, or create new messages. We just parse the
@@ -759,7 +732,7 @@
       (setf p (dbm+ p (received-signal-power-dbm received-signal)))
       (when (numberp (received-signal-bit-errors received-signal))
         (setf (received-signal-bit-errors received-signal) t)
-        (emit radio 'rx-fail-no-rx-state)
+        (emit radio 'rx "Failed, non RX state")
         (tracelog
          "Just entered RX, existing signal from ~A cannot be received."
          (src received-signal))))

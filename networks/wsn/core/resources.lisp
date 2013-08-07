@@ -57,7 +57,7 @@
                 :documentation "Actual clock drift for this module")
    (disabled-p :type boolean :initform t :accessor disabled-p))
   (:properties
-     :statistic (energy-consumed :title "energy consumed" :default (sum)))
+     :statistic (energy-consumed :title "Consumed Energy" :default (sum)))
   (:metaclass module-class))
 
 (defmethod initialize-instance :after
