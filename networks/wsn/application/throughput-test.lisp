@@ -59,7 +59,7 @@
                            (message radio-control-message))
   (case (command message)
     (carrier-sense-interrupt
-     (tracelog "CS Interrupt received! current RSSI value is ~A"
+     (tracelog "CS Interrupt received. Current RSSI value is ~/dfv:eng/dBm"
                (read-rssi
                 (submodule (node application) '(communications radio)))))))
 
