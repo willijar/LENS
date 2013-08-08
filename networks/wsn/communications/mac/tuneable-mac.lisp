@@ -17,25 +17,25 @@
     :parameter t :type time-type :initform 10e-3 :reader listen-interval
     :documentation "how long do we leave the radio in listen mode, in ms")
    (beacon-interval-fraction
-    :parameter t :type float :initform 1.0 :reader beacon-interval-fraction
+    :parameter t :type float :initform 1.0 :accessor beacon-interval-fraction
     :documentation "fraction of the sleeping interval that we send beacons")
    (probability-tx
     :parameter t :type float :initform 1.0 :reader probability-tx
     :documentation "the probability of a single try of Transmission to happen")
    (num-tx
-    :parameter t :type integer :initform 1 :reader num-tx
+    :parameter t :type integer :initform 1 :accessor num-tx
     :documentation "when we have something to Tx, how many times we try")
    (random-tx-offset
-    :parameter t :type time-type :initform 0d0 :reader random-tx-offset
+    :parameter t :type time-type :initform 0d0 :accessor random-tx-offset
     :documentation "Tx after time chosen randomly from interval [0..randomTxOffset]")
-   (re-tx-interval
-    :parameter t :type time-type :initform 0d0 :reader re-tx-interval
+   (retx-interval
+    :parameter t :type time-type :initform 0d0 :accessor retx-interval
     :documentation "Interval between retransmissions in ms, (numTx-1) retransmissions")
    (backoff-type
-    :parameter t :type symbol :initform 'multiplying :reader backoff-type
+    :parameter t :type symbol :initform 'multiplying :accessor backoff-type
     :documentation "0-->sleep-interval, constant, multiplying (e.g. 1*a, 2*a, 3*a, 4*a ...), exponential (e.g. 2, 4, 8, 16, 32...)")
    (backoff-base-value
-    :parameter t :type time-type :initform 16d-3 :reader backoff-base-value)
+    :parameter t :type time-type :initform 16d-3 :accessor backoff-base-value)
    (csma-persistence
     :parameter t :type float :initform 0 :reader csma-persistence
     :properties (:format (number :min 0 :max 1 :coerce-to float))
@@ -76,7 +76,7 @@
 
    ;; timers (may be able to use same message with different names)
    (sleep-listen-timer
-    :type message :reader start-sleeping-timer
+    :type message :reader sleep-listen-timer
     :initform (make-instance 'message))
    (start-cs-timer
     :type message :reader start-cs-timer
@@ -97,8 +97,9 @@
 (deftype tuneable-mac-frame-type() '(member data beacon))
 
 (defclass TuneableMacPacket(mac-packet)
-  ((frame-type :type tuneable-mac-frame-type :intform 'data :initarg frame-type
-               :reader "data or beacon")))
+  ((frame-type
+    :type tuneable-mac-frame-type :initform 'data :initarg :frame-type
+    :reader frame-type :documentation "data or beacon")))
 
 (deftype tuneable-mac-command-type()
   '(member
@@ -139,11 +140,11 @@
           (backoff-times instance) 0)))
 
 (defmethod handle-message((mac tuneable-mac) (msg radio-control-message))
-  (case (command message)
+  (case (command msg)
     (change-data-rate
      (with-slots(phy-data-rate beacon-frame-size
                  beacon-tx-time phy-layer-overhead) mac
-       (setf phy-data-rate (argument message))
+       (setf phy-data-rate (argument msg))
        (setf beacon-tx-time
              (/ (* 8 (+ beacon-frame-size phy-layer-overhead))
                 phy-data-rate)))))
@@ -163,13 +164,12 @@
      (to-radio instance '(set-state . rx))
      (handle-cs-result instance
                        (channel-clear-p
-                        (submodule (node module) '(communication radio)))))
+                        (submodule (node instance) '(communication radio)))))
      ((eql message (attempt-tx-timer instance))
       (attempt-tx instance))
      ((eql message  (send-beacons-or-data-timer instance))
       (send-beacons-or-data instance))
      (t (call-next-method))))
-
 
 (defun handle-cs-result(instance result)
   (ecase result
@@ -230,7 +230,7 @@
                    (expt 2.0 (if (zerop backoff-times) 0 (1- backoff-times))))))))
           (set-timer instance (start-cs-timer instance)
                      (uniform 0.0 backoff-timer))
-          (tracelog "Channel busy, backing off for ~A secs" bacjoff-timer))
+          (tracelog "Channel busy, backing off for ~A secs" backoff-timer))
         (when (and (< 0.0 (duty-cycle instance) 1.0)
                    (sleep-during-backoff instance))
 
@@ -253,7 +253,8 @@
         ;; state then we need to initiate transmission process for
         ;; this packet.  If there are more packets in the buffer, then
         ;; transmission is already being handled
-        (when (and (eql (state instance) 'default) (= (size buffer) 1))
+        (when (and (eql (state instance) 'default)
+                   (= (size (buffer instance)) 1))
           ;; First action to initiate new transmission is to deal with
           ;; all scheduled timers. In particular we need to suspend
           ;; duty cycle timers (if present) and attempt to transmit
@@ -297,7 +298,7 @@
                   (1+ (- (num-tx instance) (num-tx-tries instance)))))
        (t
         (set-timer instance
-                   (attempt-tx-timer instance) (re-tx-interval instancer))
+                   (attempt-tx-timer instance) (retx-interval instance))
         (tracelog "CONTENDING state, attempt ~D/~D skipped"
                   (1+ (- (num-tx instance) (num-tx-tries instance))))
         (decf (num-tx-tries instance)))))))
@@ -313,7 +314,7 @@
                               :source (mac-address instance)
                               :destination broadcast-mac-address))
      (to-radio instance '(set-state . tx))
-     (tracelog "Sending Beacon")
+     (tracelog "Sending Beacon.")
      (emit 'tuneable-mac-packet-breakdown 'sent-beacons)
      ;; Set timer to send next beacon (or data packet). Schedule the
 		 ;; timer a little faster than it actually takes to TX a a beacon,
@@ -323,7 +324,7 @@
                 (* 0.98 (beacon-tx-time instance))))
     ((empty-p (buffer instance))
      (setf (num-tx-tries instance) 0) ; safeguarding
-     (attempt-tx))
+     (attempt-tx instance))
     (t
      (to-radio instance (duplicate (peek (buffer instance))))
      (to-radio instance '(set-state . tx))
@@ -352,10 +353,11 @@
             (dequeue (buffer instance))
             (setf (num-tx-tries instance) (num-tx instance))))
          ((> (num-tx-tries instance) 0)
-          (set-timer (attempt-tx-timer instance)
-                     (+ packet-tx-time (re-tx-interval instance))))
+          (set-timer instance
+                     (attempt-tx-timer instance)
+                     (+ packet-tx-time (retx-interval instance))))
          (t
-          (set-timer (attempt-tx-timer instance) packet-tx-time)))))))
+          (set-timer instance (attempt-tx-timer instance) packet-tx-time)))))))
 
 (defmethod handle-message((instance tuneable-mac) (packet mac-packet))
   ;; from radio layer
@@ -366,7 +368,7 @@
   (ecase (name packet)
     (beacon
      (emit 'tuneable-mac-packet-breakdown 'received-beacons)
-     (case (state mac)
+     (case (state instance)
        (default
         (when (< 0.0 (duty-cycle instance) 1.0)
           (cancel (sleep-listen-timer instance))))
@@ -377,7 +379,7 @@
         (tracelog "ignoring beacon, we are in TX state")
         (emit  'tuneable-mac-packet-breakdown 'received-beacons-ignored)
         (return-from handle-message)))
-     (setf (state mac) 'rx)
+     (setf (state instance) 'rx)
      (tracelog "state RX, received beacon")
      (if (< 0.0 (duty-cycle instance) 1.0)
          (set-timer
@@ -394,11 +396,11 @@
                              :rssi (rssi (control-info packet))
                              :lqi (lqi (control-info packet))))
         (send instance routing-packet 'routing))
-     (when (eql (state mac) 'rx)
+     (when (eql (state instance) 'rx)
        (cancel (attempt-tx-timer instance))
        (attempt-tx instance)))))
 
-(defmethod hand-control-command
+(defmethod handle-control-command
     ((mac tuneable-mac) (command (eql 'set-duty-cycle)) (new-duty-cycle real))
   (with-slots(duty-cycle listen-interval sleep-interval) mac
     (let ((had-duty-cycle (< 0.0 duty-cycle 1.0)))
@@ -408,17 +410,17 @@
         ((< 0.0 duty-cycle 1.0)
          (setf sleep-interval (* listen-interval (/ (- 1.0 duty-cycle) duty-cycle)))
          (unless had-duty-cycle
-           (set-timer instance (sleep-listen-timer instance)
+           (set-timer mac (sleep-listen-timer mac)
                       listen-interval 'sleep)))
         (t
          ;; else if no duty cycle
          ;; cancel timer and since radio can sleep only in default state it
          ;;can only wake in default state too
          (setf sleep-interval -1.0)
-         (when had-duty-cyclen
-                (cancel (sleep-listen-timer instance)))
-         (when (eql (state instance) 'default)
-           (to-radio instance '(set-state . rx)))))))
+         (when had-duty-cycle
+           (cancel (sleep-listen-timer mac)))
+         (when (eql (state mac) 'default)
+           (to-radio mac '(set-state . rx)))))))
   t)
 
 (defmethod handle-control-command

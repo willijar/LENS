@@ -50,12 +50,14 @@
                (:module "routing" :depends-on ("routing-base")
                        :components
                        ((:file "bypass-routing")))
-               (:module "mac" :depends-on ("mac-base")
+               (:module "mac" :depends-on ("mac-base" "routing-base")
                        :components
-                       ((:file "bypass-mac")))))
+                       ((:file "bypass-mac")
+                        (:file "tuneable-mac")))))
      (:module "application" :depends-on ("core")
               :components
               ((:file "value-reporting")
+               (:file "value-propagation")
                (:file "throughput-test")))
      (:module "physical-process" :depends-on ("core")
               :components
