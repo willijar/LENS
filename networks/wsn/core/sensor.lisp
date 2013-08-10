@@ -87,7 +87,7 @@ thern the message will correspond to the last sampled time."))
      nil)
     (1
      ;; emit must be stage 1 so all listeners subscribed
-     (emit sensor 'power-changer (power-consumption sensor))
+     (emit sensor 'power-change (power-consumption sensor))
      t)))
 
 (defmethod startup((instance sensor))

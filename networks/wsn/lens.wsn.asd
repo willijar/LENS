@@ -61,7 +61,8 @@
                (:file "throughput-test")))
      (:module "physical-process" :depends-on ("core")
               :components
-              ((:file "scenario")))
+              ((:file "scenario")
+               (:file "direct")))
      (:module "mobility" :depends-on ("core")
               :components
               ((:file "line-mobility")

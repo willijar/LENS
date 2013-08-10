@@ -85,7 +85,7 @@
   (cond
     ((enqueue packet (buffer instance))
      ;; success
-     (eventlog "Packet buffered from network layer, buffer state : ~D/~D"
+     (tracelog "Packet buffered from network layer, buffer state : ~D/~D"
                (size (buffer instance)) (buffer-size (buffer instance)))
      t)
     (t ;; failure

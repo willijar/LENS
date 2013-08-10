@@ -81,7 +81,7 @@
   (:documentation "Schedule a timer using local time to determine interval")
   (:method(module (timer message) interval  &optional name)
     (assert (not (scheduled-p timer)))
-    (when name (setf (name message) name))
+    (when name (setf (name timer) name))
     (schedule-at module timer
                  :delay (get-simulation-time module interval))))
 

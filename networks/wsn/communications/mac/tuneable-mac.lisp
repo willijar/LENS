@@ -101,18 +101,6 @@
     :type tuneable-mac-frame-type :initform 'data :initarg :frame-type
     :reader frame-type :documentation "data or beacon")))
 
-(deftype tuneable-mac-command-type()
-  '(member
-    set-duty-cycle
-    set-listen-interval
-    set-beacon-interval-fraction
-    set-prob-tx
-    set-num-tx
-    set-random-tx-offset
-    set-retx-interval
-    set-backoff-type
-    set-backoff-base-value ))
-
 (defmethod initialize-instance :after ((instance tuneable-mac)
                                        &key &allow-other-keys)
   (with-slots(duty-cycle backoff-type) instance

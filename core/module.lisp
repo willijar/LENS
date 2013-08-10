@@ -517,7 +517,6 @@ return the gate given by spec. Validates spec based on class definitions"
                  (funcall (connect-func arg1 arg2) instance)
                  (funcall (connect-func arg2 arg1) instance)))))))
 
-
 (defun connection-code-walk(class specs)
   (mapcar
    #'(lambda(spec)

@@ -90,7 +90,7 @@
   "T be used by applications to request a sensor reading"
   (send application
         (make-instance 'sensor-message :name 'sensor-request)
-        (gate application 'sensor :index sensor-index)))
+        (gate application 'sensor :index sensor-index :direction :output)))
 
 (defgeneric handle-sensor-reading(application measurement)
   (:documentation "Must be implemented by applications to handle

@@ -120,13 +120,13 @@
     network-address))
 
 (defmethod sink-p((instance routing))
-  (sink-p (submodule (parent (parent instance)) 'application)))
+  (sink-p (submodule (owner (owner instance)) 'application)))
 
 (defmethod enqueue(packet (instance routing))
   (cond
     ((enqueue packet (buffer instance))
      ;; success
-     (eventlog "Packet buffered from application layer, buffer state : ~D/~D"
+     (tracelog "Packet buffered from application layer, buffer state : ~D/~D"
                (size (buffer instance)) (buffer-size (buffer instance)))
      t)
     (t ;; failure
