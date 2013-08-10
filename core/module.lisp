@@ -395,6 +395,10 @@ initargs (including types)"
          (sizespec
            ;; size may be a number, function, (sizeof gatename) or a slot name
           (cond
+            ((and (listp v) (member (first v) '(lambda function)))
+             (eval v))
+            ((and (listp v) (eql (car v) 'sizeof))
+             #'(lambda(instance) (gate-size instance (second v))))
             ((and (symbolp v)
                   (or (not (third spec)) ;; spec is single classname
                       (and (symbolp (third spec)) ;; or classname with keywords
@@ -405,12 +409,6 @@ initargs (including types)"
                `(,name nil ,@(merge-local-typespec (cdr spec) class))))
             ((numberp v)
              #'(lambda(instance) (declare (ignore instance)) v))
-            ((functionp v)
-             v)
-            ((and (listp v) (eql (car v) 'sizeof))
-             #'(lambda(instance)
-                 (gate-size instance (second v))))
-
             ((symbolp v) ;; default assume it is a slot name
              #'(lambda(instance) (slot-value instance v)))
             (t (error "Unknown size specification ~A for module array." v))))
