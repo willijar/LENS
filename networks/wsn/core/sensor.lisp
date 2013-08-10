@@ -17,7 +17,7 @@
     :initarg :power-consumption :type float
     :documentation "Power consumption for this sensor")
    (physical-process-id
-    :parameter t :type integer :reader physical-process-id :initform 0
+    :parameter t :type integer :reader physical-process-id
     :initarg :physical-process-id
     :documentation "Index of the physical process being measured")
    (physical-process
@@ -80,8 +80,10 @@ thern the message will correspond to the last sampled time."))
 (defmethod initialize :and ((sensor sensor) &optional (stage 0))
   (case stage
     (0
+     (unless (slot-boundp sensor 'physical-process-id)
+       (setf (slot-value  sensor 'physical-process-id) (index sensor)))
      (setf (slot-value sensor 'physical-process)
-          (submodule (network sensor)
+           (submodule (network sensor)
                       'physical-processes
                       :index (physical-process-id sensor)))
      nil)

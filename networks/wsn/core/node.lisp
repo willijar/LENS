@@ -3,7 +3,6 @@
 (defclass node(compound-module)
   ((owner :reader network)
    (index :reader nodeid)
-   (num-sensors :parameter t :initform 0 :type integer :reader num-sensors)
    (network-address :parameter t :reader network-address)
    (startup-offset
     :parameter t :type time-type :initform 0.0d0 :reader startup-offset
@@ -15,7 +14,7 @@
   (:gates
    (receive :input))
   (:submodules
-   (sensor num-sensors sensor)
+   (sensor #'(lambda(node) (num-physical-processes (network node))) sensor)
    (application application)
    (communications communications)
    (mobility mobility)
