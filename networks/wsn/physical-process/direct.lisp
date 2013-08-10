@@ -2,13 +2,22 @@
 
 (defclass direct-node-physical-process(physical-process)
   ((default-value :initform 0.0 :parameter t :type real)
-   (assigned-values :type list :initform nil :parameter t))
+   (assigned-values :type read :initform nil :parameter t
+                    :documentation "Assigned values in a range specification"))
   (:metaclass module-class)
   (:documentation "Physical process where value is assigned per node"))
+
+(defmethod configure((instance direct-node-physical-process))
+  (trace read-parameter)
+  (call-next-method)
+  (untrace read-parameter))
 
 (defmethod measure((instance direct-node-physical-process)
                    measurand location time)
   (declare (ignore measurand location time))
-  (with-slots(default-value values) instance
-    (getf values (nodeid (node *context*)) default-value)))
+  (with-slots(default-value assigned-values) instance
+    (if (range-list-p assigned-values)
+        (or (range-getf assigned-values (nodeid (node *context*)))
+            default-value)
+        default-value)))
 

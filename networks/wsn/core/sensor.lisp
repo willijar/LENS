@@ -27,11 +27,12 @@
     :parameter t :initform 'temperature :reader measurand
     :documentation "Type of sensor e.g. humidity, temperature, light etc")
    (bias
-    :parameter t :initform (uniform 0 0.1) :reader bias :initarg :bias
-    :properties (:format 'eval) :type float
+    :parameter t :initform 0.1 :reader bias :initarg :bias
+    :properties (:format eval)
+    :type float
     :documentation "Device offset reading")
    (noise
-    :parameter t ::volatile t :initform #'(lambda() (normal 0 0.1))
+    :parameter t ::volatile t :initform (normal 0 0.1)
     :reader noise :initarg :noise :type float
     :documentation "stddev of Gaussian Noise for device")
    (sensitivity
@@ -71,13 +72,13 @@ thern the message will correspond to the last sampled time."))
 
 (defmethod initialize-instance :after ((sensor sensor) &key &allow-other-keys)
   (with-slots(measurement-delay sample-interval) sensor
-    (assert (or (zerop measurement-delay)
+    (assert (or (zerop sample-interval)
                 (> sample-interval measurement-delay))
             ()
             "Sample interval ~A is less than measurement time of ~A"
             sample-interval measurement-delay)))
 
-(defmethod initialize :and ((sensor sensor) &optional (stage 0))
+(defmethod initialize and ((sensor sensor) &optional (stage 0))
   (case stage
     (0
      (unless (slot-boundp sensor 'physical-process-id)
