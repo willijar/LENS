@@ -95,6 +95,8 @@
 (defgeneric handle-sensor-reading(application measurement)
   (:documentation "Must be implemented by applications to handle
   sensor readings")
+  (:method(application (measurement measurement))
+    (handle-sensor-reading application (measurement-value measurement)))
   (:method(application measurement)
     (declare (ignore application measurement))))
 

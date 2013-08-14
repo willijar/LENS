@@ -44,7 +44,7 @@
     :documentation "holds the sensing resolution. the returned value
      will always be a multiple of number, given here")
    (saturation
-    :parameter t :initform  1 :reader saturation :type float
+    :parameter t :initform 1000 :reader saturation :type float
     :documentation "holds the saturation value for each sensing device")
    (last-measurement :type measurement :accessor last-measurement)
    (sample-interval
@@ -114,17 +114,18 @@ thern the message will correspond to the last sampled time."))
          (time (simulation-time))
          (value (measure (physical-process sensor) (measurand sensor)
                          location time)))
+
     (with-slots(bias resolution sensitivity saturation) sensor
-      (make-measurement
+       (make-measurement
        :sensor sensor
        :location location
        :time time
        :value (* resolution
                  (floor
-                  (max saturation
-                       (min sensitivity
-                            (+ bias value (noise sensor)))
-                       resolution)))))))
+                  (min saturation
+                       (max sensitivity
+                            (+ bias value (noise sensor))))
+                       resolution))))))
 
 (defmethod handle-message((sensor sensor) message)
   (cond
