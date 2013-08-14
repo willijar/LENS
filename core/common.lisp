@@ -154,5 +154,6 @@ appended onto end of list1 value"
      (values default 0))))
 
 (defun range-list-p(spec)
-  (let ((first (first spec)))
-    (or (listp first) (numberp first) (eql first t))))
+  (and (listp spec)
+       (let ((first (first spec)))
+         (or (listp first) (numberp first) (eql first t)))))
