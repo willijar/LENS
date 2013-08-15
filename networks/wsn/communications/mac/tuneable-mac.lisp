@@ -32,8 +32,9 @@
     :parameter t :type time-type :initform 0d0 :accessor retx-interval
     :documentation "Interval between retransmissions in ms, (numTx-1) retransmissions")
    (backoff-type
-    :parameter t :type symbol :initform 'multiplying :accessor backoff-type
-    :documentation "0-->sleep-interval, constant, multiplying (e.g. 1*a, 2*a, 3*a, 4*a ...), exponential (e.g. 2, 4, 8, 16, 32...)")
+    :parameter t :type symbol
+    :initform 'multiplying :accessor backoff-type
+    :documentation "sleep-interval, constant, multiplying (e.g. 1*a, 2*a, 3*a, 4*a ...), exponential (e.g. 2, 4, 8, 16, 32...)")
    (backoff-base-value
     :parameter t :type time-type :initform 16d-3 :accessor backoff-base-value)
    (csma-persistence
@@ -54,10 +55,7 @@
     :documentation "have a big beacon, to avoid much processing overhead, but fit at least 2 in the listening interval")
    (buffer-size :initform 32)
    (max-mac-frame-size :initform 0)
-
    ;; physical parameters
-   (phy-data-rate
-    :type float :reader phy-data-rate)
    (phy-delay-for-valid-cs
     :parameter t :type float :initform 0.128e-3 :reader phy-delay-for-valid-cs)
    (phy-layer-overhead
@@ -65,13 +63,12 @@
     :documentation "in octets")
 
    ;; implementation values
-   (mac-state :initform 'default :type mac-state-type :accessor mac-state)
+   (state :initform 'default :type tuneable-mac-state :accessor state)
    (num-tx-tries :initform 0 :type fixnum :accessor num-tx-tries)
    (backoff-times :initform 0 :type fixnum :accessor backoff-times
                   :documentation "number of consequtive backoff times")
    (remaining-beacons-to-tx
     :initform 0 :type fixnum :accessor remaining-beacons-to-tx)
-   (beacon-tx-time  :type time-type :reader beacon-tx-time)
    (sleep-interval :type time-type :reader sleep-interval)
 
    ;; timers (may be able to use same message with different names)
@@ -110,6 +107,14 @@
             "Backoff timer is set to sleeping interval but sleeping
             interval is not defined because duty cycle is 0 or 1.")))
 
+(defmethod phy-data-rate((mac tuneable-mac))
+  (phy-data-rate (submodule (owner mac) '(radio))))
+
+(defgeneric beacon-tx-time(mac)
+  (:method((instance tuneable-mac))
+    (/ (* 8 (+ (beacon-frame-size instance) (phy-layer-overhead instance)))
+       (phy-data-rate instance))))
+
 (defmethod startup((instance tuneable-mac))
   ;; start listening and schedule a time to sleeep if needed
   (to-radio instance '(set-state . rx))
@@ -122,21 +127,10 @@
           (set-timer instance (sleep-listen-timer instance) listen-interval
                      'sleep))
         (setf (slot-value instance 'sleep-interval) -1d0))
-    (setf (mac-state instance) 'default
+    (setf (state instance) 'default
           (num-tx-tries instance) 0
           (remaining-beacons-to-tx instance) 0
           (backoff-times instance) 0)))
-
-(defmethod handle-message((mac tuneable-mac) (msg radio-control-message))
-  (case (command msg)
-    (change-data-rate
-     (with-slots(phy-data-rate beacon-frame-size
-                 beacon-tx-time phy-layer-overhead) mac
-       (setf phy-data-rate (argument msg))
-       (setf beacon-tx-time
-             (/ (* 8 (+ beacon-frame-size phy-layer-overhead))
-                phy-data-rate)))))
-  (call-next-method))
 
 (defmethod handle-message((instance tuneable-mac) (message message))
   (cond
@@ -151,8 +145,8 @@
     ((eql message (start-cs-timer instance))
      (to-radio instance '(set-state . rx))
      (handle-cs-result instance
-                       (channel-clear-p
-                        (submodule (node instance) '(communication radio)))))
+                       (channel-clear-status
+                        (submodule (node instance) '(communications radio)))))
      ((eql message (attempt-tx-timer instance))
       (attempt-tx instance))
      ((eql message  (send-beacons-or-data-timer instance))
@@ -182,7 +176,7 @@
                               (beacon-interval-fraction instance))
                            (beacon-tx-time instance))
                   0))
-        (setf (mac-state instance) 'tx)
+        (setf (state instance) 'tx)
         (tracelog "Channel clear, TX state, sending ~D beacons followed by data"
                   (remaining-beacons-to-tx instance))
         (send-beacons-or-data instance))))
@@ -268,7 +262,7 @@
      (cond
        ((empty-p (buffer instance))
         ;; if no more packets go to default sleep/listen pattern
-        (setf (mac-state instance) 'default)
+        (setf (state instance) 'default)
         (tracelog "DEFAULT state, no more packets to TX")
         (when (< 0.0 (duty-cycle instance) 1.0)
           (set-timer instance (sleep-listen-timer instance) 0 'sleep)))

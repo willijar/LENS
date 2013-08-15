@@ -882,3 +882,7 @@
 (defun max-tx-power-consumed(radio)
   (reduce #'max (mapcar #'tx-level-power-consumed (tx-levels radio))))
 
+(defgeneric phy-data-rate(entity)
+  (:documentation "The physical layer data rate - needed by mac layer to determine transmission times etc.")
+  (:method ((radio radio))
+    (rx-mode-data-rate (rx-mode radio))))
