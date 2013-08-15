@@ -857,11 +857,11 @@
            (/ (rx-mode-data-rate rx-mode)
               (rx-mode-noise-bandwidth rx-mode))))
 
-(defun channel-clear-p(radio)
+(defun channel-clear-status(radio)
   (let ((value (read-rssi radio)))
     (if (symbolp value)
         value
-        (if (< value (cca-threshold radio)) t nil))))
+        (if (< value (cca-threshold radio)) 'clear 'busy))))
 
 (defun bit-errors(ber num-of-bits max-bit-errors-allowed)
   (let ((c 0.0)) ;cumulativeProbabilityOfUnrealizedEvents
