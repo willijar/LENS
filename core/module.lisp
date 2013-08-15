@@ -610,6 +610,8 @@ specification of a specific subclass."
   (:documentation "Return submodule of given name (and index if in an array)")
   (:method((module compound-module) (name symbol) &key index)
     (let ((submodule (gethash name (submodules module))))
+      (assert submodule (submodule)
+              "No ~A submodule found in compound module ~A" name module)
       (if index (aref submodule index) submodule)))
   (:method((module compound-module) (address list) &key index)
     (assert (null index))
