@@ -362,7 +362,7 @@
          (set-timer
           instance (attempt-tx-timer instance) (sleep-interval instance))
          (progn
-           ;; only happens i onhe node has duty cycle and other has not
+           ;; only happens if one node has duty cycle and other has not
            ;; so just wait 0,5 secs
            (tracelog "WARNING: received a beacond packet without a duty cycle in place.")
            (set-timer instance (attempt-tx-timer instance) 0.5))))

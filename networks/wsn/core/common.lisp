@@ -80,7 +80,7 @@
 (defgeneric set-timer(module timer interval &optional message-name)
   (:documentation "Schedule a timer using local time to determine interval")
   (:method(module (timer message) interval  &optional name)
-    (assert (not (scheduled-p timer)))
+    (cancel timer)
     (when name (setf (name timer) name))
     (schedule-at module timer
                  :delay (get-simulation-time module interval))))

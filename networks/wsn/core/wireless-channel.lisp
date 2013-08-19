@@ -294,7 +294,7 @@ and pathloss e.g. ((transmitterid (receiverid . loss) (receiverid
   (let* ((src-node (node (src message)))
          (cell-tx (location-cell wireless src-node))
          (nodeid (nodeid src-node))
-         (reception-count nil))
+         (reception-count 0))
     (dolist(path-loss (cell-path-loss cell-tx))
       (unless (cell-occupation (path-loss-destination path-loss))
         (go next))
@@ -306,7 +306,7 @@ and pathloss e.g. ((transmitterid (receiverid . loss) (receiverid
             ;; go through all nodes in that cell and send copy of message
         (dolist(node (cell-occupation (path-loss-destination path-loss)))
           (unless (eql node src-node)
-            (push (nodeid node) reception-count)
+            (incf reception-count)
             (let ((msgcopy (duplicate message))
                   (receiver (gate node 'receive :direction :input)))
               (setf (power-dbm msgcopy) current-signal-received)
@@ -314,8 +314,8 @@ and pathloss e.g. ((transmitterid (receiverid . loss) (receiverid
               (push receiver (aref (receivers wireless) nodeid))))))
       next)
     (when reception-count
-      (tracelog "Signal from ~A reached ~D other nodes (~{~A~^ ~})."
-                src-node (length reception-count) reception-count))))
+      (tracelog "Signal from ~A reached ~D other nodes."
+                src-node reception-count))))
 
 (defmethod handle-message((wireless wireless-channel)
                           (message wireless-signal-end))
