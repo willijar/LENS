@@ -90,8 +90,11 @@ channel module"
             cells
             (mapcar
              #'(lambda(f)
-                 (let ((a (max 0 (min (funcall f coord)
-                                      (funcall f (field module))))))
+                 (let* ((coord (funcall f coord))
+                        (field (funcall f (field module)))
+                        (a (max 0 (min coord field))))
+                   (when (> coord field)
+                     (tracelog "Warning at initialization: node position out of boinds in ~A dimension!" f))
                    (floor a (funcall f (cell-size module)))))
              (load-time-value (list #'coord-x #'coord-y #'coord-z)))))))
 
@@ -102,7 +105,7 @@ channel module"
 (defun (setf location-cell)(index channel instance)
   (setf (gethash instance (slot-value channel 'location-cells)) index))
 
-(defmethod initialize and ((wireless wireless-channel) &optional (stage 0))
+(defmethod initialize list ((wireless wireless-channel) &optional (stage 0))
   (let* ((nodes (nodes (network *simulation*))))
     (case stage
       (0
@@ -145,13 +148,13 @@ channel module"
                          (let ((z (* k (coord-z cell-size))))
                            (setf (aref cells i j k)
                                  (make-cell
-                                  :coord (make-coord x y z)))))))))
+                                  :coord (make-coord x y z))))))))))
                (map 'nil
                     #'(lambda(node)
                         (let ((cell (coord-cell (location node) wireless)))
                           (setf (location-cell wireless node) cell)
                           (push node (cell-occupation cell))))
-                    nodes))))
+                    nodes)))
        (with-slots(max-tx-power signal-delivery-threshold
                    d0 PLd0 sigma path-loss-exponent bidirectional-sigma)
            wireless
@@ -195,7 +198,7 @@ channel module"
                                 (- Pld bidirection-pathloss-jitter))
                                (cell-path-loss (row-major-aref cells j))))))))))
            (tracelog "Number of space cells: ~A" no-cells)
-           (tracelog "Each cells affects ~f other cells on average."
+           (tracelog "Each cell affects ~f other cells on average."
                      (/ (loop :for i :from 0 :below no-cells
                            :sum (length  (cell-path-loss (row-major-aref cells i))))
                         no-cells))))
@@ -291,12 +294,10 @@ and pathloss e.g. ((transmitterid (receiverid . loss) (receiverid
   (let* ((src-node (node (src message)))
          (cell-tx (location-cell wireless src-node))
          (nodeid (nodeid src-node))
-         (reception-count 0))
+         (reception-count nil))
     (dolist(path-loss (cell-path-loss cell-tx))
       (unless (cell-occupation (path-loss-destination path-loss))
         (go next))
-      #+nil(break "location cell ~A = ~A" src-node cell-tx)
-      #+nil(break "occupied path-loss=~A" path-loss)
       (let ((current-signal-received
              (- (power-dbm message) (path-loss-avg-path-loss path-loss))))
         ;; TODO temporal model
@@ -305,16 +306,16 @@ and pathloss e.g. ((transmitterid (receiverid . loss) (receiverid
             ;; go through all nodes in that cell and send copy of message
         (dolist(node (cell-occupation (path-loss-destination path-loss)))
           (unless (eql node src-node)
-            (incf reception-count)
+            (push (nodeid node) reception-count)
             (let ((msgcopy (duplicate message))
                   (receiver (gate node 'receive :direction :input)))
               (setf (power-dbm msgcopy) current-signal-received)
-              (send-direct wireless receiver  msgcopy)
+              (send-direct wireless receiver msgcopy)
               (push receiver (aref (receivers wireless) nodeid))))))
       next)
-    (when (> reception-count 0)
-      (tracelog "Signal from ~A reached ~D other nodes."
-                src-node reception-count))))
+    (when reception-count
+      (tracelog "Signal from ~A reached ~D other nodes (~{~A~^ ~})."
+                src-node (length reception-count) reception-count))))
 
 (defmethod handle-message((wireless wireless-channel)
                           (message wireless-signal-end))

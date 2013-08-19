@@ -22,7 +22,7 @@
    (radio :inout))
   (:metaclass module-class))
 
-(defmethod initialize and ((instance mac) &optional stage)
+(defmethod initialize list ((instance mac) &optional stage)
   (case stage
     (0
      (unless (slot-boundp instance 'address)

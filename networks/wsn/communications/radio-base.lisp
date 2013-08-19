@@ -209,7 +209,7 @@
 (defmethod initialize-instance :after ((radio radio) &key &allow-other-keys)
   (parse-radio-parameter-file radio))
 
-(defmethod initialize and ((radio radio) &optional stage)
+(defmethod initialize list ((radio radio) &optional stage)
   (case stage
     (0
      ;; determine address based on node index if undefined
@@ -883,6 +883,7 @@
   (reduce #'max (mapcar #'tx-level-power-consumed (tx-levels radio))))
 
 (defgeneric phy-data-rate(entity)
-  (:documentation "The physical layer data rate - needed by mac layer to determine transmission times etc.")
+  (:documentation "The physical layer data rate - needed by mac layer
+  to determine transmission times etc.")
   (:method ((radio radio))
     (rx-mode-data-rate (rx-mode radio))))

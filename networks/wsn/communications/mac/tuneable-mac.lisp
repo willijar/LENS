@@ -91,13 +91,6 @@
   non-persistent CSMA-CA behaviour")
   (:metaclass module-class))
 
-(deftype tuneable-mac-frame-type() '(member data beacon))
-
-(defclass TuneableMacPacket(mac-packet)
-  ((frame-type
-    :type tuneable-mac-frame-type :initform 'data :initarg :frame-type
-    :reader frame-type :documentation "data or beacon")))
-
 (defmethod initialize-instance :after ((instance tuneable-mac)
                                        &key &allow-other-keys)
   (with-slots(duty-cycle backoff-type) instance
@@ -248,7 +241,7 @@
         (progn
           ;; bufferPacket() failed, buffer is full FULL_BUFFER control
           ;; msg sent by virtualMAC code
-          (emit  instance 'tuneable-mac-packet-breakdown 'overflown)
+          (emit instance 'tuneable-mac-packet-breakdown 'overflown)
           (tracelog "WARNING: Tuneable MAC buffer overflow")))))
 
 (defun attempt-tx(instance)
@@ -277,12 +270,14 @@
         (set-timer instance (start-cs-timer instance)
                    (uniform 0.0 (random-tx-offset instance) 1))
         (tracelog "CONTENDING state, attempt ~D/~D contending"
-                  (1+ (- (num-tx instance) (num-tx-tries instance)))))
+                  (1+ (- (num-tx instance) (num-tx-tries instance)))
+                  (num-tx instance)))
        (t
         (set-timer instance
                    (attempt-tx-timer instance) (retx-interval instance))
         (tracelog "CONTENDING state, attempt ~D/~D skipped"
-                  (1+ (- (num-tx instance) (num-tx-tries instance))))
+                  (1+ (- (num-tx instance) (num-tx-tries instance)))
+                  (num-tx instance))
         (decf (num-tx-tries instance)))))))
 
 (defun send-beacons-or-data(instance)
@@ -297,7 +292,7 @@
                               :destination broadcast-mac-address))
      (to-radio instance '(set-state . tx))
      (tracelog "Sending Beacon.")
-     (emit 'tuneable-mac-packet-breakdown 'sent-beacons)
+     (emit instance 'tuneable-mac-packet-breakdown 'sent-beacons)
      ;; Set timer to send next beacon (or data packet). Schedule the
 		 ;; timer a little faster than it actually takes to TX a a beacon,
 		 ;; because we want to TX beacons back to back and we have to
@@ -314,10 +309,10 @@
      (cond
        ((= (num-tx-tries instance) (num-tx instance))
         (tracelog "Sending data packet")
-        (emit 'tuneable-mac-packet-breakdown 'sent-data-packets))
+        (emit instance 'tuneable-mac-packet-breakdown 'sent-data-packets))
        (t
         (tracelog "Sending copy of data packet")
-        (emit 'tuneable-mac-packet-breakdown 'copies-of-sent-data-packets)))
+        (emit instance 'tuneable-mac-packet-breakdown 'copies-of-sent-data-packets)))
      (let ((packet-tx-time
             (/ (* (+ (byte-length (peek (buffer instance)))
                      (phy-layer-overhead instance))
@@ -345,11 +340,11 @@
   ;; from radio layer
   (unless (or (eql (destination packet) (mac-address instance))
               (eql (destination packet) broadcast-mac-address))
-    (emit  'tuneable-mac-packet-breakdown 'filtered-other-dest)
+    (emit instance 'tuneable-mac-packet-breakdown 'filtered-other-dest)
     (return-from handle-message))
   (ecase (name packet)
     (beacon
-     (emit 'tuneable-mac-packet-breakdown 'received-beacons)
+     (emit instance 'tuneable-mac-packet-breakdown 'received-beacons)
      (case (state instance)
        (default
         (when (< 0.0 (duty-cycle instance) 1.0)
@@ -359,7 +354,7 @@
         (cancel (attempt-tx-timer instance)))
        (tx ;; ignore beacon as we are sending our own data
         (tracelog "ignoring beacon, we are in TX state")
-        (emit  'tuneable-mac-packet-breakdown 'received-beacons-ignored)
+        (emit instance 'tuneable-mac-packet-breakdown 'received-beacons-ignored)
         (return-from handle-message)))
      (setf (state instance) 'rx)
      (tracelog "state RX, received beacon")

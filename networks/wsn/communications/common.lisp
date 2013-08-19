@@ -14,9 +14,13 @@
                     :documentation "a field to distinguish between packets"))
   (:documentation "Base class for network and link layer packets"))
 
-(defmethod print-object((pkt wsn-packet) stream)
-  (print-unreadable-object(pkt stream :type t :identity nil)
-    (format stream "#~D (~D bytes)" (sequence-number pkt) (byte-length pkt))))
+(defmethod print-object((instance wsn-packet) stream)
+  (print-unreadable-object(instance stream :type t :identity nil)
+    (when (slot-boundp instance 'name)
+      (format stream "~A" (name instance)))
+    (when (slot-boundp instance 'sequence-number)
+      (format stream "#~D" (sequence-number instance)))
+    (format stream " (~D bytes)" (byte-length instance))))
 
 (defmethod duplicate((packet wsn-packet) &optional duplicate)
   (call-next-method)
@@ -61,6 +65,7 @@
   (funcall operator (buffer module)))
 
 (defmethod shutdown((module comms-module))
+  (call-next-method)
   (let ((buffer (buffer module)))
     (while (not (empty-p buffer)))
     (emit buffer 'drop (dequeue (queue buffer)))

@@ -37,7 +37,7 @@
   ((disabled-p :initform t :initarg :disabled-p :reader disabled-p))
   (:metaclass module-class))
 
-(defmethod initialize and ((module wsn-module) &optional (stage 0))
+(defmethod initialize list ((module wsn-module) &optional (stage 0))
   (case stage
     (0
      (subscribe (node module) 'node-shutdown module)
@@ -85,8 +85,5 @@
     (schedule-at module timer
                  :delay (get-simulation-time module interval))))
 
-(defmethod handle-message((module wsn-module) (message message))
-  (case (name message)
-    (node-startup (startup module))
-    (node-shutdown (shutdown module))
-    (t (call-next-method))))
+(defmethod handle-message :around ((module wsn-module) (message message))
+  (unless (disabled-p module) (call-next-method)))

@@ -39,7 +39,7 @@
     (emit instance 'node-move)
     location))
 
-(defmethod initialize and ((instance mobility) &optional (stage 0))
+(defmethod initialize list ((instance mobility) &optional (stage 0))
   (case stage
     (0  (tracelog "initial location is ~A" (location instance))))
   t)

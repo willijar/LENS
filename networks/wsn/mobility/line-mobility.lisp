@@ -26,7 +26,7 @@
              distance       (distance location destination)
              delta          (coord- destination location))))
 
-(defmethod initialize and ((instance line-mobility) &optional (stage 0))
+(defmethod initialize list ((instance line-mobility) &optional (stage 0))
   (case stage
     (0 (schedule-at instance (periodic-update-message instance) :delay 0)))
   t)

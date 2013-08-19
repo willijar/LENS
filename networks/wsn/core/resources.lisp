@@ -79,7 +79,7 @@
   (unless (slot-boundp module 'time-of-last-calculation)
     (setf (slot-value module 'time-of-last-calculation) (simulation-time))))
 
-(defmethod initialize and ((module resources) &optional (stage 0))
+(defmethod initialize list ((module resources) &optional (stage 0))
   (case stage
     (0 (subscribe (node module) 'power-change module)))
   t)

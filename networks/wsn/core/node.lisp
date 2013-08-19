@@ -49,13 +49,15 @@
   (subscribe node 'out-of-memory node)
   (subscribe node 'out-of-energy node))
 
-(defmethod initialize and ((node node) &optional (stage 0))
+(defmethod initialize list ((node node) &optional (stage 0))
   (case stage
     (0
-     (schedule-at
-      node (make-instance 'message :name 'node-startup)
-      :delay  (+ (startup-offset node)
-                 (* (uniform 0.0 (startup-randomization node)))))))
+     (let ((delay (+ (startup-offset node)
+                     (* (uniform 0.0 (startup-randomization node))))))
+       (tracelog "Delaying startup to ~:/eng/s" delay)
+       (schedule-at
+        node (make-instance 'message :name 'node-startup)
+        :delay delay))))
   t)
 
 (defmethod handle-message((node node) message)

@@ -78,7 +78,7 @@ thern the message will correspond to the last sampled time."))
             "Sample interval ~A is less than measurement time of ~A"
             sample-interval measurement-delay)))
 
-(defmethod initialize and ((sensor sensor) &optional (stage 0))
+(defmethod initialize list ((sensor sensor) &optional (stage 0))
   (case stage
     (0
      (unless (slot-boundp sensor 'physical-process-id)
