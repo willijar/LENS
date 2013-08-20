@@ -46,7 +46,7 @@
     :documentation " if you find the channel free, tx all packets in buffer?")
    (sleep-during-backoff
     :parameter t :type boolean :initform nil :reader sleep-during-backoff
-    :documentation " for no dutyCycle case: sleep when backing off?")
+    :documentation " for no dutyCycle case: sleep when backing off")
 
    ;;other parameters
    (header-overhead :initform 9)
@@ -188,7 +188,8 @@
         (set-timer instance (start-cs-timer instance)
                    (phy-delay-for-valid-cs instance)))
        (t
-        (let ((backoff-timer
+        (let ((backoff-time
+               (uniform 0.0
                (with-slots(backoff-times sleep-interval backoff-base-value)
                    instance
                  (incf backoff-times)
@@ -202,14 +203,13 @@
                   (multiplying
                    (* backoff-times backoff-base-value))
                   (exponential
-                   (expt 2.0 (if (zerop backoff-times) 0 (1- backoff-times))))))))
-          (set-timer instance (start-cs-timer instance)
-                     (uniform 0.0 backoff-timer))
-          (tracelog "Channel busy, backing off for ~A secs" backoff-timer))
-        (when (and (< 0.0 (duty-cycle instance) 1.0)
-                   (sleep-during-backoff instance))
-
-          (to-radio instance '(set-state .sleep))))))
+                   (expt 2.0 (if (zerop backoff-times) 0 (1- backoff-times))))))
+               1)))
+          (set-timer instance (start-cs-timer instance) backoff-time)
+          (tracelog "Channel busy, backing off for ~:/dfv::eng/s" backoff-time))
+        (when (or (< 0.0 (duty-cycle instance) 1.0)
+                  (sleep-during-backoff instance))
+          (to-radio instance '(set-state . sleep))))))
     (cs-not-valid) ;; do nothing
     (cs-not-valid-yet
      (set-timer instance (start-cs-timer instance)
@@ -364,7 +364,7 @@
          (progn
            ;; only happens if one node has duty cycle and other has not
            ;; so just wait 0,5 secs
-           (tracelog "WARNING: received a beacond packet without a duty cycle in place.")
+           (tracelog "WARNING: received a beacod packet without a duty cycle in place.")
            (set-timer instance (attempt-tx-timer instance) 0.5))))
     (data
      (let ((routing-packet (decapsulate packet)))

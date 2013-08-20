@@ -53,7 +53,7 @@
 (defclass radio-control-command(communications-control-command)
   ())
 
-(define-condition invalid-command(serious-condition)
+(define-condition invalid-command(warning)
   ((module :reader module :initarg :module)
    (command :reader command :initarg :command)
    (argument :reader argument :initarg :argument))

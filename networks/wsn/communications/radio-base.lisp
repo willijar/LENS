@@ -498,9 +498,12 @@
          (return-from handle-control-command))
        (setf changing-to-state new-state)
        (let* ((transition
-             (getf (getf (transitions radio) changing-to-state) state))
-            (transition-delay (transition-element-delay transition))
-            (transition-power (transition-element-power transition)))
+               (or
+                (getf (getf (transitions radio) changing-to-state) state)
+                (load-time-value
+                 (make-transition-element :delay 0d0 :power 0d0))))
+              (transition-delay (transition-element-delay transition))
+              (transition-power (transition-element-power transition)))
        ;; With sleep levels it gets a little more complicated. We
 			 ;; can add the trans delay from going to one sleep level to the
 			 ;; other to get the total transDelay, but the power is not as
