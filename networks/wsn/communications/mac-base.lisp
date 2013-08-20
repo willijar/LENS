@@ -72,6 +72,11 @@
                              :command (first command)
                              :argument (rest command)))))
 
+(defmethod to-network((mac mac) (routing-packet routing-packet) &optional dummy)
+  (declare (ignore dummy))
+  (send mac routing-packet 'routing)
+  (tracelog "Delivering ~A to network layer" routing-packet))
+
 (defmethod encapsulate((module mac) packet)
   (encapsulate
    (make-instance 'mac-packet

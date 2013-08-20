@@ -22,4 +22,4 @@
               (make-instance 'net-mac-control-info
                              :rssi (rssi (control-info packet))
                              :lqi (lqi (control-info packet))))
-        (send instance routing-packet 'routing))))
+        (to-network instance routing-packet))))

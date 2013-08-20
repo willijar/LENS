@@ -134,7 +134,7 @@
         (set-timer instance message (sleep-interval instance) 'listen))
        (listen
         (to-radio instance '(set-state . rx))
-        (set-timer instance message (sleep-interval instance) 'sleep))))
+        (set-timer instance message (listen-interval instance) 'sleep))))
     ((eql message (start-cs-timer instance))
      (to-radio instance '(set-state . rx))
      (handle-cs-result instance
@@ -372,7 +372,7 @@
               (make-instance 'net-mac-control-info
                              :rssi (rssi (control-info packet))
                              :lqi (lqi (control-info packet))))
-        (send instance routing-packet 'routing))
+        (to-network instance routing-packet))
      (when (eql (state instance) 'rx)
        (cancel (attempt-tx-timer instance))
        (attempt-tx instance)))))
