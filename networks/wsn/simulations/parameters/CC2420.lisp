@@ -46,7 +46,7 @@
   rx
    (rx nil
     tx #s(transition-element :delay 0.01d-3 :power 62e-3)
-    sleep #s(transition-element :delay 0.194d0 :power 62e-3))
+    sleep #s(transition-element :delay 0.194d-3 :power 62e-3))
   tx
    (rx #s(transition-element :delay 0.01d-3 :power 62e-3)
     tx nil
