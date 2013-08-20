@@ -26,7 +26,7 @@
   "Current global context in which evaluation (e.g. random functions)
   is to be done.")
 
-(defvar *time-format* "~7,3f"  "Time output format control")
+(defvar *time-format* "~7,4f"  "Time output format control")
 
 ;; base class for in simulation errors (not program errors)
 (define-condition simulation-condition(condition)())

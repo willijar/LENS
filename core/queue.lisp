@@ -37,6 +37,10 @@
   (:method((q timestamped-queue))
     (- (timestamped-queue-average-timestamp q) (simulation-time))))
 
+(defmethod peek((q timestamped-queue))
+  (let ((record (call-next-method)))
+    (values (timestamped-value record) (timestamped-time record))))
+
 (defclass packet-buffer(entity-with-signals parameter-object)
   ((queue :reader queue :type timestamped-queue)
    (buffer-size

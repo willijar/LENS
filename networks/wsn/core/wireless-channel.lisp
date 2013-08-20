@@ -246,7 +246,7 @@ and pathloss e.g. ((transmitterid (receiverid . loss) (receiverid
 
 (defmethod print-object((msg wireless-signal-start) os)
   (print-unreadable-object(msg os :type t :identity nil)
-    (format os "~6,2fdBm from ~A" (power-dbm msg)  (src msg))))
+    (format os "~5,2fdBm from ~A" (power-dbm msg)  (nodeid (node (src msg))))))
 
 (defmethod duplicate((original wireless-signal-start) &optional
                      (duplicate (make-instance 'wireless-signal-start)))
@@ -270,7 +270,7 @@ and pathloss e.g. ((transmitterid (receiverid . loss) (receiverid
 
 (defmethod print-object((msg wireless-signal-end) os)
   (print-unreadable-object(msg os :type t :identity nil)
-    (format os "from ~A"  (src msg))))
+    (format os "from ~A"  (nodeid (node (src msg))))))
 
 (defmethod duplicate((original wireless-signal-end) &optional
                      (duplicate (make-instance 'wireless-signal-end)))

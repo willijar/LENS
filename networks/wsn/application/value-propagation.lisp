@@ -43,7 +43,7 @@ and send data to 'SINK over network"))
 (defmethod handle-message((application value-propagation)
                           (pkt application-packet))
   (emit application 'packets-received (source (control-info pkt)))
-  (let ((received-value (decapsulate pkt)))
+  (let ((received-value (payload pkt)))
     (with-slots(current-max-received-value temp-threshold the-value sent-once)
         application
       (when (> received-value current-max-received-value)
