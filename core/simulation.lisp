@@ -147,7 +147,7 @@
     :type fixnum :initform 0 :initarg :priority :accessor priority
     :documentation "Determines delivery of messages with same arrival time")
    (schedule-id
-    :initform -1 :type integer
+    :initform -1 :type integer :reader schedule-id
     :documentation "Used to ensure events with same time and
    priority are scheduled in order of scheduling" :reader uid)
    (root-event :type event :reader root-event
@@ -169,6 +169,26 @@
            ((> pa pb))
            ((= pa pb)
             (< (slot-value a 'schedule-id) (slot-value b 'schedule-id)))))))))
+
+(defun event-queue-consistent-p(simulation)
+  "Do a consistency check on event-queue by dequeing and checking order and then reinqueueing"
+  (let ((q (event-queue simulation))
+        (result t)
+        (events nil))
+    (unless (empty-p q)
+      (let ((prev (dequeue q)))
+        (push prev events)
+        (loop
+           (when (empty-p q) (return))
+           (let ((next (dequeue q)))
+             (when (event< next prev)
+               (setf result nil)
+               (format t "~%Inconsistent at ~A -> ~A~%" (arrival-time prev) (arrival-time next)))
+             (setf prev next)
+             (push prev events))))
+      (dolist(event (sort (copy-list events) #'< :key #'schedule-id))
+        (enqueue event q)))
+    (values result events)))
 
 (defmethod (setf arrival-time) :before ((event event) time)
   (assert (not (scheduled-p event))))
@@ -212,9 +232,8 @@
     (assert (>= (arrival-time event) (simulation-time)))
     (setf (slot-value event 'schedule-id)
           (incf (slot-value *simulation* 'last-schedule-id)))
-    ;; we don't enqueue unless we need to
-    ;; return value is event if enqueued or handler return value if not
-    (enqueue event (event-queue *simulation*)))
+    (enqueue event (event-queue *simulation*))
+    (slot-value event 'schedule-id))
   (:method(handler &key (delay 0) (time (+ delay (simulation-time))))
     (schedule (make-instance 'simple-event :handler handler) :time time)))
 

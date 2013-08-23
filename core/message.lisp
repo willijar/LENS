@@ -56,7 +56,9 @@ model domain."))
       (format stream "~A" (name instance)))
     (if (>= (slot-value instance 'rank) 0)
       (format stream " (~D) t=~@?"
-              (uid instance) *time-format* (arrival-time instance)))))
+              (uid instance) *time-format* (arrival-time instance)))
+    (when (slot-boundp instance 'to)
+      (format stream " to ~A" (slot-value instance 'to)))))
 
 (defmethod latency((message message))
   (- (arrival-time message) (timestamp message) ))
