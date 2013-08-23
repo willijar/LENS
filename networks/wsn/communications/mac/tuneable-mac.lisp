@@ -33,7 +33,7 @@
     :documentation "Interval between retransmissions in ms, (numTx-1) retransmissions")
    (backoff-type
     :parameter t :type symbol
-    :initform 'multiplying :accessor backoff-type
+    :initform 'constant :accessor backoff-type
     :documentation "sleep-interval, constant, multiplying (e.g. 1*a, 2*a, 3*a, 4*a ...), exponential (e.g. 2, 4, 8, 16, 32...)")
    (backoff-base-value
     :parameter t :type time-type :initform 16d-3 :accessor backoff-base-value)
@@ -188,30 +188,28 @@
         (set-timer instance (start-cs-timer instance)
                    (phy-delay-for-valid-cs instance)))
        (t
-        (let ((backoff-time
-               (uniform 0.0
-               (with-slots(backoff-times sleep-interval backoff-base-value)
-                   instance
-                 (incf backoff-times)
-                 (ecase (backoff-type instance)
-                  (sleep-interval
-                   (if (< sleep-interval 0)
-                       backoff-base-value
-                       sleep-interval))
-                  (constant
-                   backoff-base-value)
-                  (multiplying
-                   (* backoff-times backoff-base-value))
-                  (exponential
-                   (expt 2.0 (if (zerop backoff-times) 0 (1- backoff-times))))))
-               1)))
-          (set-timer instance (start-cs-timer instance) backoff-time)
-          (tracelog "Channel busy, backing off for ~:/dfv::eng/s" backoff-time))
+        (with-slots(backoff-times sleep-interval backoff-base-value)
+            instance
+          (incf backoff-times)
+          (let* ((backoff-limit
+                  (ecase (backoff-type instance)
+                    (sleep-interval
+                     (if (< sleep-interval 0)
+                         backoff-base-value
+                         sleep-interval))
+                    (constant
+                     backoff-base-value)
+                    (multiplying
+                     (* backoff-times backoff-base-value))
+                    (exponential
+                     (expt 2.0 (if (zerop backoff-times) 0 (1- backoff-times))))))
+                 (backoff-time (uniform 0.0 backoff-limit 1)))
+            (set-timer instance (start-cs-timer instance) backoff-time)
+            (tracelog "Channel busy, backing off ~D (0-~:/dfv::eng/s) for ~:/dfv::eng/s" backoff-times backoff-limit backoff-time))
         (when (or (< 0.0 (duty-cycle instance) 1.0)
                   (sleep-during-backoff instance))
-          (to-radio instance '(set-state . sleep))))))
-    (cs-not-valid) ;; do nothing
-    (cs-not-valid-yet
+          (to-radio instance '(set-state . sleep)))))))
+    ((cs-not-valid cs-not-valid-yet)
      (set-timer instance (start-cs-timer instance)
                 (phy-delay-for-valid-cs instance))
      (tracelog "CS not valid yet, trying again."))))
