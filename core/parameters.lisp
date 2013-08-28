@@ -70,22 +70,26 @@
   (:method((type (eql 'time-type))) type))
 
 (defmethod parse-input((spec (eql 'time-type)) value &key &allow-other-keys)
-  (multiple-value-bind(n p) (parse-integer value :junk-allowed t)
     (coerce
-     (cond
-       ((and n (= p (length value))) n)
-       ((and n (= p (1- (length value))))
-        (let ((lc (char value (1- (length value)))))
-          (case lc
-            (#\s n)
-            (#\m (* n 60))
-            (#\h (* n 60 60))
-            (#\d (* n 24 60 60))
-            (t (dfv::invalid-format-error
-                spec value
-                "~A is not a recognized time unit" lc)))))
-       (t (parse-input 'number-or-expression value)))
-     'time-type)))
+     (handler-bind
+         ((dfv::invalid-format
+           #'(lambda(c) (invoke-restart 'dfv::use-value nil))))
+       (cond
+         ((ignore-errors (parse-input 'dfv:eng value :units "s")))
+         ((ignore-errors (parse-input 'number value)))
+         ((multiple-value-bind(n p) (parse-integer value :junk-allowed t)
+            (when (and n (= p (1- (length value))))
+              (let ((lc (char value (1- (length value)))))
+                (case lc
+                  (#\s n)
+                  (#\m (* n 60))
+                  (#\h (* n 60 60))
+                  (#\d (* n 24 60 60))
+                  (t (dfv::invalid-format-error
+                      spec value
+                      "~A is not a recognized time unit" lc)))))))
+         (t (parse-input 'number-or-expression value))))
+     'time-type))
 
 (defmethod parse-input((spec (eql 'coord)) value &key &allow-other-keys)
   (let ((coords
