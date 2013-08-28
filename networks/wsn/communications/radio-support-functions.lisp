@@ -2,6 +2,7 @@
 
 (declaim (inline ratio-to-db db-to-ratio))
 
+;; these are exact fp functions
 (defun ratio-to-db(ratio)
   (if (> ratio 1e-10)
       (* 10.0 (log ratio 10.0))
@@ -10,11 +11,61 @@
 (defun db-to-ratio(db)
   (expt 10.0 (* db 0.1)))
 
-(defun dbm+(a b)
+#-castelia-compatability(defun dbm+(a b)
   (ratio-to-db (+ (db-to-ratio a) (db-to-ratio b))))
 
-(defun dbm-(a b)
+#-castelia-compatability(defun dbm-(a b)
   (ratio-to-db (- (db-to-ratio a) (db-to-ratio b))))
+
+;;;; these are approximate versions used in Castalia
+#+castelia-compatability(defun dbm+(a b)
+  (let ((diff (- a b)))
+    (cond
+      ((> diff 7.0) a)
+      ((< diff -7.0) b)
+      ((> diff 5.0) (+ 1.0 a))
+      ((< diff -5.0) (+ 1.0 b))
+      ((> diff 3.0) (+ 1.5 a))
+      ((< diff -3.0) (+ 1.5 b))
+      ((> diff 2.0) (+ 2.0 a))
+      ((< diff -2.0) (+ 2.0 b))
+      ((> diff 1.0) (+ 2.5 a))
+      ((< diff -1.0) (+ 2.5 b))
+      ((> diff 0.0) (+ a 3.0))
+      (t (+ b 3.0)))))
+
+#+castelia-compatability(defun dbm-(a b)
+  (let ((diff (- a b)))
+    (cond
+      ((< diff 0.5) -200.0)
+      ((< diff 1.0) (- b 9.0))
+      ((< diff 2.0) (- b 5.0))
+      ((< diff 3.0) (- b 2.0))
+      ((< diff 4.0) b)
+      ((< diff 5.0) (+ b 2.0))
+      ((< diff 6.0) (- a 1.6))
+      ((< diff 7.0) (- a 1.2))
+      ((< diff 8.0) (- a 0.9))
+      ((< diff 9.0) (- a 0.7))
+      ((< diff 12.0) (- a 0.5))
+      (t a))))
+
+;; (let ((a #(-12.041200 -9.030900 -7.269987 -6.020600 -5.051500 -4.259687
+;;            -3.590219 -3.010300 -2.498775 -2.041200 -1.627273 -1.249387
+;;            -0.901766 -0.579919 -0.280287)))
+;;   (defun ratio-to-db(ratio)
+;;     (cond
+;;       ((>= ratio 1.0) 0.0)
+;;       ((< ratio 0.0625) -100.0)
+;;       (t (aref a (1- (floor (* 16 ratio))))))))
+
+;; (defun db-to-ratio(db)
+;;   (cond
+;;     ((> db 9.0) 8.0)
+;;     ((> db 6.0) 4.0)
+;;     ((> db 3.0) 2.0)
+;;     ((> db 1.25) 1.3333)
+;;     (t 1.0)))
 
 (defvar +ideal-modulation-threshold+ 5.0)
 
@@ -25,6 +76,7 @@
   (:method((encoding (eql 'fsk)) snr-db &optional bpnb)
     (* 0.5 (exp (* -0.5 (/ (db-to-ratio snr-db) bpnb)))))
   (:method((encoding (eql 'psk)) snr-db &optional bpnb)
+    (tracelog "erc(~A)" (sqrt (/ (db-to-ratio snr-db) bpnb)))
     (* 0.5 (erfc (sqrt (/ (db-to-ratio snr-db) bpnb)))))
   (:method((encoding (eql 'dpsk)) snr-db &optional bpnb)
     (* 0.5 (exp (/ (db-to-ratio snr-db)  bpnb))))

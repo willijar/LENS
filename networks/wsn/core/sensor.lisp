@@ -90,6 +90,7 @@ thern the message will correspond to the last sampled time."))
      nil)
     (1
      ;; emit must be stage 1 so all listeners subscribed
+     #-castelia-compatability
      (emit sensor 'power-change (power-consumption sensor))
      t)))
 

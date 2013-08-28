@@ -42,7 +42,7 @@
               :components
               ((:file "common")
                (:file "routing-base" :depends-on ("common"))
-               (:file "mac-base" :depends-on ("common"))
+               (:file "mac-base" :depends-on ("common" "routing-base"))
                (:file "radio-support-functions")
                (:file "radio-base"
                       :depends-on

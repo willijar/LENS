@@ -219,7 +219,7 @@
   (let ((mac-packet (encapsulate instance packet)))
     (setf (destination mac-packet) (next-hop (control-info packet)))
     (setf (name mac-packet) 'data)
-    (emit instance 'tuneable-mac-packet-breakdown 'received-from-app)
+    (emit instance 'tuneable-mac-packet-breakdown "Received from App")
     ;; always try and buffer packet first
     (if (enqueue mac-packet instance)
         ;; If the new packet is the only packet and we are in default
@@ -239,7 +239,7 @@
         (progn
           ;; bufferPacket() failed, buffer is full FULL_BUFFER control
           ;; msg sent by virtualMAC code
-          (emit instance 'tuneable-mac-packet-breakdown 'overflown)
+          (emit instance 'tuneable-mac-packet-breakdown "Overflown")
           (tracelog "WARNING: Tuneable MAC buffer overflow")))))
 
 (defun attempt-tx(instance)
@@ -290,7 +290,7 @@
                               :destination broadcast-mac-address))
      (to-radio instance '(set-state . tx))
      (tracelog "Sending Beacon.")
-     (emit instance 'tuneable-mac-packet-breakdown 'sent-beacons)
+     (emit instance 'tuneable-mac-packet-breakdown "sent beacons")
      ;; Set timer to send next beacon (or data packet). Schedule the
 		 ;; timer a little faster than it actually takes to TX a a beacon,
 		 ;; because we want to TX beacons back to back and we have to
@@ -307,10 +307,10 @@
      (cond
        ((= (num-tx-tries instance) (num-tx instance))
         (tracelog "Sending data packet")
-        (emit instance 'tuneable-mac-packet-breakdown 'sent-data-packets))
+        (emit instance 'tuneable-mac-packet-breakdown "sent data packets"))
        (t
         (tracelog "Sending copy of data packet")
-        (emit instance 'tuneable-mac-packet-breakdown 'copies-of-sent-data-packets)))
+        (emit instance 'tuneable-mac-packet-breakdown "copies of sent data packets")))
      (let ((packet-tx-time
             (/ (* (+ (byte-length (peek (buffer instance)))
                      (phy-layer-overhead instance))
@@ -338,11 +338,11 @@
   ;; from radio layer
   (unless (or (eql (destination packet) (mac-address instance))
               (eql (destination packet) broadcast-mac-address))
-    (emit instance 'tuneable-mac-packet-breakdown 'filtered-other-dest)
+    (emit instance 'tuneable-mac-packet-breakdown "filtered other destination")
     (return-from handle-message))
   (ecase (name packet)
     (beacon
-     (emit instance 'tuneable-mac-packet-breakdown 'received-beacons)
+     (emit instance 'tuneable-mac-packet-breakdown "received beacons")
      (case (state instance)
        (default
         (when (< 0.0 (duty-cycle instance) 1.0)
@@ -352,7 +352,8 @@
         (cancel (attempt-tx-timer instance)))
        (tx ;; ignore beacon as we are sending our own data
         (tracelog "ignoring beacon, we are in TX state")
-        (emit instance 'tuneable-mac-packet-breakdown 'received-beacons-ignored)
+        (emit instance 'tuneable-mac-packet-breakdown
+              "received beacons ignored")
         (return-from handle-message)))
      (setf (state instance) 'rx)
      (tracelog "state RX, received beacon")
@@ -370,6 +371,7 @@
               (make-instance 'net-mac-control-info
                              :rssi (rssi (control-info packet))
                              :lqi (lqi (control-info packet))))
+        (emit  instance 'tuneable-mac-packet-breakdown "received data packets")
         (to-network instance routing-packet))
      (when (eql (state instance) 'rx)
        (cancel (attempt-tx-timer instance))

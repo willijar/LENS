@@ -310,11 +310,12 @@
               (ber (snr2ber (rx-mode radio)
                             (- (received-signal-power-dbm signal)
                                (received-signal-current-interference signal)))))
+          (let ((bit-errors (bit-errors ber num-of-bits max-errors)))
           (incf (received-signal-bit-errors signal)
-                (bit-errors ber num-of-bits max-errors)))
+                bit-errors))
         ;; update current-interference in the received signal structure
         (unless (eql signal interferance)
-          (update-interference radio signal interferance)))))
+          (update-interference radio signal interferance))))))
   (received-signals radio))
 
 (defmethod handle-message((radio radio) (message wireless-signal-start))
@@ -350,6 +351,7 @@
            :power-dbm (power-dbm message)
            :modulation (modulation message)
            :encoding (encoding message)
+           :bit-errors 0
            :current-interference
            (ecase (collision-model radio)
              (no-interference-no-collisions
@@ -738,7 +740,7 @@
         (emit radio 'rx "Failed, non RX state")
         (tracelog
          "Just entered RX, existing signal from ~A cannot be received."
-         (src received-signal))))
+         (received-signal-src received-signal))))
     (push
      (make-total-power-received
       :start-time (simulation-time)

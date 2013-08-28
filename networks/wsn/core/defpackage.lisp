@@ -60,3 +60,4 @@
     #:resources #:draw-power #:ram-store
    #:ram-size #:flash-size #:clock-drift))
 
+(pushnew :castelia-compatability *features*)
