@@ -27,10 +27,31 @@
   id
   sn)
 
-(defclass tuneable-mac(mac)
-  (
-   ;;debugging parameter
-   (print-state-transitions :parameter t :type boolean :initform nil)
+(deftype tmac-state ()
+  '(member
+    setup
+    sleep
+    active
+    active-silent
+    in-tx
+    carrier-sense-for-tx-rts
+    carrier-sense-for-tx-data
+    carrier-sense-for-tx-sync
+    carrier-sense-before-sleep
+    wait-for-data
+    wait-for-cts
+    wait-for-ack))
+
+(deftype tmac-collision-resolution ()
+  '(member
+    immediate-retry ;; (low collision avoidance)
+    overhearing ;; (default)
+    retry-next-frame)) ;;(aggressive collision avoidance)"
+
+(defclass tmac(mac)
+  ((print-state-transitions
+    :parameter t :type boolean :initform nil
+    :documentation "Debugging parameter")
 
    ;; mac layer packet sizes
    (ack-packet-size :parameter t :type integer :initform 11)
@@ -40,7 +61,7 @@
 
    ;; common mac layer parameters
    (max-mac-frame-size :parameter t :initform 0)
-   (header-overhead :parameter t :initform 11) ;; data overhead
+   (header-overhead :parameter t :initform 11) ;; data-packet-size
    (buffer-size :parameter t :initform 32)
 
    ;; tmac protocol parameters
@@ -78,14 +99,15 @@
     :parameter t :type time-type :initform 610e-3
     :documentation "frame time (standard = 610ms)")
    (collision-resolution
-    :parameter t :type symbol :initform 'overhearing
-    :documentation " collision resolution mechanism, choose from
-											'immediate-retry (low collision avoidance)
-											'overhearing (default)
-											'retry-next-frame (aggressive collision avoidance)")
+    :parameter t :type tmac-collision-resolution :initform 'overhearing
+    :documentation
+    "collision resolution mechanism, choose from
+     'immediate-retry (low collision avoidance)
+     'overhearing (default)
+		 'retry-next-frame (aggressive collision avoidance)")
 
    ;; implementation values
-   (state :type symbol)
+   (state :type tmac-state)
    (tx-addr :type integer
             :documentation "current communication peer (can be BROADCAST)")
    (tx-retries
@@ -125,20 +147,19 @@
 
 (defmethod startup((instance tmac))
   ;; start listening and schedule a time to sleeep if needed
-  (let ((radio (submodule (owner mac) '(radio))))
-    (setf (slot-value instance 'phy-data-rate) (phy-data-rater radio)
-          (slot-value instance 'phy-layer-overhead (header-overhead radio))))
   (setf (slot-value instance 'state) 'setup
         (fill-pointer (slot-value instance 'schedule-table)) 0
         (slot-value instance 'primary-wakeup) t
         (slot-value instance 'need-resync) nil
         (slot-value instance 'current-frame-start) -1
         (slot-value instance 'activation-timeout) 0)
-  (with-slots(allow-sync-state frame-time) instance
+  (with-slots(allow-sink-sync frame-time) instance
     (if (and allow-sink-sync (sink-p instance))
         (set-timer instance 'sync-create 0.1)
-        (set-timer instance 'sync-setup (if allow-sync-state (* 3 frame-time) 0.1))))
+        (set-timer instance 'sync-setup
+                   (if allow-sink-sync (* 3 frame-time) 0.1))))
   (to-radio instance '(set-cs-interrupt . t)))
+
 
 (defmethod handle-timer((instance tmac) (timer (eql 'sync-setup)))
   (with-slots(state frame-time) instance
@@ -157,7 +178,7 @@
 
 (defmethod handle-timer((instance tmac) (timer (eql 'frame-start)))
   (with-slots(primary-wakeup current-frame-timeout active-timeout frame-time
-              schedule-table need-resync state) instnace
+              schedule-table need-resync state) instance
   ;; primary wakeup is always the one at beginning of frame
   (setf primary-wakeup t)
   ;; record current time and extend activation timeout
@@ -176,7 +197,7 @@
       (setf  (tmac-schedule-offset (aref schedule-table 0)) 0d0)
       (setf need-resync t)))
   ;; schedule wakeup messages for secondary schedules within the current frame
-  (do((i 1 (+1 i)))
+  (do((i 1 (1+ i)))
      ((= i (length schedule-table)))
     (let ((schedule (aref schedule-table i)))
       (when (< (tmac-schedule-offset schedule) 0)
@@ -221,19 +242,19 @@
                           carrier-sense-for-tx-data
                           carrier-sense-before-sleep))
       (tracelog "Warning: bad MAC state for carrier sense")
-      (return-from handle-timer)))
-  (ecase (channel-clear-status
-          (submodule (node instance) '(communications radio)))
-    (clear (carrier-is-clear instance))
-    (busy (carrier-is-busy instance))
-    (cs-not-valid-yet
-     (set-timer instance 'carrier-sense
-                (slot-value instance 'phy-delay-for-valid-cs)))
-    (cs-not-valid
-     (unless (eql state 'sleep)
-       (to-radio instance '(set-state . rx))
+      (return-from handle-timer))
+    (ecase (channel-clear-status
+            (submodule (node instance) '(communications radio)))
+      (clear (carrier-is-clear instance))
+      (busy (carrier-is-busy instance))
+      (cs-not-valid-yet
        (set-timer instance 'carrier-sense
-                  (slot-value instance 'phy-delay-for-valid-cs))))))
+                  (slot-value instance 'phy-delay-for-valid-cs)))
+      (cs-not-valid
+       (unless (eql state 'sleep)
+         (to-radio instance '(set-state . rx))
+         (set-timer instance 'carrier-sense
+                    (slot-value instance 'phy-delay-for-valid-cs)))))))
 
 (defmethod handle-timer((instance tmac) (timer (eql 'transmission-timeout)))
   (reset-default-state instance "timeout"))
@@ -247,13 +268,14 @@
     (extend-active-period instance)
     (when (eql state 'sleep)
       (to-radio instance '(set-state . rx))
-      (reset-default-state "secondary schedule starts"))))
+      (reset-default-state instance "secondary schedule starts"))))
 
 (defmethod handle-timer((instance tmac) (timer integer))
   ;; timer is wakeup inhdexed into schedule table
-  (if (0 < timer < (length (slot-value instance 'schedule-table)))
+  (if (< 0 timer (length (slot-value instance 'schedule-table)))
       (handle-timer instance 'wakeup-silent)
       (tracelog "Unknown timer ~A" timer)))
+
 
 (defmethod handle-message((instance tmac)
                           (message radio-control-message))
@@ -268,10 +290,10 @@
        (encapsulate
         (make-instance
          'tmac-data-packet
-         :header-overhead (header-overhead module)
-         :source (mac-address module)
+         :header-overhead (header-overhead instance)
+         :source (mac-address instance)
          :destination (next-hop (control-info packet))
-         :sequence-number (next-sequence-number module))
+         :sequence-number (next-sequence-number instance))
         packet)
        instance)
     (check-tx-buffer instance)))
@@ -281,7 +303,7 @@
     (tracelog "Resetting MAC state to default, reason: ~A" description))
   (with-slots(activation-timeout disable-ta-extension primary-wakeup
               contention-period need-resync sync-packet schedule-table
-              sync-packet-size frame-time current-frame-time)
+              sync-packet-size frame-time current-frame-start)
       instance
     (cond
       ((<= activation-timeout (get-clock instance))
@@ -317,10 +339,14 @@
                  (progn
                    (if (and use-rts-cts
                             (not (eql tx-addr broadcast-mac-address)))
-                       (perform-carrier-sense instance 'carrier-sense-for-tx-rts
-                                              random-contention-interval)
-                       (perform-carrier-sense instance 'carrier-sense-for-tx-data
-                                              random-contention-interval))
+                       (perform-carrier-sense
+                        instance
+                        'carrier-sense-for-tx-rts
+                        random-contention-interval)
+                       (perform-carrier-sense
+                        instance
+                        'carrier-sense-for-tx-data
+                        random-contention-interval))
                    (return-from reset-default-state))))))
        (set-mac-state instance 'active "nothing to transmit"))
       (t
@@ -334,6 +360,7 @@
   (set-timer instance 'sync-renew (slot-value instance 'resync-time)))
 
 (defun set-mac-state(instance new-state &optional description)
+  (check-type new-state tmac-state)
   (with-slots(state print-state-transitions) instance
     (unless (eql state new-state)
       (when print-state-transitions
@@ -342,70 +369,70 @@
       (setf state new-state))))
 
 (defun update-schedule-table(instance wakeup id sn)
-  (with-slots(wakeup frame-time current-frame-start schedule-table
+  (with-slots(frame-time current-frame-start schedule-table
               activation-timeout) instance
-    (dotimes(i (length schedule-table))
-      (let ((schedule (aref schedule-table i)))
-        (when (eql (tmac-schedule-id schedule) id)
-          (cond
-            ((< (tmac-schedule-sn schedule) sn)
-             (let ((new-offset (- (+ (get-clock instance) wakeup)
-                                 (+ current-frame-start frame-time))))
-              (tracelog "Resync successful for ID: ~A old offset: ~A new offset: ~A"
-                        id (tmac-schedule-offset schedule) new-offset)
-              (setf (tmac-schedule-offset schedule) new-offset
-                    (tmac-schedule-sn schedule) sn)
-              (cond
-                ((= i 0)
-                 	;;If the update came for primary schedule, then the
-                 	;;next frame message has to be rescheduled
-                 (set-timer instance 'frame-start wakeup)
-                 (incf current-frame-start new-offset))
-                (t
-                 ;;This is not primary schedule, check that offset
-                 ;;value falls within the interval: 0 < offset < frameTime
+    (let ((clock (get-clock instance)))
+      (dotimes(i (length schedule-table))
+        (let ((schedule (aref schedule-table i)))
+          (when (eql (tmac-schedule-id schedule) id)
+            (cond
+              ((< (tmac-schedule-sn schedule) sn)
+               (let ((new-offset (- (+ clock wakeup)
+                                  (+ current-frame-start frame-time))))
+                 (tracelog "Resync successful for ID: ~A old offset: ~A new offset: ~A"
+                           id (tmac-schedule-offset schedule) new-offset)
+                 (setf (tmac-schedule-offset schedule) new-offset
+                       (tmac-schedule-sn schedule) sn)
                  (cond
-                   ((< (tmac-schedule-offset schedule) 0)
-                    (incf (tmac-schedule-offset schedule) frame-time))
-                   ((> (tmac-schedule-offset schedule) frame-time)
-                    (decf (tmac-schedule-offset schedule) frame-time)))))))
-            ((> (tmac-schedule-sn schedule) sn)
-             ;; TMAC received a sync with lower SN than what
-             ;; currently stored in the schedule table. With
-             ;; current TMAC implementation, this is not
-             ;; possible, however in future it may be neccesary
-             ;; to implement a unicast sync packet here to
-             ;; notify the source of this packet with the updated
-             ;; schedule
-             ))
+                   ((= i 0)
+                    ;;If the update came for primary schedule, then the
+                    ;;next frame message has to be rescheduled
+                    (set-timer instance 'frame-start wakeup)
+                    (incf current-frame-start new-offset))
+                   (t
+                    ;;This is not primary schedule, check that offset
+                    ;;value falls within the interval: 0 < offset < frameTime
+                    (cond
+                      ((< (tmac-schedule-offset schedule) 0)
+                       (incf (tmac-schedule-offset schedule) frame-time))
+                      ((> (tmac-schedule-offset schedule) frame-time)
+                       (decf (tmac-schedule-offset schedule) frame-time)))))))
+              ((> (tmac-schedule-sn schedule) sn)
+               ;; TMAC received a sync with lower SN than what
+               ;; currently stored in the schedule table. With current
+               ;; TMAC implementation, this is not possible, however
+               ;; in future it may be neccesary to implement a unicast
+               ;; sync packet here to notify the source of this packet
+               ;; with the updated schedule
+               ))
           (return-from update-schedule-table))))
     ;; schedule not found so add to current table
-    (let* ((clock (get-clock instance))
-           (schedule
-            (make-tmac-schedule
-             :id id
-             :sn sn
-             :offset (if (= current-frame-start -1)
-                         0
-                         (- (+ clock wakeup)
-                            (+ current-frame-start frame-time))))))
-      (tracelog "Creading schedule ~A, wakeup:~A" schedule wakeup)
-      (vector-push-extend schedule schedule-table))
+      (let ((schedule
+             (make-tmac-schedule
+              :id id
+              :sn sn
+              :offset (if (= current-frame-start -1)
+                          0
+                          (- (+ clock wakeup)
+                             (+ current-frame-start frame-time))))))
+        (tracelog "Creading schedule ~A, wakeup:~A" schedule wakeup)
+        (vector-push-extend schedule schedule-table))
     ;; if primary more needs to be done
     (when  (= current-frame-start -1)
       (setf current-frame-start (- (+ clock wakeup) frame-time)
             activation-timeout clock)
-      (extend-active-period)
+      (extend-active-period instance)
       (set-timer instance 'frame-start wakeup)
       (setf (slot-value instance 'need-resync) t
             (slot-value instance 'primary-wakeup) t)
-      (reset-default-state "new primary schedule found"))))
+      (reset-default-state instance "new primary schedule found")))))
+
 
 (defmethod handle-message :around ((instance tmac) (pkt tmac-packet))
   ;; from radio layer
   ;; first check if packet is for this node
-  (if (or (eql (destination packet) (mac-address instance))
-          (eql (destination packet) broadcast-mac-address))
+  (if (or (eql (destination pkt) (mac-address instance))
+          (eql (destination pkt) broadcast-mac-address))
       (call-next-method)
       (with-slots(state use-frts collision-resolution) instance
         (when (and (eql state 'carrier-sense-for-tx-rts)  use-frts)
@@ -426,7 +453,8 @@
            'tmac-cts-packet
            :source (mac-address instance)
            :destination (source rts-packet)
-           :nav (- (nav rts-packet) (tx-time instance cts-packet-size))
+           :nav (- (slot-value rts-packet 'nav)
+                   (tx-time instance cts-packet-size))
            :byte-length cts-packet-size))
     (to-radio instance cts-packet)
     (to-radio instance '(set-state . tx))
@@ -460,7 +488,7 @@
                            :lqi (lqi (control-info packet))))
       (emit instance 'mac-packet-breakdown "received data packets")
       (to-network instance routing-packet)))
-  (when (eql (destination packet broadcast-mac-address))
+  (when (eql (destination packet) broadcast-mac-address)
     (return-from handle-message))
   (when (eql (slot-value instance 'state) 'wait-for-data)
     (cancel-timer instance 'transmission-timeout))
@@ -547,7 +575,7 @@
      (with-slots(sync-packet need-resync sync-packet-size) instance
        (unless sync-packet
          (tracelog "WARNING: Invalid CARRIER_SENSE_FOR_TX_SYNC while sync-packet undefined")
-         (reset-default-stateinstance"invalid state, no SYNC packet found")
+         (reset-default-state instance"invalid state, no SYNC packet found")
          (return-from carrier-is-clear))
        ;; Send SYNC packet to radio
        (to-radio instance sync-packet)
@@ -593,11 +621,11 @@
        (set-mac-state instance 'wait-for-ack
                       "sent DATA packet to UNICAST address")
        (set-timer instance 'transmission-timeout
-                  (+ tx-time (slot-value instance wait-timeout)))))
+                  (+ tx-time (slot-value instance 'wait-timeout)))))
     (extend-active-period instance tx-time)
     (to-radio instance '(set-state . tx))))
 
-(defun perform-carrier-sense(instance new-state delay)
+(defun perform-carrier-sense(instance new-state &optional (delay 0))
  ;; This function will set a timer to perform carrier sense.  MAC
  ;; state is important when performing CS, so setMacState is always
  ;; called here.  delay allows to perform a carrier sense after a
@@ -626,7 +654,7 @@
 
 (defmethod dequeue((instance tmac))
   (dequeue (buffer instance))
-  (check-tx-buffer))
+  (check-tx-buffer instance))
 
 (defun check-tx-buffer(instance)
   (unless (empty-p (buffer instance))
@@ -634,5 +662,5 @@
       (with-slots(tx-addr tx-retries max-tx-retries last-sequence-number)
           instance
         (setf tx-addr (destination packet)
-              tx-retries max-retries
+              tx-retries max-tx-retries
               last-sequence-number -1)))))

@@ -53,7 +53,8 @@
                (:module "mac" :depends-on ("mac-base" "routing-base")
                        :components
                        ((:file "bypass-mac")
-                        (:file "tuneable-mac")))))
+                        (:file "tuneable-mac")
+                        (:file "tmac")))))
      (:module "application" :depends-on ("core")
               :components
               ((:file "value-reporting" :depends-on ("value-propagation"))

@@ -35,7 +35,6 @@
     (0
      (unless (slot-boundp instance 'address)
        (setf (slot-value instance 'address) (nodeid (node instance))))
-
      (setf (slot-value instance 'radio)
            (end-module (gate instance 'radio :direction :output)))))
   t)
