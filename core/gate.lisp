@@ -360,3 +360,9 @@ The method has no effect i(load-system :lens.wsn)f the gate is not connected.")
   (if (eql (gate-direction gate) :input)
       (next-gate gate)
       (previous-gate gate)))
+
+(defun end-module(gate)
+  (parent-module
+   (if (eql (gate-direction gate) :input)
+       (path-start-gate gate)
+       (path-end-gate gate))))

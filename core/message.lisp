@@ -61,7 +61,7 @@ model domain."))
       (format stream " to ~A" (slot-value instance 'to)))))
 
 (defmethod latency((message message))
-  (- (arrival-time message) (timestamp message) ))
+  (- (arrival-time message) (timestamp message)))
 
 (defmethod duplicate((message message)
                       &optional (duplicate (make-instance (class-of message))))

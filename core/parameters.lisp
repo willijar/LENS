@@ -73,7 +73,9 @@
     (coerce
      (handler-bind
          ((dfv::invalid-format
-           #'(lambda(c) (invoke-restart 'dfv::use-value nil))))
+           #'(lambda(c)
+               (declare (ignore c))
+               (invoke-restart 'dfv::use-value nil))))
        (cond
          ((ignore-errors (parse-input 'dfv:eng value :units "s")))
          ((ignore-errors (parse-input 'number value)))
