@@ -10,7 +10,7 @@
     :initarg :destination :accessor destination
     :documentation "the destination address of the packet to be sent")
    (sequence-number :initarg :seqnum :initarg :sequence-number
-                    :reader sequence-number :reader sequence-number
+                    :reader sequence-number
                     :documentation "a field to distinguish between packets"))
   (:documentation "Base class for network and link layer packets"))
 

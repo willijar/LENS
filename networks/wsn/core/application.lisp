@@ -158,3 +158,11 @@
 
 (defgeneric sink-p(entity)
   (:documentation "Return true if an application (or router) is a sink"))
+
+(defgeneric sink-network-address(entity)
+  (:documentation "Address of sink node for reporting applications")
+  (:method((entity application)) 'sink))
+
+(defgeneric parent-network-address(entity)
+    (:documentation "Address of parent node for aggregation applications")
+    (:method((entity application)) 'parent))

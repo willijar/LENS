@@ -49,7 +49,8 @@
                       ("common" "mac-base" "radio-support-functions"))
                (:module "routing" :depends-on ("routing-base")
                        :components
-                       ((:file "bypass-routing")))
+                       ((:file "bypass-routing")
+                        (:file "multipath-rings-routing")))
                (:module "mac" :depends-on ("mac-base" "routing-base")
                        :components
                        ((:file "bypass-mac")

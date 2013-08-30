@@ -1,5 +1,9 @@
 (in-package :lens.wsn)
 
+(defstruct mprings-sink
+  (id 0 :type integer)
+  (level 0 :type fixnum)) ;; used to store sink data
+
 (defclass multipath-rings-routing(routing)
   ((header-overhead :initform 14)
    (buffer-size :initform 32)
@@ -10,86 +14,84 @@
    (setup-timeout
     :type time-type :parameter t :initform 50d-3 :initarg :setup-timeout
     :reader setup-timeout)
-   (current-sink-id :initform nil :type integer :reader current-sink-id)
-   (current-level :initform nil :type integer :reader current-level)
-   (setup-timer :type message :initform nil)
+   (current-sink :initform nil :type mprings-sink :reader current-sink)
    (connected-p :type boolean :initform nil :accessor connected-p)
-   (tmp-level :type fixnum :documentation "Best level received during setup")
-   (tmp-sink-id :documentation "Used during setup"))
+   (tmp-sink :initform nil :type mprings-sink
+             :documentation "Used during setup"))
   (:metaclass module-class))
 
-(defclass multipath-rings-packet(routing-packet)
-  ((sink-id :type integer :initarg :sink-id :reader sink-id)
-   (level :type fixnum :initarg :sender-level :initarg :level :initform 0
-          :reader level :accessor sender-level)))
+(defmethod sink-network-address((instance routing))
+  (sink-network-address (submodule (parent-module instance) 'application)))
 
-(defmethod duplicate((packet multipath-rings-packet) &optional duplicate)
-  (call-next-method)
-  (copy-slots '(sink-id level) packet duplicate))
+(defmethod parent-network-address((instance routing))
+  (parent-network-address (submodule (parent-module instance) 'application)))
 
-(defclass multipath-rings-setup-packet(multipath-rings-packet)
+(defclass multipath-rings-routing-packet(routing-packet)
+  ((sink :type mprings-sink :initarg :sink :accessor sink))
+  (:documentation "name is either data or topology-setup.
+	DATA packet overhead contains all fields, making its total size 13 bytes
+	SETUP packet does not contain sequence number field, making its size 12 bytes"))
+
+(defclass multipath-rings-routing-control-message(network-control-message)
   ())
+
+(defmethod duplicate((packet multipath-rings-routing-packet) &optional duplicate)
+  (setf (sink duplicate) (copy-mprings-sink (sink packet)))
+  (call-next-method))
 
 (defmethod startup((instance multipath-rings-routing))
   (when (sink-p instance)
-    (setf (current-sink-id instance) (network-address instance)
-          (current-level instance) 0)
-    (send-topology-setup-packet instance))))
+    (setf (slot-value instance 'current-sink)
+          (make-mprings-sink :id  (nodeid (node instance))))
+    (setf (connected-p instance) t)
+    (send-topology-setup-packet instance)))
 
-(defun send-topology-setup-packet((instance multipath-rings-routing))
+(defun send-topology-setup-packet(instance)
   (to-mac
    instance
    (make-instance
-    'multipath-rings-routing-setup-packup
+    'multipath-rings-routing-packet
+    :name 'topology-setup
+    :sink (copy-mprings-sink (current-sink instance))
     :source (network-address instance)
-    :destination broadcast-network-address
-    :sink-id (current-sink-id instance)
-    :sender-level (current-sender-level instance))
+    :destination broadcast-network-address)
    broadcast-mac-address))
 
-(defun send-control-message((instance multipath-rings-routing) kind)
+(defun send-control-message(instance kind)
   (send instance
-        (make-instance 'network-control-message :command kind)
+        (make-instance 'multipath-rings-routing-control-message
+                       :command kind
+                       :argument (current-sink instance))
         'application))
 
-(defmethod handle-message((instance multipath-rings-routing)
-                          (message message))
-  (with-slots(setup-timer tmp-level tmp-sink-id current-level current-sink-id)
-      instance
-  (cond
-    ((eql message setup-timer)
-     (setf (slot-value instance 'setup-timer) nil)
-     (cond
-       ((not (slot-boundp instance 'tmp-level))
-        (set-timer instance
-                   (setf setup-timer (make-instance 'message))
-                   (setup-timeout instance)))
-       ((not current-level)
-        (setf current-level (1+ tmp-level)
-              current-sink-id tmp-sink-id)
-        (cond
-          ((connected-p instance)
-           (send-control-message 'tree-level-updated)
-           (tracelog "Reconnected to ~A at level ~A"
-                     current-sink-id current-level))
-          (t
-           (setf (connected-p instance) t)
-           (send-control-message 'connected-to-tree)
-           (tracelog "Connected to ~A at level ~A"
-                     current-sink-id current-level)
-           (process-buffered-packet instance)))
-        (send-topology-setup-packet)))
-     (cond
-       ((sink-p instance)
-        (setf tmp-level 0
-              tml-sink-id (network-address self)))
-       (t
-        (slot-makunbound instance 'tmp-level))))
-    (t (call-next-method)))))
-
-(defun process-buffered-packet(instance)
+(defun process-buffered-packets(instance)
   (while (not (empty-p (buffer instance)))
     (to-mac instance (dequeue (buffer instance)) broadcast-mac-address)))
+
+(defmethod handle-timer((instance multipath-rings-routing)
+                        (timer (eql 'topology-setup)))
+  (with-slots(tmp-sink current-sink connected-p) instance
+    (cond
+      ((not tmp-sink)
+       (set-timer instance 'topology-setup (setup-timeout instance)))
+      ((not current-sink)
+       ;; Broadcast to all nodes of currentLevel-1
+       (setf current-sink
+             (make-mprings-sink :id (mprings-sink-id tmp-sink)
+                              :level (1+ (mprings-sink-level tmp-sink))))
+       (if connected-p
+           (progn
+             (send-control-message instance 'tree-level-updated)
+             (tracelog "Reconnected to ~A" current-sink))
+           (progn
+             (setf connected-p t)
+             (send-control-message instance 'connected-to-tree)
+             (tracelog "Connected to ~A" current-sink)
+             (process-buffered-packets instance)))
+       (send-topology-setup-packet instance)))
+    (setf tmp-sink
+          (when (sink-p instance)
+            (make-mprings-sink :id (nodeid (node instance)) :level 0)))))
 
 (defmethod handle-message((instance multipath-rings-routing)
                           (packet application-packet))
@@ -98,61 +100,67 @@
          (routing-packet
           (encapsulate
            (make-instance 'multipath-rings-packet
-                          :name (class-name (class-of instance))
+                          :name 'data
                           :header-overhead (header-overhead instance)
-                          :sequence-number (next-sequence-number instance)
                           :source (network-address instance)
                           :destination destination
-                          :sink-id (current-sink-id instance)
-                          :sender-level (current-level instance))
+                          :sink (copy-mprings-sink (current-sink instance)))
            packet)))
     (cond
-      ((member destination '(sink parent))
-       (enqueue routing-packet instance)
-       (if (connected-p instance)
-           (process-buffered-packet instance)
-           (send-control-instance 'not-connected)))
+      ((eql destination (sink-network-address instance))
+       (setf (slot-value instance 'sequence-number)
+             (next-sequence-number instance))
+       (when (enqueue routing-packet instance)
+         (if (connected-p instance)
+           (process-buffered-packets instance)
+           (send-control-message instance 'not-connected))))
       (t
        (to-mac instance routing-packet broadcast-mac-address)))))
 
 (defmethod handle-message ((instance multipath-rings-routing)
-                           (packet multipath-rings-setup-packet))
+                           (packet multipath-rings-routing-packet))
   ;; from mac layer
-  (unless (sink-p instance)
-    (with-slots(setup-timer tmp-level tmp-sink-id) instance
-      (cond
-        (setup-timer
-         (setf tmp-level (sender-level packet)
-               tmp-sink-id (sink-id packet)
-               setup-timer nil)
-        (t
-         (set-timer instance
-                    (setf setup-timer (make-instance 'message))
-                    (setup-timeout instance))
-         (slot-makunbound instance 'tmp-level)))))))
-
-(defmethod handle-message ((instance multipath-rings-routing)
-                           (packet multipath-rings-packet))
-  ;; data packet
-  (flet((to-app(packet)
-          (if (duplicate-p packet (packet-history instance))
-              (tracelog "Discarding duplicate pakcet from ~A" (source packet))
-              (send instance (decapsulate packet) 'application))))
-    (case (destination packet)
-      (sink
-       (when (= (sender-level packet) (1+ (current-level instance)))
-         (cond
-           ((eql (sink-id packet) (network-address instance))
-            (to-app packet))
-           ((eql (sink-id packet) (current-sink-id instance))
-            ;; rebroadcast this packet since we are not its destination
-						;; copy of the packet is created and sender level field is
-						;; updated before calling toMacLayer() function
-            (let ((dup-packet (duplicate packet)))
-              (setf (sender-level packet) (current-sender-level instance))
-              (to-mac instance dup-packet broadcast-mac-address))))))
-      (parent
-       (when (and (eql (sender-level packet) (1+ (current-level instance)))
-                  (eql (sink-id packet) (current-sink-id instance)))
-         (to-app packet)))
-      (t (call-next-method)))))
+  (ecase (name packet)
+    (topology-setup
+       (unless (sink-p instance)
+         (with-slots(tmp-sink net-setup-timeout) instance
+           (when (not (timer instance 'topology-setup))
+             (set-timer instance 'topology-setup net-setup-timeout)
+             (setf tmp-sink nil))
+           (when (or (not tmp-sink)
+                     (> (mprings-sink-level tmp-sink)
+                        (mprings-sink-level packet)))
+             (setf tmp-sink (copy-mprings-sink (sink packet)))))))
+    (data
+     (let ((destination (destination packet))
+           (sender-level (mprings-sink-level (sink packet)))
+           (sink-id (mprings-sink-id (sink packet)))
+           (current-level (mprings-sink-level (current-sink instance)))
+           (current-sink-id  (mprings-sink-id (current-sink instance))))
+       (cond
+         ((or (eql destination (network-address instance))
+              (eql destination broadcast-network-address))
+          (send instance (decapsulate packet) 'application))
+         ((eql destination (sink-network-address instance))
+          (when (eql sender-level (1+ current-level))
+            (cond
+              ((eql sink-id (nodeid (node instance)))
+               ;;Packet is for this node, if filter passes, forward it to application
+               (if (duplicate-p packet (packet-history instance))
+                   (tracelog "Discarding duplicate packet from ~A" (source packet))
+                   (send instance (decapsulate packet) 'application)))
+              ((eql sink-id current-sink-id)
+               ;; We want to rebroadcast this packet since we are not
+               ;; its destination. For this, a copy of the packet is
+               ;; created and sender level field is updated before
+               ;; calling toMacLayer() function
+               (let ((dup (duplicate packet)))
+                 (setf (mprings-sink-level (sink packet))
+                       (mprings-sink-level (current-sink instance)))
+                 (to-mac instance dup broadcast-mac-address))))))
+         ((eql destination (parent-network-address instance))
+          (when (and (eql sink-id current-sink-id)
+                     (eql sender-level (1+ current-level)))
+             (if (duplicate-p packet (packet-history instance))
+                 (tracelog "Discarding duplicate packet from ~A" (source packet))
+                 (send instance (decapsulate packet) 'application)))))))))

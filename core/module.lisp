@@ -655,10 +655,11 @@ specification of a specific subclass."
       (for-each-submodule module #'init))
     initialized-p))
 
-(defun connected-p(gate)
-  (if (typep (parent-module gate) 'compound-module)
-      (and (previous-gate gate) (next-gate gate))
-      (connected-outside-p gate)))
+(defgeneric connected-p(instance)
+  (:method ((gate gate))
+    (if (typep (parent-module gate) 'compound-module)
+        (and (previous-gate gate) (next-gate gate))
+        (connected-outside-p gate))))
 
 (defun path-ok-p(gate)
   (not (or (typep (parent-module (path-start-gate gate)) 'compound-module)

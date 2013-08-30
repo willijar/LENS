@@ -10,11 +10,23 @@
   ((sync :type integer :initarg :sync) ;; 4 bytes
    (sync-id :type integer :initarg :sync-id))) ;; 4 bytes
 
+(defmethod duplicate((pkt tmac-sync-packet) &optional duplicate)
+  (call-next-method)
+  (copy-slots '(sync sync-id) pkt duplicate))
+
 (defclass tmac-rts-packet(tmac-packet)
   ((nav :type time-type :initarg :nav))) ;; 4 bytes
 
+(defmethod duplicate((pkt tmac-rts-packet) &optional duplicate)
+  (call-next-method)
+  (copy-slots '(nav) pkt duplicate))
+
 (defclass tmac-cts-packet(tmac-packet)
   ((nav :type time-type :initarg :nav)))
+
+(defmethod duplicate((pkt tmac-cts-packet) &optional duplicate)
+  (call-next-method)
+  (copy-slots '(nav) pkt duplicate))
 
 (defclass tmac-ds-packet(tmac-packet) ())
 (defclass tmac-frts-packet(tmac-packet) ())
