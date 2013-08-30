@@ -5,7 +5,7 @@
 (deftype backoff-type()
   '(member sleep-interval constant multiplying exponential))
 
-(register-signal 'tuneable-mac-packet-breakdown
+(register-signal 'mac-packet-breakdown
                  "Statistics on tuneable mac packets")
 
 (defclass tuneable-mac(mac)
@@ -52,15 +52,10 @@
    (header-overhead :initform 9)
    (beacon-frame-size
     :parameter t :type integer :initform 125 :reader beacon-frame-size
-    :documentation "have a big beacon, to avoid much processing overhead, but fit at least 2 in the listening interval")
+    :documentation "have a big beacon, to avoid much processing
+    overhead, but fit at least 2 in the listening interval")
    (buffer-size :initform 32)
    (max-mac-frame-size :initform 0)
-   ;; physical parameters
-   (phy-delay-for-valid-cs
-    :parameter t :type float :initform 0.128e-3 :reader phy-delay-for-valid-cs)
-   (phy-layer-overhead
-    :parameter t :type integer :initform 6 :reader phy-layer-overhead
-    :documentation "in octets")
 
    ;; implementation values
    (state :initform 'default :type tuneable-mac-state :accessor state)
@@ -74,18 +69,18 @@
    ;; timers (may be able to use same message with different names)
    (sleep-listen-timer
     :type message :reader sleep-listen-timer
-    :initform (make-instance 'message))
+    :initform (make-instance 'timer-message))
    (start-cs-timer
     :type message :reader start-cs-timer
-    :initform (make-instance 'message :name 'start-cs-timer))
+    :initform (make-instance 'timer-message :name 'start-cs-timer))
    (attempt-tx-timer
     :type message :reader attempt-tx-timer
-    :initform (make-instance 'message :name 'attempt-tx-timer))
+    :initform (make-instance 'timer-message :name 'attempt-tx-timer))
    (send-beacons-or-data-timer
     :type message :reader send-beacons-or-data-timer
-    :initform (make-instance 'message :name 'send-beacons-or-data-timer)))
+    :initform (make-instance 'timer-message :name 'send-beacons-or-data-timer)))
   (:properties
-   :statistic (tuneable-mac-packet-breakdown
+   :statistic (mac-packet-breakdown
                :default (indexed-count)))
   (:documentation "Default parameter values will result in
   non-persistent CSMA-CA behaviour")
@@ -100,13 +95,9 @@
             "Backoff timer is set to sleeping interval but sleeping
             interval is not defined because duty cycle is 0 or 1.")))
 
-(defmethod phy-data-rate((mac tuneable-mac))
-  (phy-data-rate (submodule (owner mac) '(radio))))
-
 (defgeneric beacon-tx-time(mac)
   (:method((instance tuneable-mac))
-    (/ (* 8 (+ (beacon-frame-size instance) (phy-layer-overhead instance)))
-       (phy-data-rate instance))))
+    (tx-time instance (beacon-frame-size instance))))
 
 (defmethod startup((instance tuneable-mac))
   ;; start listening and schedule a time to sleeep if needed
@@ -219,7 +210,7 @@
   (let ((mac-packet (encapsulate instance packet)))
     (setf (destination mac-packet) (next-hop (control-info packet)))
     (setf (name mac-packet) 'data)
-    (emit instance 'tuneable-mac-packet-breakdown "Received from App")
+    (emit instance 'mac-packet-breakdown "Received from App")
     ;; always try and buffer packet first
     (if (enqueue mac-packet instance)
         ;; If the new packet is the only packet and we are in default
@@ -239,7 +230,7 @@
         (progn
           ;; bufferPacket() failed, buffer is full FULL_BUFFER control
           ;; msg sent by virtualMAC code
-          (emit instance 'tuneable-mac-packet-breakdown "Overflown")
+          (emit instance 'mac-packet-breakdown "Overflown")
           (tracelog "WARNING: Tuneable MAC buffer overflow")))))
 
 (defun attempt-tx(instance)
@@ -290,7 +281,7 @@
                               :destination broadcast-mac-address))
      (to-radio instance '(set-state . tx))
      (tracelog "Sending Beacon.")
-     (emit instance 'tuneable-mac-packet-breakdown "sent beacons")
+     (emit instance 'mac-packet-breakdown "sent beacons")
      ;; Set timer to send next beacon (or data packet). Schedule the
 		 ;; timer a little faster than it actually takes to TX a a beacon,
 		 ;; because we want to TX beacons back to back and we have to
@@ -307,15 +298,11 @@
      (cond
        ((= (num-tx-tries instance) (num-tx instance))
         (tracelog "Sending data packet")
-        (emit instance 'tuneable-mac-packet-breakdown "sent data packets"))
+        (emit instance 'mac-packet-breakdown "sent data packets"))
        (t
         (tracelog "Sending copy of data packet")
-        (emit instance 'tuneable-mac-packet-breakdown "copies of sent data packets")))
-     (let ((packet-tx-time
-            (/ (* (+ (byte-length (peek (buffer instance)))
-                     (phy-layer-overhead instance))
-                  8)
-               (phy-data-rate instance))))
+        (emit instance 'mac-packet-breakdown "copies of sent data packets")))
+     (let ((packet-tx-time (tx-time instance (peek (buffer instance)))))
        (decf (num-tx-tries instance))
        (cond
          ((tx-all-packets-in-free-channel instance)
@@ -338,11 +325,11 @@
   ;; from radio layer
   (unless (or (eql (destination packet) (mac-address instance))
               (eql (destination packet) broadcast-mac-address))
-    (emit instance 'tuneable-mac-packet-breakdown "filtered other destination")
+    (emit instance 'mac-packet-breakdown "filtered other destination")
     (return-from handle-message))
   (ecase (name packet)
     (beacon
-     (emit instance 'tuneable-mac-packet-breakdown "received beacons")
+     (emit instance 'mac-packet-breakdown "received beacons")
      (case (state instance)
        (default
         (when (< 0.0 (duty-cycle instance) 1.0)
@@ -352,7 +339,7 @@
         (cancel (attempt-tx-timer instance)))
        (tx ;; ignore beacon as we are sending our own data
         (tracelog "ignoring beacon, we are in TX state")
-        (emit instance 'tuneable-mac-packet-breakdown
+        (emit instance 'mac-packet-breakdown
               "received beacons ignored")
         (return-from handle-message)))
      (setf (state instance) 'rx)
@@ -371,7 +358,7 @@
               (make-instance 'net-mac-control-info
                              :rssi (rssi (control-info packet))
                              :lqi (lqi (control-info packet))))
-        (emit  instance 'tuneable-mac-packet-breakdown "received data packets")
+        (emit instance 'mac-packet-breakdown "received data packets")
         (to-network instance routing-packet))
      (when (eql (state instance) 'rx)
        (cancel (attempt-tx-timer instance))

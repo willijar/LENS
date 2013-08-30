@@ -9,13 +9,21 @@
 (defclass mac-packet(wsn-packet)
   ())
 
+(register-signal 'mac-packet-breakdown "Statistics on mac packets")
+
 (defclass mac(comms-module)
   ((max-mac-frame-size
     :initform 0 :type integer :parameter t :reader max-mac-frame-size
     :initarg :max-mac-frame-size :properties (:units "B")
     :documentation "in bytes")
    (address :parameter t :type integer :reader mac-address
-            :documentation "MAC address - will default to nodeid."))
+            :documentation "MAC address - will default to nodeid.")
+   ;; physical layer parameters
+   (phy-delay-for-valid-cs :parameter t :initform 0.128e-3
+                           :type time-type :reader phy-delay-for-valid-cs)
+   (radio :reader radio))
+  (:properties
+   :statistic (mac-packet-breakdown :default (indexed-count)))
   (:default-initargs :num-rngs 2)
   (:gates
    (routing :inout)
@@ -26,8 +34,17 @@
   (case stage
     (0
      (unless (slot-boundp instance 'address)
-       (setf (slot-value instance 'address) (nodeid (node instance))))))
+       (setf (slot-value instance 'address) (nodeid (node instance))))
+
+     (setf (slot-value instance 'radio)
+           (end-module (gate instance 'radio :direction :output)))))
   t)
+
+(defmethod tx-time((mac mac) (no-octets integer))
+  (tx-time (radio mac) no-octets))
+
+(defmethod tx-time((mac mac) (pkt mac-packet))
+  (tx-time mac (byte-length pkt)))
 
 (defmethod mac-address((node node))
   ;; currently one mac and radio per node so this is OK - change if multiple
