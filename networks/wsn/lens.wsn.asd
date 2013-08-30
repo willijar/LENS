@@ -56,7 +56,7 @@
                         (:file "tuneable-mac")))))
      (:module "application" :depends-on ("core")
               :components
-              ((:file "value-reporting")
+              ((:file "value-reporting" :depends-on ("value-propagation"))
                (:file "value-propagation")
                (:file "throughput-test")))
      (:module "physical-process" :depends-on ("core")

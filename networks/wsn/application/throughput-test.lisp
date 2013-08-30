@@ -1,9 +1,5 @@
 (in-package :lens.wsn)
 
-(register-signal
- 'packets-received
- "Emitted with source address as value when packet received by application")
-
 (defclass throughput-test (application)
   ((header-overhead :initform 5)
    (payload-overhead :initform 100)
@@ -23,12 +19,14 @@
     :documentation "Delay in seconds before application starts
     producing packets")
    (packet-spacing :type real :reader packet-spacing)
-   (timer-message :type message :reader timer-message
-                  :initform (make-instance 'message :name 'send-packet-timer)))
+   (send-packet
+    :type timer-message
+    :initform (make-instance 'timer-message)))
   (:properties
-   :statistic (packets-received
-               :title "packets received per node"
-               :default (indexed-count)))
+   :statistic (packets-received-by-sender
+               :source (source (control-info packet-receive)))
+               :title "packets received per sender node"
+               :default (indexed-count))
   (:metaclass module-class)
   (:documentation "Application that will generate packets at specified rate"))
 
@@ -39,21 +37,14 @@
     (if (and (> packet-spacing 0)
              (not (eql (network-address (node application))
                        (next-recipient application))))
-        (set-timer application (timer-message application)
+        (set-timer application 'send-packet
                    (+ startup-delay packet-spacing))
         (tracelog "Not sending Packets"))))
 
-(defmethod shutdown((application throughput-test))
-  (call-next-method)
-  (cancel (timer-message application)))
-
-(defmethod handle-message((application throughput-test) message)
-  (cond
-    ((eql message (timer-message application))
-     (to-network application nil  (next-recipient application))
-     (set-timer
-      application (timer-message application) (packet-spacing application)))
-    (t (call-next-method))))
+(defmethod handle-timer((application throughput-test)
+                        (timer (eql 'send-packet-timer)))
+  (to-network application nil  (next-recipient application))
+  (set-timer application 'send-packet (packet-spacing application)))
 
 (defmethod handle-message ((application throughput-test)
                            (message radio-control-message))
@@ -70,11 +61,10 @@
       (progn
         (tracelog "Received packet #~A from node ~A"
                   (sequence-number rcvPacket) (source (control-info rcvPacket)))
-        (emit application 'packets-received (source (control-info rcvPacket)))
-        (call-next-method)) ;; log receipt
+        (emit application 'packet-receive rcvPacket)) ;; log receipt
       (to-network application
                   (duplicate rcvPacket)
-                  (next-recipient application))))
+                  (next-recipient application)))) ;; else send on
 
 
 

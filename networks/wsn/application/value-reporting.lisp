@@ -1,49 +1,60 @@
 (in-package :lens.wsn)
 
+(defstruct value-report
+  nodeid
+  location
+  value)
+
 (defclass value-reporting(application)
-  ((sink-address :parameter t :initform 'SINK :reader sink-address
-                 :properties (:format 'read))
+  ((sink-network-address :parameter t :type fixnum :reader sink-network-address)
    (header-overhead :initform 8)
    (payload-overhead :initform 12)
-   (max-sample-interval :parameter t :type real :initform 60)
-   (min-sample-interval :parameter t :type real :initform 1)
-   (random-back-off-interval-fraction :parameter t :initform '(uniform 0 1)
-                                      :properties (:format 'eval))
-   (timer-message :type message :reader timer-message
-                  :initform (make-instance 'message :name 'request-sample)))
+   (max-sample-interval :parameter t :type time-type :initform 60e0)
+   (min-sample-interval :parameter t :type time-type :initform 1e0)
+
+   (routing-level :type fixnum)
+   (last-sensed-value :type real)
+   (sent-once :type boolean :initform nil)
+   (random-back-off-interval-fraction :type real)
+   (request-sample :type timer-message
+                   :initform (make-instance 'timer-message)))
+   (:properties
+    :statistic (got-value :title "got value" :default (last-value)))
   (:metaclass module-class)
   (:documentation "Document class which will continually sample sensors
 and send data to 'SINK over network"))
+
+(defmethod sink-p((application value-reporting))
+  (eql (sink-network-address application) (network-address (node application))))
 
 (defmethod startup((application value-reporting))
   (call-next-method)
   (with-slots(random-back-off-interval-fraction max-sample-interval)
           application
-      (set-timer application (timer-message application)
-                 (* random-back-off-interval-fraction max-sample-interval))))
+    (setf random-back-off-interval-fraction (uniform 0 1.0))
+    (set-timer application 'request-sample
+               (* random-back-off-interval-fraction max-sample-interval))))
 
-(defmethod shutdown((application value-reporting))
-  (call-next-method)
-  (cancel (timer-message application)))
+(defmethod handle-timer((application value-reporting)
+                        (timer (eql 'request-sample)))
+  (sensor-request application)
+  (set-timer application 'request-sample
+             (slot-value application 'max-sample-interval)))
 
-(defmethod handle-message((application value-reporting) message)
-  (cond
-    ((eql message (timer-message application))
-     ;; timer fired so request sensor measurements and reset timer
-     (dotimes(i (gate-size application 'sensor))
-       (send application
-             (make-instance 'sensor-message)
-             (gate application 'sensor :index i)))
-     (set-timer application message
-                (slot-value application 'max-sample-interval)))
-    ((typep message 'sensor-message)
-     ;; got measurement from sensor
-     (send application (measurement message) (sink-address application)))
-    (t (warn 'unknown-message :message message :module application))))
+(defmethod handle-message ((application value-reporting)
+                           (pkt application-packet))
+  (when (sink-p application)
+    (emit application 'packet-receive pkt)
+    (emit application 'got-value (value-report-value (payload pkt)))
+    (tracelog "Sink received ~A" (payload pkt))))
 
-(defmethod handle-message((application value-reporting) (pkt application-packet))
-  (when (eql (network-address (node application))
-             (sink-address application))
-    (tracelog "Sink received from ~A value ~A"
-              (source (control-info pkt))
-              (payload pkt))))
+(defmethod handle-sensor-reading((application value-reporting)
+                                 (sensed-value real))
+  (tracelog "Sensed = ~A" sensed-value)
+  (emit application 'got-value sensed-value)
+  (to-network application
+              (make-value-report
+               :nodeid (nodeid (node application))
+               :location (location (node application))
+               :value sensed-value)
+              (sink-network-address application)))
