@@ -133,6 +133,9 @@
 (defmethod get-simulation-time((instance resources) local-time)
     (* local-time (+ 1d0 (clock-drift instance))))
 
+(defmethod get-clock((instance resources))
+  (* (clock-drift instance) (simulation-time)))
+
 (defmethod startup((instance resources))
   ;; note since power-change signal may be received before this we have to check
   (unless (zerop (update-interval instance))

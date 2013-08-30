@@ -1,5 +1,13 @@
 (in-package :lens.wsn)
 
+(register-signal
+ 'packet-receive
+ "Emitted when application receives a packet.")
+
+(register-signal
+ 'packet-send
+ "Emitted when application sends a packet.")
+
 (defclass app-net-control-info()
   ((RSSI :type float :initarg :RSSI :reader RSSI :initform nil
          :documentation "the RSSI of the received packet")
@@ -45,11 +53,6 @@
   (call-next-method)
   (copy-slots '(sequence-number byte-length) pkt duplicate))
 
-(defgeneric latency(packet)
-  (:documentation "Given a packet return it's latency")
-  (:method ((packet application-packet))
-    (- (arrival-time packet) (timestamp packet))))
-
 (defclass application(wsn-module)
   ((owner :reader node)
    (applicationid :parameter t :type symbol :initform nil
@@ -69,9 +72,13 @@
    (sensor :inout 0))
   (:properties
    :statistic (latency
-               :source (latency application-receive)
+               :source (latency packet-receive)
                :title "application latency"
-               :default ((histogram :min 0))))
+               :default ((histogram :min 0)))
+   :statistic (packet-receive :title "application packets received"
+                              :default (count))
+   :statistic (packet-send :title "application packets sent"
+                           :default (count)))
   (:metaclass module-class)
   (:documentation "Application connects to sensors for measurements
   and to communication module for sending/receiving data."))
@@ -117,7 +124,7 @@
         (assert (destination (control-info packet))
                 ()
                 "Destination not specified for packet send"))
-    (emit application 'application-send packet)
+    (emit application 'packet-send packet)
     (send application packet 'network)
     (tracelog "Sending ~A to communication layer" packet))
   (:method((application application) (message message) &optional destination)
@@ -144,9 +151,7 @@
 
 (defmethod handle-message ((application application)
                            (message application-packet))
-  (when (or (not (applicationid application))
-            (eql (applicationid application) (applicationid message)))
-    (emit application 'application-receive message)))
+  (emit application 'packet-receive message))
 
 (defmethod handle-message((application application) (message sensor-message))
   (handle-sensor-reading application (measurement message)))
