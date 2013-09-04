@@ -233,9 +233,9 @@
           (emit instance 'mac-packet-breakdown "Overflown")
           (tracelog "WARNING: Tuneable MAC buffer overflow")))))
 
-(defun attempt-tx(instance)
-  (tracelog "attempt-tx, buffer size ~A, num-tx-tries ~A"
-            (size (buffer instance)) (num-tx-tries instance))
+(defmethod attempt-tx((instance tuneable-mac) &optional description)
+  (tracelog "attempt-tx, buffer size ~A, num-tx-tries ~A~:[ ~A~]"
+            (size (buffer instance)) (num-tx-tries instance) description)
   (cond
     ((<= (num-tx-tries instance) 0)
      ;; if we have attempted num-tx times on front message so remove it

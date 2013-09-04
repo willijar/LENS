@@ -114,3 +114,6 @@
            (make-instance 'mac-control-message :command 'mac-buffer-full)
            'routing)
      nil)))
+
+(defgeneric attempt-tx(module &optional description)
+  (:documentation "Attempt to transmit next packet. Description added to tracelog if present."))

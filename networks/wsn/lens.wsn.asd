@@ -55,7 +55,8 @@
                        :components
                        ((:file "bypass-mac")
                         (:file "tuneable-mac")
-                        (:file "tmac")))))
+                        (:file "tmac")
+                        (:file "IEEE802.15.4")))))
      (:module "application" :depends-on ("core")
               :components
               ((:file "value-reporting" :depends-on ("value-propagation"))

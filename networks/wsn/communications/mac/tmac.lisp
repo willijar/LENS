@@ -111,7 +111,7 @@
     :parameter t :type time-type :initform 610e-3
     :documentation "frame time (standard = 610ms)")
    (collision-resolution
-    :parameter t :type tmac-collision-resolution :initform 'overhearing
+    :parameter t :type symbol :initform 'overhearing
     :documentation
     "collision resolution mechanism, choose from
      'immediate-retry (low collision avoidance)
@@ -230,16 +230,15 @@
     ((slot-value instance 'disable-ta-extension)
      (setf (slot-value instance 'primary-wakeup) nil)
      (to-radio instance '(set-state . sleep))
-     (set-mac-state instance 'sleep "active period expired (SMAC)"))
+     (set-state instance 'sleep "active period expired (SMAC)"))
     ((slot-value instance 'conservative-ta)
-     (if (member (slot-value instance 'state)
-                 '(active sleep active-silent))
+     (if (member (slot-value instance 'state) '(active sleep active-silent))
          (perform-carrier-sense instance 'carrier-sense-before-sleep)
          (extend-active-period instance)))
     (t
      (setf (slot-value instance 'primary-wakeup) nil)
      (to-radio instance '(set-state . sleep))
-     (set-mac-state instance 'sleep "active period expired (TMAC)"))))
+     (set-state instance 'sleep "active period expired (TMAC)"))))
 
 (defmethod handle-timer((instance tmac) (timer (eql 'carrier-sense)))
   ;; First it is important to check for valid MAC state If we heard
@@ -322,7 +321,7 @@
        (if disable-ta-extension
            (progn
              (to-radio instance '(set-state sleep))
-             (set-mac-state instance 'sleep "active period expierd (SMAC)"))
+             (set-state instance 'sleep "active period expierd (SMAC)"))
            (perform-carrier-sense instance 'carrier-sense-before-sleep)))
       (primary-wakeup
        (let ((random-contention-interval (uniform 0.0 contention-period 1)))
@@ -360,9 +359,9 @@
                         'carrier-sense-for-tx-data
                         random-contention-interval))
                    (return-from reset-default-state))))))
-       (set-mac-state instance 'active "nothing to transmit"))
+       (set-state instance 'active "nothing to transmit"))
       (t
-       (set-mac-state instance 'active-silent
+       (set-state instance 'active-silent
                       "node is awake not in primary schedule")))))
 
 (defun create-primary-schedule(instance)
@@ -371,14 +370,9 @@
                          (mac-address instance) 0)
   (set-timer instance 'sync-renew (slot-value instance 'resync-time)))
 
-(defun set-mac-state(instance new-state &optional description)
-  (check-type new-state tmac-state)
-  (with-slots(state print-state-transitions) instance
-    (unless (eql state new-state)
-      (when print-state-transitions
-        (tracelog "state changed from ~A to ~A~:[, reason: ~A~]"
-                  state new-state description))
-      (setf state new-state))))
+(defmethod set-state :before((instance tmac) new-state &optional description)
+  (declare (ignore description))
+  (check-type new-state tmac-state))
 
 (defun update-schedule-table(instance wakeup id sn)
   (with-slots(frame-time current-frame-start schedule-table
@@ -454,7 +448,7 @@
           (when (and (> nav 0) (eql collision-resolution 'retry-next-frame))
             (set-timer instance 'transmission-timeout nav))
           (extend-active-period instance nav)
-          (set-mac-state 'active-silent "overheard a packet")))))
+          (set-state instance 'active-silent "overheard a packet")))))
 
 (defmethod handle-message((instance tmac) (rts-packet tmac-rts-packet))
   ;; reply with a CTS packet
@@ -472,7 +466,7 @@
     (to-radio instance '(set-state . tx))
     (emit instance 'mac-packet-breakdown "CTS Sent")
     (setf cts-packet nil)
-    (set-mac-state instance 'wait-for-data "sent CTS packet")
+    (set-state instance 'wait-for-data "sent CTS packet")
     (set-timer instance 'transmission-timeout
                (+ (tx-time instance cts-packet-size) wait-timeout))))
 
@@ -517,7 +511,7 @@
     (to-radio instance '(set-state . tx))
     (emit instance 'mac-packet-breakdown "ACK sent")
     (setf ack-packet nil)
-    (set-mac-state instance 'in-tx "transmitting ACK packet")
+    (set-state instance 'in-tx "transmitting ACK packet")
     (set-timer instance 'transmission-timeout
                (tx-time instance ack-packet-size))
     (extend-active-period instance (tx-time instance ack-packet-size))))
@@ -550,7 +544,7 @@
                         carrier-sense-for-tx-sync carrier-sense-before-sleep))
           (reset-default-state instance "sensed carrier"))
         (when (member state '(wait-for-ack wait-for-data wait-for-cts))
-          (set-mac-state instance 'active-silent "sensed carrier")))))
+          (set-state instance 'active-silent "sensed carrier")))))
 
 (defun carrier-is-clear(instance)
   (ecase (slot-value instance 'state)
@@ -579,7 +573,7 @@
        (when use-rts-cts (decf tx-retries))
        (emit instance 'mac-packet-breakdown "RTS sent")
        (setf rts-packet nil)
-       (set-mac-state instance 'wait-for-cts "sent RTS packet")
+       (set-state instance 'wait-for-cts "sent RTS packet")
        (set-timer instance 'transmission-timeout
                   (+ (tx-time instance rts-packet-size) wait-timeout))))
     (carrier-sense-for-tx-sync
@@ -595,7 +589,7 @@
        (emit instance 'mac-packet-breakdown "SYNC sent")
        (setf sync-packet nil
              need-resync nil)
-       (set-mac-state instance 'in-tx  "transmitting SYNC packet")
+       (set-state instance 'in-tx  "transmitting SYNC packet")
        (set-timer instance 'transmission-timeout
                   (tx-time instance sync-packet-size))))
     (carrier-sense-for-tx-data
@@ -603,7 +597,7 @@
     (carrier-sense-before-sleep
      (setf (slot-value instance 'primary-wakeup) nil)
      (to-radio instance '(set-state . sleep))
-     (set-mac-state instance 'sleep "no activity on the channel"))))
+     (set-state instance 'sleep "no activity on the channel"))))
 
 (defun send-data-packet(instance)
   (when (empty-p (buffer instance))
@@ -620,7 +614,7 @@
        ;; The packet can be cleared from transmission buffer
        ;; and MAC timeout is only to allow RADIO to finish the transmission
        (dequeue instance)
-       (set-mac-state instance 'in-tx "sent DATA packet to BROADCAST address")
+       (set-state instance 'in-tx "sent DATA packet to BROADCAST address")
        (set-timer instance 'transmission-timeout tx-time))
       (t
        ;; This packet is unicast, so MAC will be expecting an ACK
@@ -630,7 +624,7 @@
        ;; packet decrements counter)
        (when (slot-value instance 'use-rts-cts)
          (decf (slot-value instance 'tx-retries)))
-       (set-mac-state instance 'wait-for-ack
+       (set-state instance 'wait-for-ack
                       "sent DATA packet to UNICAST address")
        (set-timer instance 'transmission-timeout
                   (+ tx-time (slot-value instance 'wait-timeout)))))
@@ -642,7 +636,7 @@
  ;; state is important when performing CS, so setMacState is always
  ;; called here.  delay allows to perform a carrier sense after a
  ;; choosen delay (useful for randomisation of transmissions)
-  (set-mac-state instance new-state)
+  (set-state instance new-state)
   (set-timer instance 'carrier-sense delay))
 
 (defun extend-active-period(instance &optional (extra 0))

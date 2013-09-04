@@ -77,7 +77,7 @@
          :documentation "we can choose an rx-mode to begin with. Modes are
          defined in the RadioParametersFile. nil means use
          the first mode defined)")
-   (state :type symbol :parameter t :initform 'rx :accessor state
+   (state :type symbol :parameter t :initform 'rx :reader state
           :documentation "we can choose a radio state to begin
           with. RX and TX are always there. according to the radio
           defined we can choose from a different set of sleep states")
@@ -893,6 +893,22 @@
   (:method ((radio radio))
     (rx-mode-data-rate (rx-mode radio))))
 
+(defgeneric bits-per-symbol(entity)
+  (:method((radio radio))
+    (rx-mode-bits-per-symbol (rx-mode radio))))
+
+(defgeneric symbol-length(entity)
+  (:method(entity)
+    (/ (bits-per-symbol entity) (data-rate entity))))
+
 (defgeneric tx-time(entity no-octets)
   (:method((radio radio) (no-octets integer))
-    (/ (* (+ (header-overhead radio) no-octets) 8) (data-rate radio))))
+    (/ (* (+ (header-overhead radio) no-octets) 8)
+       (data-rate radio))))
+
+(defgeneric transition-delay(entity state1 state2)
+  (:documentation "Return the delay in going from state 1 to state 2")
+  (:method((radio radio) (from-state symbol) (to-state symbol))
+    (transition-element-delay
+     (getf (getf (transitions radio) to-state) from-state))))
+

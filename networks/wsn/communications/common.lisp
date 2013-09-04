@@ -71,3 +71,19 @@
     (emit buffer 'drop (dequeue (queue buffer)))
     (setf (slot-value buffer 'byte-length) 0)
     (emit buffer 'buffer-length buffer)))
+
+(defgeneric state(instance)
+  (:documentation "Return current state of instance"))
+
+(defgeneric set-state(state-machine state &optional description)
+  (:documentation "Set new state of a protocol
+  implementation. Description may be used to add comments for
+  tracing. print-state-transitions parameter slot switches on tracing of this.
+state is stored in slate slot.")
+  (:method((wsn-module module) new-state &optional description)
+    (with-slots(state print-state-transitions) instance
+      (unless (eql state new-state)
+        (when print-state-transitions
+        (tracelog "state changed from ~A to ~A~:[, reason: ~A~]"
+                  state new-state description))
+        (setf state new-state)))))
