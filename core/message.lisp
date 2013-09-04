@@ -90,6 +90,10 @@ model domain."))
 
 (defmethod byte-length((v bit-vector)) (* 8 (ceiling  (length v) 8)))
 
+(defgeneric bit-length(entity)
+  (:method(entity) (* 8 (byte-length entity)))
+  (:method((v bit-vector)) (length v)))
+
 (defclass packet(message)
   ((encapsulated-packet
     :type packet :initarg :encapsulated-packet
