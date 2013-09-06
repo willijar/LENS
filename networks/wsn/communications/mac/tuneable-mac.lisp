@@ -1,12 +1,19 @@
 (in-package :lens.wsn)
 
+(defpackage :lens.wsn.mac.tuneable
+  (:use :cl :cl-user :lens :lens.wsn)
+  (:export #:tuneable-mac
+           #:sleep-interval #:constant #:multiplying #:exponential
+           #:mac-packet-breakdown))
+
+(use-package '(:lens.wsn.mac.tuneable) :lens.wsn)
+
+(in-package :lens.wsn.mac.tuneable)
+
 (deftype tuneable-mac-state() '(member default tx contending rx))
 
 (deftype backoff-type()
   '(member sleep-interval constant multiplying exponential))
-
-(register-signal 'mac-packet-breakdown
-                 "Statistics on tuneable mac packets")
 
 (defclass tuneable-mac(mac)
   ;; The main tuneable parameters

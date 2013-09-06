@@ -901,10 +901,9 @@
   (:method(entity)
     (/ (bits-per-symbol entity) (data-rate entity))))
 
-(defgeneric tx-time(entity no-octets)
-  (:method((radio radio) (no-octets integer))
-    (/ (* (+ (header-overhead radio) no-octets) 8)
-       (data-rate radio))))
+(defmethod tx-time((radio radio) (no-octets integer))
+  (/ (* (+ (header-overhead radio) no-octets) 8)
+     (data-rate radio)))
 
 (defgeneric transition-delay(entity state1 state2)
   (:documentation "Return the delay in going from state 1 to state 2")

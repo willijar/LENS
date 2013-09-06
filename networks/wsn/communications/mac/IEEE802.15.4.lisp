@@ -1,5 +1,13 @@
 (in-package :lens.wsn)
 
+(defpackage :lens.wsn.mac.802.15.4
+  (:use :cl :cl-user :lens :lens.wsn)
+  (:export #:mac802.15.4))
+
+(use-package '(:lens.wsn.mac.802.15.4) :lens.wsn)
+
+(in-package :lens.wsn.mac.802.15.4)
+
 (defclass mac802.15.4-packet(mac-packet)
   ((pan-id :type integer :accessor pan-id :initarg :pan-id)))
 

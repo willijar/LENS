@@ -50,6 +50,7 @@
                (:module "routing" :depends-on ("routing-base")
                        :components
                        ((:file "bypass-routing")
+                        (:file "leach-routing")
                         (:file "multipath-rings-routing")))
                (:module "mac" :depends-on ("mac-base" "routing-base")
                        :components

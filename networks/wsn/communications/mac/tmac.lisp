@@ -1,5 +1,13 @@
 (in-package :lens.wsn)
 
+(defpackage :lens.wsn.mac.tmac
+  (:use :cl :cl-user :lens :lens.wsn)
+  (:export #:tmac))
+
+(use-package '(:lens.wsn.mac.tmac) :lens.wsn)
+
+(in-package :lens.wsn.mac.tmac)
+
 (defclass tmac-packet(mac-packet)
   ())
 

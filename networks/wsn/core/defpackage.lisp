@@ -24,29 +24,44 @@
   (:export
    ;; signals
    #:node-move #:out-of-energy #:node-startup #:node-shutdown #:out-of-memory
-   #:application-receive #:application-send
+   #:application-receive #:application-send #:power-change #:energy-consumed
    ;; common
    #:startup #:shutdown #:node #:nodeid #:wsn-module #:disabled-p
-   #:get-simulation-time #:set-timer
+   #:get-simulation-time #:get-clock
+   #:set-timer #:timer-message #:timer #:cancel-timer #:handle-timer
+   #:buffer #:buffer-size #:packet-history #:last-sequence-number
    ;; application
    #:app-net-control-info #:application-packet
-   #:application #:RSSI #:LQI #:source-address #:destination-address
+   #:application #:rssi #:lqi #:source #:destination
    #:applicationid
    #:sequence-number #:header-overhead #:payload-overhead
    #:next-sequence-number #:sensor-request #:handle-sensor-reading
-   #:toNetwork #:packet-size
+   #:to-network #:packet-size #:payload
    ;;communications
    #:communications :network #:mac #:radio
    #:network-control-message #:mac-control-message #:radio-control-message
    #:network-control-command #:mac-control-command #:radio-control-command
-   #:command #:argument
+   #:wsn-packet #:command #:argument #:comms-module
+   #:packet-history #:state #:set-state
    ;; network layer
    #:net-mac-control-info #:next-hop #:last-hop #:routing-packet
-   #:routing #:toMacLayer
+   #:routing #:max-net-frame-size #:to-mac #:resolve-network-address
+   #:sink-p #:broadcast-network-address
+   #:sink-network-address #:parent-network-address
    ;; MAC layer
-   #:mac-radio-control-info #:mac-packet #:mac #:toRadioLayer
+   #:mac-radio-control-info #:mac-packet #:mac #:mac-packet-breakdown
+   #:to-radio #:to-network #:broadcast-mac-address
+   #:max-mac-frame-size #:mac-address #:phy-delay-for-valid-cs
+   #:attempt-tx
    ;; RADIO layer
-
+   #:sleep #:rx #:tx #:tx-time #:radio-control-command-name
+   #:collision-model #:additive-interference-model
+   #:no-interference-no-collisions #:simple-collision-model
+   #:set-state #:set-mode #:set-tx-output #:set-sleep-level #:set-carrier-freq
+   #:set-cca-threshold #:set-cs-interrupt-on #:set-cs-interrupt-off
+   #:channel-clear-status
+   #:set-encoding #:read-rssi
+   #:data-rate #:bits-per-symbol #:symbol-length #:transition-delay
    ;; mobility
    #:mobility #:location #:cell #:theta #:phi
    ;; top level network
@@ -57,7 +72,7 @@
    ;; physical process
    #:physical-process #:description #:measure
    ;; resources
-    #:resources #:draw-power #:ram-store
-   #:ram-size #:flash-size #:clock-drift))
+    #:resources #:draw-power #:ram-store #:ram-size #:flash-size #:clock-drift
+    #:get-simulation-time #:get-clock))
 
 (pushnew :castelia-compatability *features*)

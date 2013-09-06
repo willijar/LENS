@@ -1,5 +1,13 @@
 (in-package :lens.wsn)
 
+(defpackage :lens.wsn.routing.multipath-rings
+    (:use :cl :cl-user :lens :lens.wsn)
+    (:export #:multipath-rings-routing))
+
+(use-package '(:lens.wsn.routing.multipath-rings) :lens.wsn)
+
+(in-package :lens.wsn.routing.multipath-rings)
+
 (defstruct mprings-sink
   (id 0 :type integer)
   (level 0 :type fixnum)) ;; used to store sink data

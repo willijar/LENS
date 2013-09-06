@@ -39,11 +39,12 @@
            (end-module (gate instance 'radio :direction :output)))))
   t)
 
-(defmethod tx-time((mac mac) (no-octets integer))
-  (tx-time (radio mac) no-octets))
-
-(defmethod tx-time((mac mac) (pkt mac-packet))
-  (tx-time mac (byte-length pkt)))
+(defgeneric tx-time(entity no-octets)
+  (:documentation "Return the transmission time for no-octets on entity")
+  (:method ((mac mac) (no-octets integer))
+    (tx-time (radio mac) no-octets))
+  (:method ((mac mac) (pkt mac-packet))
+    (tx-time mac (byte-length pkt))))
 
 (defmethod mac-address((node node))
   ;; currently one mac and radio per node so this is OK - change if multiple
@@ -86,7 +87,12 @@
     (to-radio module
               (make-instance 'radio-control-command
                              :command (first command)
-                             :argument (rest command)))))
+                             :argument (rest command))))
+  (:method((module routing) (command cons))
+    (send module (make-instance 'radio-control-command
+                             :command (first command)
+                             :argument (rest command))
+          'mac)))
 
 (defmethod to-network((mac mac) (routing-packet routing-packet) &optional dummy)
   (declare (ignore dummy))

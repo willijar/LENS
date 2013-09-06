@@ -81,7 +81,9 @@
 
 (defmethod initialize list ((module resources) &optional (stage 0))
   (case stage
-    (0 (subscribe (node module) 'power-change module)))
+    (0
+     (subscribe (node module) 'power-change module)
+     (subscribe (node module) 'energy-consumed module)))
   t)
 
 (defun calculate-energy-spent(instance)
@@ -96,19 +98,11 @@
         (tracelog "Energy consumed in last ~:/dfv:eng/s is ~:/dfv:eng/J"
                   time-passed energy-consumed)
         (emit instance 'energy-consumed energy-consumed)
-        (consume-energy instance energy-consumed)
         (setf time-of-last-calculation (simulation-time))))))
 
 (defmethod finish((instance resources))
   (calculate-energy-spent instance)
   (call-next-method))
-
-(defun consume-energy(instance amount)
-  (with-slots(remaining-energy) instance
-    (decf remaining-energy amount)
-    (when (<= remaining-energy 0.0)
-      (setf remaining-energy 0.0)
-      (emit instance 'out-of-energy))))
 
 (defmethod handle-message((instance resources) message)
   (cond
@@ -151,3 +145,11 @@
                (current-node-power instance) new-power)
      (setf (current-node-power instance) new-power)
      (setf (gethash source (power-levels instance)) power)))
+
+(defmethod receive-signal((instance resources) (signal (eql 'energy-consumed))
+                          source amount)
+  (with-slots(remaining-energy) instance
+    (decf remaining-energy amount)
+    (when (<= remaining-energy 0.0)
+      (setf remaining-energy 0.0)
+      (emit instance 'out-of-energy))))
