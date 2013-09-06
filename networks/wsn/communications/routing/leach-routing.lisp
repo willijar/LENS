@@ -4,8 +4,6 @@
   (:use :cl :cl-user :lens :lens.wsn)
   (:export #:leach-routing))
 
-(use-package '(:lens.wsn.routing.leach) :lens.wsn)
-
 (in-package :lens.wsn.routing.leach)
 
 (defstruct cluster-head-info

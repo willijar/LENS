@@ -127,10 +127,6 @@
     (with-slots(timers) (owner timer)
       (setf timers (delete timer timers)))))
 
-(defmethod handle-message :around ((module wsn-module) (message message))
-  #+nil(unless (disabled-p module) (call-next-method))
-  (call-next-method))
-
 (defgeneric handle-timer(module timer-name)
   (:documentation "Called when a timer message arrives with the message name"))
 

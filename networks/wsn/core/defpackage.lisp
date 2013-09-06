@@ -62,6 +62,7 @@
    #:channel-clear-status
    #:set-encoding #:read-rssi
    #:data-rate #:bits-per-symbol #:symbol-length #:transition-delay
+   #:cs-not-valid #:cs-not-valid-yet #:busy #:clear
    ;; mobility
    #:mobility #:location #:cell #:theta #:phi
    ;; top level network

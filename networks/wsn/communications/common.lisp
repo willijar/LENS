@@ -55,6 +55,9 @@
     :documentation "in bytes"))
   (:metaclass module-class))
 
+(defmethod handle-message :around ((module comms-module) (message message))
+  (unless (disabled-p module) (call-next-method)))
+
 (defmethod build-submodules((module comms-module))
   (let ((buffer-size (slot-value module 'buffer-size)))
     (setf (slot-value module 'buffer)
