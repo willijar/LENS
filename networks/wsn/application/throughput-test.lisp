@@ -20,8 +20,7 @@
     producing packets")
    (packet-spacing :type real :reader packet-spacing)
    (send-packet
-    :type timer-message
-    :initform (make-instance 'timer-message)))
+    :type timer-message :initform (make-instance 'timer-message)))
   (:properties
    :statistic (packets-received-by-sender
                :source (source (control-info packet-receive)))
@@ -42,7 +41,7 @@
         (tracelog "Not sending Packets"))))
 
 (defmethod handle-timer((application throughput-test)
-                        (timer (eql 'send-packet-timer)))
+                        (timer (eql 'send-packet)))
   (to-network application nil  (next-recipient application))
   (set-timer application 'send-packet (packet-spacing application)))
 

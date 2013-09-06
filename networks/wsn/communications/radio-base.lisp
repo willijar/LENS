@@ -77,7 +77,7 @@
          :documentation "we can choose an rx-mode to begin with. Modes are
          defined in the RadioParametersFile. nil means use
          the first mode defined)")
-   (state :type symbol :parameter t :initform 'rx :reader state
+   (state :type symbol :parameter t :initform 'rx :accessor state
           :documentation "we can choose a radio state to begin
           with. RX and TX are always there. according to the radio
           defined we can choose from a different set of sleep states")

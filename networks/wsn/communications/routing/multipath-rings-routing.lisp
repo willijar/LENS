@@ -4,8 +4,6 @@
     (:use :cl :cl-user :lens :lens.wsn)
     (:export #:multipath-rings-routing))
 
-(use-package '(:lens.wsn.routing.multipath-rings) :lens.wsn)
-
 (in-package :lens.wsn.routing.multipath-rings)
 
 (defstruct mprings-sink

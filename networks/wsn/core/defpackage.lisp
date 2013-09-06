@@ -72,7 +72,17 @@
    ;; physical process
    #:physical-process #:description #:measure
    ;; resources
-    #:resources #:draw-power #:ram-store #:ram-size #:flash-size #:clock-drift
-    #:get-simulation-time #:get-clock))
+   #:resources #:draw-power #:ram-store #:ram-size #:flash-size #:clock-drift
+   #:get-simulation-time #:get-clock
+   ;; protocol specific -- add in public protocol interfaces here
+   ;; so available in ini files without package suffix
+   #:bypass-mac
+   #:tuneable-mac #:sleep-interval #:constant #:multiplying #:exponential
+   #:tmac
+   #:mac802.15.4
+   #:bypass-routing
+   #:multipath-rings-routing
+   #:leach-routing
+))
 
 (pushnew :castelia-compatability *features*)

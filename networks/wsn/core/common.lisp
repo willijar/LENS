@@ -112,7 +112,8 @@
            (let ((msg (make-instance 'timer-message :owner module :name timer)))
              (push msg timers)
              msg))
-       interval))))
+       interval
+       timer))))
 
 (defgeneric cancel-timer(instance timer)
   (:method(instance (timer timer-message))
@@ -127,7 +128,8 @@
       (setf timers (delete timer timers)))))
 
 (defmethod handle-message :around ((module wsn-module) (message message))
-  (unless (disabled-p module) (call-next-method)))
+  #+nil(unless (disabled-p module) (call-next-method))
+  (call-next-method))
 
 (defgeneric handle-timer(module timer-name)
   (:documentation "Called when a timer message arrives with the message name"))

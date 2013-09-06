@@ -77,6 +77,10 @@
                :default ((histogram :min 0)))
    :statistic (packet-receive :title "application packets received"
                               :default (count))
+   :statistic (packet-receive-per-node
+               :title "packets received per node"
+               :source (source (control-info packet-receive))
+               :default (indexed-count))
    :statistic (packet-send :title "application packets sent"
                            :default (count)))
   (:metaclass module-class)

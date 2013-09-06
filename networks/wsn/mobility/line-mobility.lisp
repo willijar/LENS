@@ -13,9 +13,7 @@
    (update-interval
     :parameter t :type time-type :reader update-interval :initform 1d0
     :documentation "Interval for position updates along trajectory")
-   (periodic-update-message
-    :type message :reader periodic-update-message
-    :initform (make-instance 'message :name 'mobility-periodic-update)))
+   (update :type timer-message :initform (make-instance 'timer-message)))
   (:metaclass module-class)
   (:default-initargs :static-p nil))
 
@@ -28,22 +26,20 @@
 
 (defmethod initialize list ((instance line-mobility) &optional (stage 0))
   (case stage
-    (0 (schedule-at instance (periodic-update-message instance) :delay 0)))
+    (0 (set-timer instance 'update 0d0)))
   t)
 
 (defmethod shutdown((instance line-mobility))
-  (cancel (periodic-update-message instance)))
+  (cancel-timer instance 'update))
 
-(defmethod handle-message((instance line-mobility) message)
-  (if (eql message (periodic-update-message instance))
-      (with-slots(start-location distance speed delta) instance
-        (let ((distance-travelled
-               (coerce (* (simulation-time) speed) 'single-float)))
-          (multiple-value-bind(n d)
-              (floor (/ distance-travelled distance))
-            (setf (location instance)
-                  (coord+ start-location
-                          (coord* delta (if (evenp n) d (- 1 d)))))))
-        (schedule-at instance message :delay (update-interval instance)))
-      (warn 'unknown-message :module instance :message message)))
+(defmethod handle-timer((instance line-mobility) (timer (eql 'update)))
+  (with-slots(start-location distance speed delta) instance
+    (let ((distance-travelled
+           (coerce (* (simulation-time) speed) 'single-float)))
+      (multiple-value-bind(n d)
+          (floor (/ distance-travelled distance))
+        (setf (location instance)
+              (coord+ start-location
+                      (coord* delta (if (evenp n) d (- 1 d)))))))
+    (set-timer instance 'update (update-interval instance))))
 

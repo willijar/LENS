@@ -6,8 +6,6 @@
            #:sleep-interval #:constant #:multiplying #:exponential
            #:mac-packet-breakdown))
 
-(use-package '(:lens.wsn.mac.tuneable) :lens.wsn)
-
 (in-package :lens.wsn.mac.tuneable)
 
 (deftype tuneable-mac-state() '(member default tx contending rx))
