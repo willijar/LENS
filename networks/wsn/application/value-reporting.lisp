@@ -24,9 +24,6 @@
   (:documentation "Document class which will continually sample sensors
 and send data to 'SINK over network"))
 
-(defmethod sink-p((application value-reporting))
-  (eql (sink-network-address application) (network-address (node application))))
-
 (defmethod startup((application value-reporting))
   (call-next-method)
   (with-slots(random-back-off-interval-fraction max-sample-interval)

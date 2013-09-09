@@ -46,6 +46,9 @@
    (mac :inout))
   (:metaclass module-class))
 
+(defmethod network-address((instance routing))
+  (network-address (node instance)))
+
 ;; default - pass through unwanted control commands and messages -
 ;; warn if for this layer but unhandled
 ;; implementations must handle application packets and routing packets
@@ -118,9 +121,6 @@
     (declare (ignore routing))
     ;; by default mac address and network address have same values in WSN
     network-address))
-
-(defmethod sink-p((instance routing))
-  (sink-p (submodule (owner (owner instance)) 'application)))
 
 (defmethod enqueue(packet (instance routing))
   (cond

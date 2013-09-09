@@ -8,7 +8,7 @@
    (num-nodes :parameter t :type fixnum :reader num-nodes
               :initform 30 :documentation "Number of nodes")
    (num-physical-processes :parameter t :type fixnum
-                           :reader num-physical-processes :initform 0
+                           :reader num-physical-processes :initform 1
                            :documentation "Number of physical processes")
    (deployment :parameter t :type list :reader deployment :initform 'uniform
                :properties (:format read)

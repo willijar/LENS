@@ -2,13 +2,13 @@
 
 (defpackage :lens.wsn.routing.multipath-rings
     (:use :cl :cl-user :lens :lens.wsn)
-    (:export #:multipath-rings-routing))
+    (:export #:multipath-rings-routing #:mprings-sink-id #:mprings-sink-level))
 
 (in-package :lens.wsn.routing.multipath-rings)
 
 (defstruct mprings-sink
-  (id 0 :type integer)
-  (level 0 :type fixnum)) ;; used to store sink data
+  (id 0 :type fixnum)
+  (level 0 :type fixnum)) ;; used to store mprings-sink data
 
 (defclass multipath-rings-routing(routing)
   ((header-overhead :initform 14)
@@ -26,14 +26,11 @@
              :documentation "Used during setup"))
   (:metaclass module-class))
 
-(defmethod sink-network-address((instance routing))
-  (sink-network-address (submodule (parent-module instance) 'application)))
-
 (defmethod parent-network-address((instance routing))
-  (parent-network-address (submodule (parent-module instance) 'application)))
+  (parent-network-address (submodule (node instance) 'application)))
 
 (defclass multipath-rings-routing-packet(routing-packet)
-  ((sink :type mprings-sink :initarg :sink :accessor sink))
+  ((sink :type mprings-sink :initarg :mprings-sink :accessor sink))
   (:documentation "name is either data or topology-setup.
 	DATA packet overhead contains all fields, making its total size 13 bytes
 	SETUP packet does not contain sequence number field, making its size 12 bytes"))
@@ -48,7 +45,7 @@
 (defmethod startup((instance multipath-rings-routing))
   (when (sink-p instance)
     (setf (slot-value instance 'current-sink)
-          (make-mprings-sink :id  (nodeid (node instance))))
+          (make-mprings-sink :id (nodeid (node instance))))
     (setf (connected-p instance) t)
     (send-topology-setup-packet instance)))
 
@@ -84,7 +81,7 @@
        ;; Broadcast to all nodes of currentLevel-1
        (setf current-sink
              (make-mprings-sink :id (mprings-sink-id tmp-sink)
-                              :level (1+ (mprings-sink-level tmp-sink))))
+                                :level (1+ (mprings-sink-level tmp-sink))))
        (if connected-p
            (progn
              (send-control-message instance 'tree-level-updated)
@@ -105,16 +102,16 @@
   (let* ((destination (destination (control-info packet)))
          (routing-packet
           (encapsulate
-           (make-instance 'multipath-rings-packet
+           (make-instance 'multipath-rings-routing-packet
                           :name 'data
                           :header-overhead (header-overhead instance)
                           :source (network-address instance)
                           :destination destination
-                          :sink (copy-mprings-sink (current-sink instance)))
+                          :sink (current-sink instance))
            packet)))
     (cond
       ((eql destination (sink-network-address instance))
-       (setf (slot-value instance 'sequence-number)
+       (setf (slot-value routing-packet 'sequence-number)
              (next-sequence-number instance))
        (when (enqueue routing-packet instance)
          (if (connected-p instance)
@@ -140,7 +137,7 @@
     (data
      (let ((destination (destination packet))
            (sender-level (mprings-sink-level (sink packet)))
-           (sink-id (mprings-sink-id (sink packet)))
+           (mprings-sink-id (mprings-sink-id (sink packet)))
            (current-level (mprings-sink-level (current-sink instance)))
            (current-sink-id  (mprings-sink-id (current-sink instance))))
        (cond
@@ -150,12 +147,12 @@
          ((eql destination (sink-network-address instance))
           (when (eql sender-level (1+ current-level))
             (cond
-              ((eql sink-id (nodeid (node instance)))
+              ((eql mprings-sink-id (nodeid (node instance)))
                ;;Packet is for this node, if filter passes, forward it to application
                (if (duplicate-p packet (packet-history instance))
                    (tracelog "Discarding duplicate packet from ~A" (source packet))
                    (send instance (decapsulate packet) 'application)))
-              ((eql sink-id current-sink-id)
+              ((eql mprings-sink-id current-sink-id)
                ;; We want to rebroadcast this packet since we are not
                ;; its destination. For this, a copy of the packet is
                ;; created and sender level field is updated before
@@ -165,7 +162,7 @@
                        (mprings-sink-level (current-sink instance)))
                  (to-mac instance dup broadcast-mac-address))))))
          ((eql destination (parent-network-address instance))
-          (when (and (eql sink-id current-sink-id)
+          (when (and (eql mprings-sink-id current-sink-id)
                      (eql sender-level (1+ current-level)))
              (if (duplicate-p packet (packet-history instance))
                  (tracelog "Discarding duplicate packet from ~A" (source packet))

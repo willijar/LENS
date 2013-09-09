@@ -42,7 +42,8 @@
    #:network-control-message #:mac-control-message #:radio-control-message
    #:network-control-command #:mac-control-command #:radio-control-command
    #:wsn-packet #:command #:argument #:comms-module
-   #:packet-history #:state #:set-state
+   #:packet-history #:state #:set-state #:handle-control-command
+   #:print-state-transitions
    ;; network layer
    #:net-mac-control-info #:next-hop #:last-hop #:routing-packet
    #:routing #:max-net-frame-size #:to-mac #:resolve-network-address
@@ -57,8 +58,9 @@
    #:sleep #:rx #:tx #:tx-time #:radio-control-command-name
    #:collision-model #:additive-interference-model
    #:no-interference-no-collisions #:simple-collision-model
-   #:set-state #:set-mode #:set-tx-output #:set-sleep-level #:set-carrier-freq
-   #:set-cca-threshold #:set-cs-interrupt-on #:set-cs-interrupt-off
+   #:set-state #:set-mode #:set-tx-output #:set-sleep-level
+   #:set-carrier-frequency
+   #:set-cca-threshold #:set-cs-interrupt
    #:channel-clear-status
    #:set-encoding #:read-rssi
    #:data-rate #:bits-per-symbol #:symbol-length #:transition-delay

@@ -158,8 +158,7 @@
    (ack-packet :initform nil :type tmac-ack-packet)
 
    ;; cached timers
-   (transmission-timeout :initform (make-instance :timer-message))
-)
+   (transmission-timeout :initform (make-instance 'timer-message)))
   (:documentation "TMAC")
   (:metaclass module-class))
 
@@ -178,7 +177,6 @@
                    (if allow-sink-sync (* 3 frame-time) 0.1))))
   (to-radio instance '(set-cs-interrupt . t)))
 
-
 (defmethod handle-timer((instance tmac) (timer (eql 'sync-setup)))
   (with-slots(state frame-time) instance
     (when (eql state 'setup)
@@ -190,18 +188,18 @@
 
 (defmethod handle-timer((instance tmac) (timer (eql 'sync-renew)))
   (tracelog "Initiated RESYNC procedure")
-  (incf (tmac-schedule-sn (aref (slot-value instance 'schedule-table))))
+  (incf (tmac-schedule-sn (aref (slot-value instance 'schedule-table) 0)))
   (setf (slot-value instance 'need-resync) t)
   (set-timer instance 'sync-renew (slot-value instance 'resync-time)))
 
 (defmethod handle-timer((instance tmac) (timer (eql 'frame-start)))
-  (with-slots(primary-wakeup current-frame-timeout active-timeout frame-time
+  (with-slots(primary-wakeup current-frame-start active-timeout frame-time
               schedule-table need-resync state) instance
   ;; primary wakeup is always the one at beginning of frame
   (setf primary-wakeup t)
   ;; record current time and extend activation timeout
   (let ((clk (get-clock instance)))
-    (setf current-frame-timeout clk
+    (setf current-frame-start clk
           (slot-value instance 'activation-timeout) clk))
   (extend-active-period instance)
   ;; schedule message to start next frame
@@ -438,7 +436,6 @@
       (setf (slot-value instance 'need-resync) t
             (slot-value instance 'primary-wakeup) t)
       (reset-default-state instance "new primary schedule found")))))
-
 
 (defmethod handle-message :around ((instance tmac) (pkt tmac-packet))
   ;; from radio layer

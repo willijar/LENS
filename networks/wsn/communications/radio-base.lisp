@@ -228,7 +228,7 @@
        (tracelog "Initialized  RX mode to ~A" (rx-mode-name (rx-mode radio)))
        (setf (tx-level radio)
              (or (find initial-tx-output-power (tx-levels radio)
-                       :key #'tx-level-output-power :test #'=)
+                       :key #'tx-level-output-power :test #'eql)
                  (elt (tx-levels radio) 0)))
        (tracelog
         "Initalized TX power output to ~1/dfv:eng/dBm consuming ~1:/dfv:eng/W"
