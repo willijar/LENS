@@ -217,7 +217,8 @@ any parameter initargs - they aren't inherited."
         (eval
          `(defmethod ,gf  :around
             ((entity ,(class-name class)))
-            (funcall (call-next-method)))))))
+            (let ((*context* entity))
+              (funcall (call-next-method))))))))
   ;; deal with property inheritance from superclasses
   (setf (slot-value class 'properties)
         (nconc properties
@@ -246,7 +247,8 @@ any parameter initargs - they aren't inherited."
 
 (defgeneric configure(instance)
   (:documentation "Configure an instances unbound parameter slots from
-  configuration data. Called after initialization from initargs but before initialization from initforms (defaults)")
+  configuration data. Called after initialization from initargs but
+  before initialization from initforms (defaults)")
   (:method((instance parameter-object))
     (let* ((full-path (copy-list (full-path instance)))
            (full-path-last (last full-path)))
