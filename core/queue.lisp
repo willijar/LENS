@@ -111,13 +111,14 @@
                          :implementation :wrap)))
 
 (defmethod duplicate-p(x (buffer history-buffer) &optional (record t))
-  (or
-   (find
-    (buffer-key x)
-    (alg::vector-wrap-queue-vector (queue buffer))
-    :test #'(lambda(a b) (when b (funcall (buffer-test buffer) a b))))
-   (progn
-     (when record (enqueue (funcall (buffer-key x)) (queue buffer)))
-     nil)))
+  (let ((key (funcall (buffer-key buffer) x)))
+    (or
+     (find
+      key
+      (alg::vector-wrap-queue-vector (queue buffer))
+      :test #'(lambda(a b) (when b (funcall (buffer-test buffer) a b))))
+     (progn
+       (when record (enqueue key (queue buffer)))
+       nil))))
 
 

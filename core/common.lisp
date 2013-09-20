@@ -70,6 +70,12 @@ Returns:
       ((>= ,var ,gstop))
       ,@body)))
 
+(defun set-slots(instance defs)
+  (dolist(def defs)
+    (if (listp def)
+        (setf (slot-value instance (first def)) (second def))
+        (setf (slot-value instance def) nil))))
+
 (defun copy-slots(slots source destination)
   "Copies anemd slot values shallowly from source to destination
 returning the modifed destination object."
