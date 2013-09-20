@@ -27,12 +27,11 @@
     :parameter t :initform 'temperature :reader measurand
     :documentation "Type of sensor e.g. humidity, temperature, light etc")
    (bias
-    :parameter t :initform 0.1 :reader bias :initarg :bias
-    :properties (:format eval)
-    :type float
+    :parameter t :initform (normal 0 0.1 0)
+    :initarg :bias :reader bias :format number-or-expression
     :documentation "Device offset reading")
    (noise
-    :parameter t ::volatile t :initform (normal 0 0.1)
+    :parameter t ::volatile t :initform (normal 0 0.1 1)
     :reader noise :initarg :noise :type float
     :documentation "stddev of Gaussian Noise for device")
    (sensitivity
@@ -62,21 +61,26 @@
   (:gates
    (application :inout))
   (:metaclass module-class)
+  (:default-initargs :num-rngs 2)
   (:documentation "Module representing a single sensor. Sensors may
   either operate in continual sampling mode or in responsive mode (if
   sample-interval is 0).
 
 In responsive mode there will be measurement-delay delay between
-request message and sending back a readin message. If in sampling mode
+request message and sending back a reading message. If in sampling mode
 thern the message will correspond to the last sampled time."))
 
+
 (defmethod initialize-instance :after ((sensor sensor) &key &allow-other-keys)
-  (with-slots(measurement-delay sample-interval) sensor
+  (with-slots(measurement-delay sample-interval bias) sensor
     (assert (or (zerop sample-interval)
                 (> sample-interval measurement-delay))
             ()
             "Sample interval ~A is less than measurement time of ~A"
-            sample-interval measurement-delay)))
+            sample-interval measurement-delay)
+  #+nil(unless (numberp bias)
+    (let ((*context* sensor))
+      (setf (slot-value sensor 'bias) (eval bias))))))
 
 (defmethod initialize list ((sensor sensor) &optional (stage 0))
   (case stage
@@ -114,10 +118,11 @@ thern the message will correspond to the last sampled time."))
   (let* ((location (location (node sensor)))
          (time (simulation-time))
          (value (measure (physical-process sensor) (measurand sensor)
-                         location time)))
-
-    (with-slots(bias resolution sensitivity saturation) sensor
-       (make-measurement
+                         location time))
+         (noise (noise sensor))
+         (bias (bias sensor)))
+    (with-slots(resolution sensitivity saturation) sensor
+      (make-measurement
        :sensor sensor
        :location location
        :time time
@@ -125,7 +130,7 @@ thern the message will correspond to the last sampled time."))
                  (floor
                   (min saturation
                        (max sensitivity
-                            (+ bias value (noise sensor))))
+                            (+ bias value noise)))
                        resolution))))))
 
 (defmethod handle-message((sensor sensor) message)

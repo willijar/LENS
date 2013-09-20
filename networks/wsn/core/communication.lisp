@@ -36,12 +36,6 @@
 (defclass radio-control-message(communications-control-message)
   ())
 
-
-(defmethod handle-message((instance application)
-                          (message communications-control-message))
-  ;; by default applications can ignore control messages
-)
-
 (defclass communications-control-command(message)
   ((name :accessor command :initarg :command
          :documentation "Command is held as message name")

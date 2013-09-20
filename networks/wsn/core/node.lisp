@@ -54,7 +54,7 @@
     (0
      (let ((delay (+ (startup-offset node)
                      (* (uniform 0.0 (startup-randomization node))))))
-       (tracelog "Delaying startup to ~:/eng/s" delay)
+       (tracelog "Delaying startup to ~:/dfv:eng/s" delay)
        (schedule-at
         node (make-instance 'message :name 'node-startup)
         :delay delay))))

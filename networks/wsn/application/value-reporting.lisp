@@ -11,7 +11,6 @@
    (payload-overhead :initform 12)
    (max-sample-interval :parameter t :type time-type :initform 60e0)
    (min-sample-interval :parameter t :type time-type :initform 1e0)
-
    (routing-level :type fixnum)
    (last-sensed-value :type real)
    (sent-once :type boolean :initform nil)
@@ -29,6 +28,7 @@ and send data to 'SINK over network"))
   (with-slots(random-back-off-interval-fraction max-sample-interval)
           application
     (setf random-back-off-interval-fraction (uniform 0 1.0))
+    ;;(tracelog "application backofff=~:/dfv:eng/s" random-back-off-interval-fraction)
     (set-timer application 'request-sample
                (* random-back-off-interval-fraction max-sample-interval))))
 

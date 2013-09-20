@@ -87,6 +87,6 @@ state is stored in slate slot.")
     (with-slots(state print-state-transitions) instance
       (unless (eql state new-state)
         (when print-state-transitions
-          (tracelog "state changed from ~A to ~A~:[, reason: ~A~]"
+          (tracelog "state changed from ~A to ~A~@[, reason: ~A~]"
                     state new-state description))
         (setf state new-state)))))

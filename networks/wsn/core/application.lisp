@@ -182,3 +182,8 @@
          (sink-network-address  (submodule node 'application))))
   (:method((instance wsn-module))
     (sink-p (node instance))))
+
+(defmethod handle-message((instance application)
+                          (message communications-control-message))
+  ;; by default applications can ignore control messages
+)

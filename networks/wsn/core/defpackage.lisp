@@ -65,6 +65,7 @@
    #:set-encoding #:read-rssi
    #:data-rate #:bits-per-symbol #:symbol-length #:transition-delay
    #:cs-not-valid #:cs-not-valid-yet #:busy #:clear
+   #:carrier-sense-interrupt
    ;; mobility
    #:mobility #:location #:cell #:theta #:phi
    ;; top level network

@@ -76,7 +76,6 @@
   (:method((encoding (eql 'fsk)) snr-db &optional bpnb)
     (* 0.5 (exp (* -0.5 (/ (db-to-ratio snr-db) bpnb)))))
   (:method((encoding (eql 'psk)) snr-db &optional bpnb)
-    (tracelog "erc(~A)" (sqrt (/ (db-to-ratio snr-db) bpnb)))
     (* 0.5 (erfc (sqrt (/ (db-to-ratio snr-db) bpnb)))))
   (:method((encoding (eql 'dpsk)) snr-db &optional bpnb)
     (* 0.5 (exp (/ (db-to-ratio snr-db)  bpnb))))

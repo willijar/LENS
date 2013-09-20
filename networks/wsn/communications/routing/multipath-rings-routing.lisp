@@ -30,7 +30,7 @@
   (parent-network-address (submodule (node instance) 'application)))
 
 (defclass multipath-rings-routing-packet(routing-packet)
-  ((sink :type mprings-sink :initarg :mprings-sink :accessor sink))
+  ((sink :type mprings-sink :initarg :sink :accessor sink))
   (:documentation "name is either data or topology-setup.
 	DATA packet overhead contains all fields, making its total size 13 bytes
 	SETUP packet does not contain sequence number field, making its size 12 bytes"))
@@ -73,6 +73,7 @@
 
 (defmethod handle-timer((instance multipath-rings-routing)
                         (timer (eql 'topology-setup)))
+  (break)
   (with-slots(tmp-sink current-sink connected-p) instance
     (cond
       ((not tmp-sink)

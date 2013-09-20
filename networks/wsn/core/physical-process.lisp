@@ -22,8 +22,14 @@
           (format nil "~A[~D]" (class-name (class-of instance))
                   (index instance)))))
 
+(defmethod measure :around ((physical-process physical-process)
+                            measurand
+                            location time)
+  (let ((*context* physical-process))
+    (call-next-method)))
+
 (defmethod measure((physical-process physical-process)
                    (measurand (eql 'temperature))
                    (location coord) (time real))
-  (funcall (physical-process-function physical-process)
-           measurand location time))
+    (funcall (physical-process-function physical-process)
+             measurand location time))

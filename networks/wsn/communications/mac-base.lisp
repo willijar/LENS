@@ -61,7 +61,7 @@
 
 (defmethod handle-message((instance mac)
                           (message radio-control-message))
-  (send instance message 'routing))
+  (to-network instance message))
 
 (defmethod handle-message((instance mac) (message mac-control-message))
   (handle-control-command instance (command message) (argument message)))
@@ -94,10 +94,10 @@
                              :argument (rest command))
           'mac)))
 
-(defmethod to-network((mac mac) (routing-packet routing-packet) &optional dummy)
+(defmethod to-network((mac mac) packet &optional dummy)
   (declare (ignore dummy))
-  (send mac routing-packet 'routing)
-  (tracelog "Delivering ~A to network layer" routing-packet))
+  (send mac packet 'routing)
+  (tracelog "Delivering ~A to network layer" packet))
 
 (defmethod encapsulate((module mac) packet)
   (encapsulate
