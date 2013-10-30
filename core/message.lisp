@@ -55,8 +55,7 @@ model domain."))
     (when (slot-boundp instance 'name)
       (format stream "~A" (name instance)))
     (if (>= (slot-value instance 'rank) 0)
-      (format stream " (~D) t=~@?"
-              (uid instance) *time-format* (arrival-time instance)))
+      (format stream " (~D)" (uid instance)))
     (when (slot-boundp instance 'to)
       (format stream " to ~A" (slot-value instance 'to)))))
 

@@ -13,7 +13,7 @@
 ;; the Free Software Foundation, either version 3 of the License, or
 ;; (at your option) any later version.
 
-;; FOOBAR is distributed in the hope that it will be useful,
+;; LENS is distributed in the hope that it will be useful,
 ;; but WITHOUT ANY WARRANTY; without even the implied warranty of
 ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 ;; GNU General Public License for more details.
@@ -386,7 +386,8 @@
                           :fill-pointer 0))))
 
 (defmethod record :before ((instance histogram) time (value number))
-  (assert (and (not (integerp value)) (not (eql (histogram-mode instance) 'integer)))
+  (assert (and (not (integerp value))
+               (not (eql (histogram-mode instance) 'integer)))
           ()
           "Histogram in INTEGER mode cannot accept a float value"))
 

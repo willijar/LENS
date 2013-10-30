@@ -50,5 +50,5 @@
                (:file "module" :depends-on
                       ("message" "gate" "component" "parameters" "simulation"))
                (:file "statistics" :depends-on
-                      ("simulation" "parameters" "signals"))
+                      ("simulation" "parameters" "signals" "module"))
                (:file "statistics-impl" :depends-on ("statistics"))))))

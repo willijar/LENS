@@ -13,7 +13,7 @@
 ;; the Free Software Foundation, either version 3 of the License, or
 ;; (at your option) any later version.
 
-;; FOOBAR is distributed in the hope that it will be useful,
+;; LENS is distributed in the hope that it will be useful,
 ;; but WITHOUT ANY WARRANTY; without even the implied warranty of
 ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 ;; GNU General Public License for more details.
@@ -84,7 +84,7 @@ needs to know about its surroundings."))
      ,@(when (slot-boundp gate 'index) (list (index gate)))))
 
 (defmethod print-object((gate gate) stream)
-  (print-unreadable-object (gate stream :type t :identity t)
+  (print-unreadable-object (gate stream :type t)
     (format stream "~A.~A[~A]~@[[~A]~]"
             (name (parent-module gate))
             (first (full-name gate))
