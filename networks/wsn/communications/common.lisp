@@ -2,7 +2,7 @@
 
 (defclass wsn-packet(packet)
   ((header-overhead
-    :initform 0 :accessor header-overhead :initarg :header-overhead
+    :initform 0 :accessor header-overhead :initarg :header-overhead :initarg :byte-length
     :documentation "In bytes")
    (source :initarg :source :accessor source
            :documentation "the  source address of the received packet")

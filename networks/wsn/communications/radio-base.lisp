@@ -157,7 +157,7 @@
     :type radio-control-message :reader cs-interrupt-message
     :initform (make-instance 'radio-control-message
                              :command 'carrier-sense-interrupt)
-    :documentation " message that carries a future carrier sense interrupt")
+    :documentation "message that carries a future carrier sense interrupt")
    (state-transition-message
     :type message :reader state-transition-message
     :initform (make-instance 'message :name 'state-transition)

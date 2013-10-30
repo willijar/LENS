@@ -1,13 +1,13 @@
 (in-package :lens.wsn)
 
-(declaim (inline ratio-to-db db-to-ratio))
-
 ;; these are exact fp functions
+#-castelia-compatability
 (defun ratio-to-db(ratio)
   (if (> ratio 1e-10)
       (* 10.0 (log ratio 10.0))
       -100.0))
 
+#-castelia-compatability
 (defun db-to-ratio(db)
   (expt 10.0 (* db 0.1)))
 
@@ -50,22 +50,23 @@
       ((< diff 12.0) (- a 0.5))
       (t a))))
 
-;; (let ((a #(-12.041200 -9.030900 -7.269987 -6.020600 -5.051500 -4.259687
-;;            -3.590219 -3.010300 -2.498775 -2.041200 -1.627273 -1.249387
-;;            -0.901766 -0.579919 -0.280287)))
-;;   (defun ratio-to-db(ratio)
-;;     (cond
-;;       ((>= ratio 1.0) 0.0)
-;;       ((< ratio 0.0625) -100.0)
-;;       (t (aref a (1- (floor (* 16 ratio))))))))
+#+castelia-compatability
+(let ((a #(-12.041200 -9.030900 -7.269987 -6.020600 -5.051500 -4.259687
+            -3.590219 -3.010300 -2.498775 -2.041200 -1.627273 -1.249387
+            -0.901766 -0.579919 -0.280287)))
+   (defun ratio-to-db(ratio)
+     (cond
+       ((>= ratio 1.0) 0.0)
+       ((< ratio 0.0625) -100.0)
+       (t (aref a (1- (floor (* 16 ratio)))))))
 
-;; (defun db-to-ratio(db)
-;;   (cond
-;;     ((> db 9.0) 8.0)
-;;     ((> db 6.0) 4.0)
-;;     ((> db 3.0) 2.0)
-;;     ((> db 1.25) 1.3333)
-;;     (t 1.0)))
+ (defun db-to-ratio(db)
+   (cond
+     ((> db 9.0) 8.0)
+     ((> db 6.0) 4.0)
+     ((> db 3.0) 2.0)
+     ((> db 1.25) 1.3333)
+     (t 1.0))))
 
 (defvar +ideal-modulation-threshold+ 5.0)
 

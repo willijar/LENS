@@ -79,6 +79,9 @@
                   (byte-length packet) header-overhead max-net-frame-size)
         (call-next-method))))
 
+(defmethod  handle-message :before ((instance routing) (packet routing-packet))
+  (tracelog "Received ~A from mac layer." packet))
+
 (defmethod handle-message ((instance routing) (packet routing-packet))
   ;; from mac layer
   (when (or (eql (destination packet) (network-address (node instance)))
