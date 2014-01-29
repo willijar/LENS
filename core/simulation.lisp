@@ -170,6 +170,9 @@
            ((= pa pb)
             (< (slot-value a 'schedule-id) (slot-value b 'schedule-id)))))))))
 
+(defun event=(a b)
+  (= (arrival-time a) (arrival-time b)))
+
 (defun event-queue-consistent-p(simulation)
   "Do a consistency check on event-queue by dequeing and checking order and then reinqueueing"
   (let ((q (event-queue simulation))
@@ -225,15 +228,18 @@
 
 (defgeneric schedule(event &key delay time)
   (:documentation "Schedule event for given time")
-  (:method((event event) &key delay time)
-    (assert (not (scheduled-p event)))
-    (when delay (setf time (+ delay (simulation-time))))
-    (when time (setf (slot-value event 'arrival-time) time))
-    (assert (>= (arrival-time event) (simulation-time)))
-    (setf (slot-value event 'schedule-id)
-          (incf (slot-value *simulation* 'last-schedule-id)))
-    (enqueue event (event-queue *simulation*))
-    (slot-value event 'schedule-id))
+  (:method((event event) &key delay (time (arrival-time event) time-p))
+    (let ((now (simulation-time)))
+      (assert (not (scheduled-p event)))
+      (when delay (setf time (+ delay now)))
+      (when time-p (setf (slot-value event 'arrival-time) time))
+      (assert (>= time now))
+      (setf (slot-value event 'schedule-id)
+            (incf (slot-value *simulation* 'last-schedule-id)))
+      (if (= time now)
+          (handle event)
+          (enqueue event (event-queue *simulation*)))
+      (slot-value event 'schedule-id)))
   (:method(handler &key (delay 0) (time (+ delay (simulation-time))))
     (schedule (make-instance 'simple-event :handler handler) :time time)))
 

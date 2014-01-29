@@ -51,7 +51,7 @@ commands, jobs, customers or other kinds of entities, depending on the
 model domain."))
 
 (defmethod print-object((instance message) stream)
-  (print-unreadable-object(instance stream :type t)
+  (print-unreadable-object(instance stream :type t :identity t)
     (when (slot-boundp instance 'name)
       (format stream "~A" (name instance)))
     (if (>= (slot-value instance 'rank) 0)
