@@ -37,7 +37,7 @@
    (byte-length :type fixnum :initarg :byte-length :reader byte-length
                 :initform 20))
   (:documentation "A generic application packet. If defining your own
-  packet you have to extend from this packewt. You do not have to use
+  packet you have to extend from this packet. You do not have to use
   the fields already defined, and you can always define your own
   size."))
 
@@ -84,7 +84,7 @@
    :statistic (packet-send :title "application packets sent"
                            :default (count)))
   (:metaclass module-class)
-  (:documentation "Application connects to sensors for measurements
+  (:documentation "Application core module connects to sensors for measurements
   and to communication module for sending/receiving data."))
 
 (defmethod initialize-instance :after ((application application)
@@ -98,7 +98,7 @@
     (incf (slot-value instance 'last-sequence-number))))
 
 (defun sensor-request(application &optional (sensor-index 0))
-  "T be used by applications to request a sensor reading"
+  "To be used by applications to request a sensor reading"
   (send application
         (make-instance 'sensor-message :name 'sensor-request)
         (gate application 'sensor :index sensor-index :direction :output)))

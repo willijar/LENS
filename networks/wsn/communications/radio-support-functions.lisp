@@ -70,6 +70,12 @@
 
 (defvar +ideal-modulation-threshold+ 5.0)
 
+(flet((ratio-to-db(ratio)
+        (if (> ratio 1e-10)
+            (* 10.0 (log ratio 10.0))
+            -100.0))
+      (db-to-ratio(db)
+        (expt 10.0 (* db 0.1))))
 (defgeneric snr2ber(encoding snr-db &optional bits-per-noise-bandwidth)
   (:documentation "Given a particular encoding, signal to noise ratio
   in db and the ratio of data rate to noise bandwidth calculate the
@@ -82,7 +88,7 @@
     (* 0.5 (exp (/ (db-to-ratio snr-db)  bpnb))))
   (:method((encoding (eql 'ideal)) snr-db &optional bpnb)
     (declare (ignore bpnb))
-    (if (< snr-db +ideal-modulation-threshold+) 1.0d0 0.0d0)))
+    (if (< snr-db +ideal-modulation-threshold+) 1.0d0 0.0d0))))
 
 (defun probability-of-exactly-N-errors(ber num-errors num-bits)
   (declare (double-float ber) (fixnum num-errors) (fixnum num-bits))

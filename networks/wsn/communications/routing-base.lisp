@@ -77,7 +77,9 @@
              (> (+ (byte-length packet) header-overhead) max-net-frame-size))
         (tracelog "Oversized packet ~A dropped. Size ~A, network layer overhead ~A, max network packet size ~A"
                   (byte-length packet) header-overhead max-net-frame-size)
-        (call-next-method))))
+        (progn
+          (tracelog "Received ~A from application layer" packet)
+          (call-next-method)))))
 
 (defmethod  handle-message :before ((instance routing) (packet routing-packet))
   (tracelog "Received ~A from mac layer." packet))

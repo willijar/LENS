@@ -128,10 +128,11 @@
     (* local-time (+ 1d0 (clock-drift instance))))
 
 (defmethod get-clock((instance resources))
-  (* (clock-drift instance) (simulation-time)))
+  (* (1+ (clock-drift instance)) (simulation-time)))
 
 (defmethod startup((instance resources))
   ;; note since power-change signal may be received before this we have to check
+  (tracelog "Clock Drift ~:/dfv:eng/s" (clock-drift instance))
   (unless (zerop (update-interval instance))
     (schedule-at instance (periodic-update-message instance)
                  :delay (update-interval instance))))

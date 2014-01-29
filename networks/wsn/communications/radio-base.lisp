@@ -304,7 +304,7 @@
       ;; only need to update bit-errors for an element that will be received
       (when (and (numberp bit-errors) (<= bit-errors max-errors))
         (let ((num-of-bits
-               (ceiling (* (rx-mode-data-rate (rx-mode radio))
+               (round (* (rx-mode-data-rate (rx-mode radio))
                            (- (simulation-time)
                               (time-of-last-signal-change radio)))))
               (ber (snr2ber (rx-mode radio)
@@ -430,7 +430,7 @@
              (tracelog "~A received despite ~1/dfv:eng/dBm interference" message
                        (received-signal-max-interference ending-signal))
              (emit radio 'rx "Received despite interference"))))
-         (t
+        (t
           (cond
            ((= (received-signal-max-interference ending-signal)
                (rx-mode-noise-floor (rx-mode radio)))
@@ -830,9 +830,10 @@
  ;; complex. Instead we assume that all previous received power is
  ;; negligibly small and given the current power, CCAthreshold and
  ;; averaging/integration time for RSSI.
-  (when (> (read-rssi radio) (cca-threshold radio))
+  (let ((rssi (read-rssi radio)))
+    (when (or (not (numberp rssi)) (> rssi (cca-threshold radio)))
     ;; if we are above the threshold, no point in scheduling an interrupt
-    (return-from update-possible-cs-interrupt))
+    (return-from update-possible-cs-interrupt)))
   ;;if we are going to schedule an interrupt, cancel any future CS interrupt
   (cancel (cs-interrupt-message radio))
   ;; We calculate the fraction of the RSSI averaging time that it
@@ -910,4 +911,3 @@
   (:method((radio radio) (from-state symbol) (to-state symbol))
     (transition-element-delay
      (getf (getf (transitions radio) to-state) from-state))))
-

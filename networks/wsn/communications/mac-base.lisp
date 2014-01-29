@@ -96,8 +96,8 @@
 
 (defmethod to-network((mac mac) packet &optional dummy)
   (declare (ignore dummy))
-  (send mac packet 'routing)
-  (tracelog "Delivering ~A to network layer" packet))
+  (tracelog "Delivering ~A to network layer" packet)
+  (send mac packet 'routing))
 
 (defmethod encapsulate((module mac) packet)
   (encapsulate
@@ -105,6 +105,7 @@
                   :name (class-name (class-of module))
                   :header-overhead (header-overhead module)
                   :source (mac-address module)
+                  :destination broadcast-mac-address
                   :sequence-number (next-sequence-number module))
    packet))
 

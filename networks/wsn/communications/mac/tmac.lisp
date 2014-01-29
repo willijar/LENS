@@ -14,21 +14,24 @@
 
 (defclass tmac-sync-packet(tmac-packet) ;; sequence number but no source/dest
   ((sync :type integer :initarg :sync) ;; 4 bytes
-   (sync-id :type integer :initarg :sync-id))) ;; 4 bytes
+   (sync-id :type integer :initarg :sync-id))  ;; 4 bytes
+  (:default-initargs :byte-length 11))
 
 (defmethod duplicate((pkt tmac-sync-packet) &optional duplicate)
   (call-next-method)
   (copy-slots '(sync sync-id) pkt duplicate))
 
 (defclass tmac-rts-packet(tmac-packet)
-  ((nav :type time-type :initarg :nav))) ;; 4 bytes
+  ((nav :type time-type :initarg :nav))
+  (:default-initargs :byte-length 13)) ;; 4 bytes
 
 (defmethod duplicate((pkt tmac-rts-packet) &optional duplicate)
   (call-next-method)
   (copy-slots '(nav) pkt duplicate))
 
 (defclass tmac-cts-packet(tmac-packet)
-  ((nav :type time-type :initarg :nav)))
+  ((nav :type time-type :initarg :nav))
+   (:default-initargs :byte-length 13))
 
 (defmethod duplicate((pkt tmac-cts-packet) &optional duplicate)
   (call-next-method)
@@ -36,9 +39,15 @@
 
 (defclass tmac-ds-packet(tmac-packet) ())
 (defclass tmac-frts-packet(tmac-packet) ())
+
 ;; ack and data require sequence number (4 bytes)
-(defclass tmac-data-packet(tmac-packet) ())
-(defclass tmac-ack-packet(tmac-packet) ())
+(defclass tmac-data-packet(tmac-packet)
+  ()
+  (:default-initargs :header-overhead 11))
+
+(defclass tmac-ack-packet(tmac-packet)
+  ()
+  (:default-initargs :byte-length 11))
 
 (defstruct tmac-schedule
   offset
@@ -131,9 +140,6 @@
    (tx-retries
     :type fixnum
     :documentation "number of transmission attempts to txAddr (when reaches 0 - packet is dropped)")
-   (tx-sequence-num
-    :type integer
-    :documentation "sequence number for current transmission")
    (primary-wakeup
     :type boolean
     :documentation "to distinguish between primary and secondary schedules")
@@ -158,7 +164,8 @@
    (ack-packet :initform nil :type tmac-ack-packet)
 
    ;; cached timers
-   (transmission-timeout :initform (make-instance 'timer-message)))
+   (transmission-timeout :initform (make-instance 'timer-message))
+   (check-ta  :initform (make-instance 'timer-message)))
   (:documentation "TMAC")
   (:metaclass module-class))
 
@@ -176,8 +183,6 @@
      cts-packet
      ack-packet))
   (with-slots(allow-sink-sync frame-time) instance
-    #+nil(tracelog "isSink=~A allowSinkSync=~A frame time=~A"
-              (sink-p instance) allow-sink-sync frame-time)
     (if (and allow-sink-sync (sink-p instance))
         (set-timer instance 'sync-create 0.1)
         (set-timer instance 'sync-setup
@@ -296,6 +301,7 @@
 
 (defmethod handle-timer((instance tmac) (timer integer))
   ;; timer is wakeup inhdexed into schedule table
+  (tracelog "Timer: ~D" timer)
   (if (< 0 timer (length (slot-value instance 'schedule-table)))
       (handle-timer instance 'wakeup-silent)
       (tracelog "Unknown timer ~A" timer)))
@@ -315,7 +321,11 @@
          'tmac-data-packet
          :header-overhead (header-overhead instance)
          :source (mac-address instance)
-         :destination (next-hop (control-info packet))
+         :destination
+         #+CASTELIA-COMPATABILITY broadcast-mac-address
+         ;; note that in castelia the virtualmac encapsulate overwrites specific
+         ;; mac packet address with broadcast address (probably an error)
+         #-CASTELIA-COMPATABILITY (next-hop (control-info packet))
          :sequence-number (next-sequence-number instance))
         packet)
        instance)
@@ -333,10 +343,11 @@
        (if disable-ta-extension
            (progn
              (to-radio instance '(set-state sleep))
-             (set-state instance 'sleep "active period expierd (SMAC)"))
+             (set-state instance 'sleep "active period expired (SMAC)"))
            (perform-carrier-sense instance 'carrier-sense-before-sleep)))
       (primary-wakeup
        (let ((random-contention-interval (uniform 0.0 contention-period 1)))
+         (tracelog "Random contention interval=~:/dfv:eng/s" random-contention-interval)
          (when need-resync
            (when sync-packet (cancel sync-packet))
            (setf sync-packet
@@ -355,24 +366,21 @@
            (return-from reset-default-state))
          (with-slots(tx-retries use-rts-cts tx-addr) instance
            (while (not (empty-p (buffer instance)))
-             (if (<= tx-retries 0)
-                 (progn
-                   (tracelog "Transmission failed to ~A" tx-addr)
-                   (dequeue  instance))
-                 (progn
+             (cond
+               ((<= tx-retries 0)
+                (tracelog "Transmission failed to ~A" tx-addr)
+                (dequeue instance))
+               (t
+                (perform-carrier-sense
+                   instance
                    (if (and use-rts-cts
                             (not (eql tx-addr broadcast-mac-address)))
-                       (perform-carrier-sense
-                        instance
-                        'carrier-sense-for-tx-rts
-                        random-contention-interval)
-                       (perform-carrier-sense
-                        instance
-                        'carrier-sense-for-tx-data
-                        random-contention-interval))
-                   (return-from reset-default-state))))))
-       (set-state instance 'active "nothing to transmit"))
-      (t
+                       'carrier-sense-for-tx-rts
+                       'carrier-sense-for-tx-data)
+                   random-contention-interval)
+                (return-from reset-default-state)))))
+         (set-state instance 'active "nothing to transmit")))
+      (;; primary-wakup is false
        (set-state instance 'active-silent
                       "node is awake not in primary schedule")))))
 
@@ -667,11 +675,9 @@
          (incf activation-timeout listen-timeout))
         ((< activation-timeout (+ cur-time listen-timeout extra))
          (setf activation-timeout (+ cur-time listen-timeout extra))))
+      (tracelog "Extend Active Period activation timeout=~:/dfv:eng/s"
+                activation-timeout)
       (set-timer instance 'check-ta (- activation-timeout cur-time)))))
-
-(defmethod dequeue((instance tmac))
-  (dequeue (buffer instance))
-  (check-tx-buffer instance))
 
 (defun check-tx-buffer(instance)
   ;; if buffer not empty update communication parameters
@@ -680,5 +686,9 @@
       (with-slots(tx-addr tx-retries max-tx-retries last-sequence-number)
           instance
         (setf tx-addr (destination packet)
-              tx-retries max-tx-retries
-              last-sequence-number -1)))))
+              tx-retries max-tx-retries)))))
+
+(defmethod dequeue((instance tmac))
+  (let ((p (dequeue (buffer instance))))
+    (cancel p)
+    (check-tx-buffer instance)))

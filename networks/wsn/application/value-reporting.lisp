@@ -7,8 +7,8 @@
 
 (defclass value-reporting(application)
   ((sink-network-address :parameter t :type fixnum :reader sink-network-address)
-   (header-overhead :initform 8)
-   (payload-overhead :initform 12)
+   (header-overhead :initform 0)
+   (payload-overhead :initform 0)
    (max-sample-interval :parameter t :type time-type :initform 60e0)
    (min-sample-interval :parameter t :type time-type :initform 1e0)
    (routing-level :type fixnum)

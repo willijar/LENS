@@ -12,6 +12,7 @@
 
 (defclass multipath-rings-routing(routing)
   ((header-overhead :initform 14)
+   (setup-overhead :parameter t :type integer :initform 13 :reader setup-overhead)
    (buffer-size :initform 32)
    (max-net-frame-size :initform 0)
    (setup-frame-size
@@ -38,6 +39,9 @@
 (defclass multipath-rings-routing-control-message(network-control-message)
   ())
 
+(defmethod sink((packet multipath-rings-routing-control-message))
+  (argument packet))
+
 (defmethod duplicate((packet multipath-rings-routing-packet) &optional duplicate)
   (setf (sink duplicate) (copy-mprings-sink (sink packet)))
   (call-next-method))
@@ -54,6 +58,7 @@
    instance
    (make-instance
     'multipath-rings-routing-packet
+    :header-overhead (setup-overhead instance)
     :name 'topology-setup
     :sink (copy-mprings-sink (current-sink instance))
     :source (network-address instance)
@@ -69,12 +74,13 @@
 
 (defun process-buffered-packets(instance)
   (while (not (empty-p (buffer instance)))
-    (to-mac instance (dequeue (buffer instance)) broadcast-mac-address)))
+    (let ((p (dequeue (buffer instance))))
+      (setf (sink p) (current-sink instance))
+      (to-mac instance p broadcast-mac-address))))
 
 (defmethod handle-timer((instance multipath-rings-routing)
                         (timer (eql 'topology-setup)))
-  (break)
-  (with-slots(tmp-sink current-sink connected-p) instance
+  (with-slots(tmp-sink current-sink) instance
     (cond
       ((not tmp-sink)
        (set-timer instance 'topology-setup (setup-timeout instance)))
@@ -83,12 +89,12 @@
        (setf current-sink
              (make-mprings-sink :id (mprings-sink-id tmp-sink)
                                 :level (1+ (mprings-sink-level tmp-sink))))
-       (if connected-p
+       (if (connected-p instance)
            (progn
              (send-control-message instance 'tree-level-updated)
              (tracelog "Reconnected to ~A" current-sink))
            (progn
-             (setf connected-p t)
+             (setf (connected-p instance) t)
              (send-control-message instance 'connected-to-tree)
              (tracelog "Connected to ~A" current-sink)
              (process-buffered-packets instance)))
@@ -127,9 +133,9 @@
   (ecase (name packet)
     (topology-setup
        (unless (sink-p instance)
-         (with-slots(tmp-sink net-setup-timeout) instance
+         (with-slots(tmp-sink setup-timeout) instance
            (when (not (timer instance 'topology-setup))
-             (set-timer instance 'topology-setup net-setup-timeout)
+             (set-timer instance 'topology-setup setup-timeout)
              (setf tmp-sink nil))
            (when (or (not tmp-sink)
                      (> (mprings-sink-level tmp-sink)

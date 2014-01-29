@@ -19,7 +19,7 @@
     (when (slot-boundp instance 'name)
       (format stream "~A" (name instance)))
     (when (slot-boundp instance 'sequence-number)
-      (format stream "#~D" (sequence-number instance)))
+      (format stream " #~D" (sequence-number instance)))
     (format stream " (~D bytes)" (byte-length instance))))
 
 (defmethod duplicate((packet wsn-packet) &optional duplicate)
