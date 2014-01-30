@@ -68,10 +68,10 @@
   (declare (ignore value))
   (incf count))
 
-(define-statistic-filter sum(value (sum 0))
+(define-statistic-filter sum(value (sum 0d0))
   (incf sum value))
 
-(define-statistic-filter mean(value (sum 0) (count 0))
+(define-statistic-filter mean(value (sum 0d0) (count 0))
   (/ (incf sum value) (incf count)))
 
 (define-statistic-filter min(value min)
@@ -213,7 +213,7 @@
   (unless (zerop (result-count r))
   (format stream "statistic ~S ~S~%" (full-path-string (owner (owner r))) (title r))
   (with-slots(min max sum count sqrsum) r
-    (format stream "field count ~A~%field mean ~A~%field stddev ~A~%field sum ~A~%field sqrsum ~A~%field min ~A~%field max ~A~%"
+    (format stream "field count ~4D~%field mean ~8,3f~%field stddev ~6,3f~%field sum ~9,3f~%field sqrsum ~6,3f~%field min ~9,3f~%field max ~9,3f~%"
             (result-count r)
             (result-mean r)
             (result-stddev r)
@@ -262,14 +262,14 @@
     (call-next-method)
     (with-slots(sum-weights sum-weighted-vals sum-squared-weights
                             sum-weights-squared-vals) r
-      (format stream "field weights ~A~% field weightedSum ~A~%field sqrSumWeights ~A~%field weightedSqrSum ~A~%"
+      (format stream "field weights ~7,3f~%field weightedSum ~7,3f~%field sqrSumWeights ~7,3f~%field weightedSqrSum ~7,3f~%"
               sum-weights sum-weighted-vals sum-squared-weights
               sum-weights-squared-vals))))
 
 (defclass histogram(stddev)
   ((range-min :initarg :min :initform nil :type real :reader range-min)
    (range-max :initarg :max :initform nil :type real :reader range-max)
-   (range-ext-factor :initarg :range-ext-factor :initform 2.0
+   (range-ext-factor :initarg :range-ext-factor :initform 1
                      :type real :reader range-ext-factor
                      :documentation "Factor to expand range by")
    (mode :type symbol :initarg :mode :initform nil :reader histogram-mode
@@ -319,11 +319,20 @@
 
 ;; TODO INTEGER mode - proper ranging
 
+(defun autorange(min max)
+  (let*((diff (- max min))
+        (s (float (expt 10 (1- (ceiling (log diff 10)))))))
+    (values (* (floor (/ min s)) s)
+            (* (ceiling (/ max s)) s))))
+
 (defun histogram-setup-cells(instance)
   (with-slots(range-min range-max num-cells cell-size array mode) instance
-    (when (eql mode 'integer)
-      (setf range-min (floor range-min)
-            range-max (ceiling range-max)))
+    (if (eql mode 'integer)
+        (setf range-min (floor range-min)
+              range-max (ceiling range-max))
+        (multiple-value-bind(min max) (autorange range-min range-max)
+          (setf range-min min
+                range-max max)))
     (setf cell-size (/ (- range-max range-min) num-cells))
     (when (and (eql mode 'integer) (not (integerp cell-size)))
       (let  ((c (ceiling cell-size)))
@@ -411,7 +420,7 @@
     (format stream "bin -INF ~D~%" (underflow-cell r))
     (let ((b (range-min r)))
       (dotimes(k (length (cells r)))
-        (format stream "bin ~A ~D~%" b (aref (cells r) k))
+        (format stream "bin ~4,2f ~4D~%" b (aref (cells r) k))
         (incf b (cell-size r))))
     (format stream "bin +INF ~D~%" (overflow-cell r))))
 
