@@ -476,12 +476,14 @@
      ;; command, and we are not changing already, then just record the
      ;; intended target state. Otherwise proceed with the change.
     (with-slots(state changing-to-state) instance
-    (if (and (eql command 'set-state)
-             (eql state 'tx)
-             (not changing-to-state)
-             (not (self-message-p message)))
-        (setf (state-after-tx instance) (argument message))
-        (handle-control-command instance  command (argument message))))))
+      (when (eql (argument message) (or changing-to-state state))
+        (return-from handle-message))
+      (if (and (eql command 'set-state)
+               (eql state 'tx)
+               (not changing-to-state)
+               (not (self-message-p message)))
+          (setf (state-after-tx instance) (argument message))
+          (handle-control-command instance  command (argument message))))))
 
 (defmethod handle-control-command((radio radio) (command (eql 'set-state))
                                   (new-state symbol))
@@ -537,9 +539,9 @@
             (loop :for a :on (sleep-levels radio)
                :until (eql (car a) (sleep-level radio))
                :do (accumulate-level (car a) #'sleep-level-down)))))
-       (emit radio 'power-change transition-power)
        (tracelog "Set state to ~A, delay=~:/dfv:eng/s, power=~1:/dfv:eng/W"
                  changing-to-state transition-delay transition-power)
+       (emit radio 'power-change transition-power)
        (delay-state-transition radio transition-delay))))
 
     ;; For the rest of the control commands we do not need to take any
@@ -635,6 +637,7 @@
     (setf changing-to-state nil)
     (ecase state
       (tx
+       (emit radio 'power-change (tx-level-power-consumed (tx-level radio)))
        (cond
          ((empty-p (buffer radio))
           ;; just changed to TX but buffer empty so send command to change to rx
@@ -645,7 +648,6 @@
           (tracelog "WARNING: just changed to TX but buffer is empty - changing to RX"))
          (t
           (let ((time-to-tx-packet (debuffer-and-send radio)))
-            (emit radio 'power-change (tx-level-power-consumed (tx-level radio)))
             ;; flush received power history
             (setf (total-power-received radio) nil)
             (schedule-at radio (continue-tx-message radio)

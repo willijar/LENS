@@ -238,7 +238,7 @@
   ;; contending for transmissions
   (when (eql (state instance) 'sleep)
     (to-radio instance '(set-state . rx)))
-  (when (member (state instance) '(sleep 'active 'active-silent))
+  (when (member (state instance) '(sleep active active-silent))
     (reset-default-state instance "new frame started"))))
 
 (defmethod handle-timer((instance tmac) (timer (eql 'check-ta)))

@@ -37,7 +37,7 @@
     :parameter t :type time-type :initform 30d-6
     :documentation "Standard deviation in cpu clock drift")
    (remaining-energy
-    :parameter t :type float :initform 18720 :accessor remaining-energy
+    :parameter t :type double-float :initform 18720d0 :accessor remaining-energy
                      :documentation "In joules - default is 2 AA batteries")
    (time-of-last-calculation :type time-type)
    (baseline-node-power
