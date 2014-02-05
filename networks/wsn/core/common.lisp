@@ -87,6 +87,10 @@
 (defclass timer-message(message)
   ())
 
+(defmethod print-object((m timer-message) stream)
+  (print-unreadable-object(m stream :type t :identity t)
+    (format stream "~A ~:[~;~A~]" (name m) (scheduled-p m) (arrival-time m))))
+
 (defgeneric timer(module name)
   (:method((module wsn-module) (name symbol))
     (if (slot-exists-p module name)
@@ -96,7 +100,8 @@
 (defgeneric set-timer(module timer interval &optional timer-name)
   (:documentation "Schedule a timer using local time to determine interval")
   (:method(module (timer message) interval  &optional name)
-    (cancel timer)
+    (when (scheduled-p timer)
+      (cancel timer))
     (when name (setf (name timer) name))
     (if (owner timer)
         (assert (eql (owner timer) module))
@@ -123,9 +128,10 @@
       (when timer (cancel timer)))))
 
 (defmethod cancel :after((timer timer-message))
-  (when (owner timer)
-    (with-slots(timers) (owner timer)
-      (setf timers (delete timer timers)))))
+  (let ((owner (owner timer)))
+    (when (and owner (not (slot-exists-p owner (name timer))))
+      (with-slots(timers) owner
+        (setf timers (delete timer timers))))))
 
 (defgeneric handle-timer(module timer-name)
   (:documentation "Called when a timer message arrives with the message name"))

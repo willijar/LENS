@@ -165,7 +165,8 @@
 
    ;; cached timers
    (transmission-timeout :initform (make-instance 'timer-message))
-   (check-ta  :initform (make-instance 'timer-message)))
+   (check-ta  :initform (make-instance 'timer-message))
+   (carrier-sense :initform (make-instance 'timer-message)))
   (:documentation "TMAC")
   (:metaclass module-class))
 
@@ -278,12 +279,14 @@
       (busy (carrier-is-busy instance))
       (cs-not-valid-yet
        (set-timer instance 'carrier-sense
-                  (slot-value instance 'phy-delay-for-valid-cs)))
+                  (slot-value instance 'phy-delay-for-valid-cs))
+       (tracelog "Set carrier sense timer ~:/dfv:eng/s" (slot-value instance 'phy-delay-for-valid-cs)))
       (cs-not-valid
        (unless (eql state 'sleep)
          (to-radio instance '(set-state . rx))
          (set-timer instance 'carrier-sense
-                    (slot-value instance 'phy-delay-for-valid-cs)))))))
+                    (slot-value instance 'phy-delay-for-valid-cs))
+         (tracelog "Set carrier sense timer ~:/dfv:eng/s" (slot-value instance 'phy-delay-for-valid-cs)))))))
 
 (defmethod handle-timer((instance tmac) (timer (eql 'transmission-timeout)))
   (reset-default-state instance "timeout"))
@@ -441,7 +444,9 @@
                           0
                           (- (+ clock wakeup)
                              (+ current-frame-start frame-time))))))
-        (tracelog "Creating schedule ~A, wakeup:~A" schedule wakeup)
+        (tracelog "Creating schedule ID:~D SN:~D Wakeup:~:/dfv:eng/s"
+                  (tmac-schedule-id schedule) (tmac-schedule-sn schedule)
+                  wakeup)
         (vector-push-extend schedule schedule-table))
     ;; if primary more needs to be done
     (when  (= current-frame-start -1)
@@ -656,7 +661,8 @@
  ;; called here.  delay allows to perform a carrier sense after a
  ;; choosen delay (useful for randomisation of transmissions)
   (set-state instance new-state)
-  (set-timer instance 'carrier-sense delay))
+  (set-timer instance 'carrier-sense delay)
+  (tracelog "Set carrier sense timer ~:/dfv:eng/s" delay))
 
 (defun extend-active-period(instance &optional (extra 0))
  ;; This function will extend active period for MAC, ensuring that the

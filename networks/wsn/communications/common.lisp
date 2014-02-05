@@ -37,8 +37,9 @@
 (defmethod bit-length((packet wsn-packet)) (* 8 (byte-length packet)))
 
 (defclass comms-module(wsn-module)
-  ((buffer :type packet-buffer :reader buffer)
-   (buffer-size :parameter t :initform 32 :type integer :initarg :buffer-size)
+  ((buffer :type packet-buffer :reader buffer :documentation "TX buffer")
+   (buffer-size :parameter t :initform 32 :type integer :initarg :buffer-size
+                :documentation "Size of TX buffer")
    (packet-history
     :type history-buffer
     :initform (make-instance 'history-buffer
@@ -46,7 +47,8 @@
                              :key #'(lambda(p)
                                       (cons (source p)
                                             (sequence-number p))))
-    :reader packet-history)
+    :reader packet-history
+    :documentation "received packet history buffer")
    (last-sequence-number :initform -1 :type integer
                          :accessor last-sequence-number)
    (header-overhead

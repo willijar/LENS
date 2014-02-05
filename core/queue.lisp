@@ -54,12 +54,16 @@
    (byte-length :initform 0 :type fixnum :reader byte-length))
   (:metaclass parameter-class))
 
+(defmethod print-object((p packet-buffer) stream)
+  (print-unreadable-object(p stream :type t :identity t)
+    (format stream "~D packets" (size p))))
+
 (defmethod initialize-instance :after((buffer packet-buffer)
                                       &key &allow-other-keys)
   (setf (slot-value buffer 'queue)
         (if (buffer-size buffer)
             (make-timestamped-queue
-             :vector (make-array (buffer-size buffer))
+             :vector (make-array (1+ (buffer-size buffer)))
              :extend-size nil)
             (make-timestamped-queue))))
 
@@ -120,5 +124,3 @@
      (progn
        (when record (enqueue key (queue buffer)))
        nil))))
-
-
