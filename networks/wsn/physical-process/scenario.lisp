@@ -30,13 +30,12 @@
                     :for a = (car r)
                     :until (not (cdr r))
                     :finally (return 0)
-                    :when (>= time (car a))
+                    :when (and (>= time (car a)) (< time (car (cadr r))))
                     :do
                     (progn
                     (let* ((b (cadr r))
                            (dt (- (car b) (car a)))
-                           (dx (- (cdr b) (cdr a))))
-
-                      (return (+ (cdr a)
-                                 (* (- time (car a)) (/ dx dt)))))))))
+                           (dx (- (cdr b) (cdr a)))
+                           (coeff (/ (- time (car a)) dt)))
+                      (return (+ (cdr a) (* coeff dx)) ))))))
             (* value (expt (1+ (* k distance)) (- a))))))))

@@ -31,5 +31,5 @@
 (defmethod measure((physical-process physical-process)
                    (measurand (eql 'temperature))
                    (location coord) (time real))
-    (funcall (physical-process-function physical-process)
-             measurand location time))
+  (funcall (physical-process-function physical-process)
+           measurand location time))

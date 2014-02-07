@@ -121,6 +121,7 @@ thern the message will correspond to the last sampled time."))
                          location time))
          (noise (noise sensor))
          (bias (bias sensor)))
+    (tracelog "Value=~,3f bias=~,3f noise=~,3f" value bias noise)
     (with-slots(resolution sensitivity saturation) sensor
       (make-measurement
        :sensor sensor
