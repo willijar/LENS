@@ -506,4 +506,3 @@ Generation method depends on value of lambda:
          :for x = -1 :then (1+ x)
          :for p = 1.0 :then (* p (%gendblrand rng))
          :when (<= p a) :do (return x))))
-
