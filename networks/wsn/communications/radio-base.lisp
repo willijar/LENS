@@ -311,8 +311,7 @@
                             (- (received-signal-power-dbm signal)
                                (received-signal-current-interference signal)))))
           (let ((bit-errors (bit-errors ber num-of-bits max-errors)))
-          (incf (received-signal-bit-errors signal)
-                bit-errors))
+            (incf (received-signal-bit-errors signal) bit-errors))
         ;; update current-interference in the received signal structure
         (unless (eql signal interferance)
           (update-interference radio signal interferance))))))

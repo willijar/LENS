@@ -7,8 +7,8 @@
 (in-package :lens.wsn.routing.multipath-rings)
 
 (defstruct mprings-sink
-  (id 0 :type fixnum)
-  (level 0 :type fixnum)) ;; used to store mprings-sink data
+  (id -1 :type fixnum :read-only t)
+  (level -1 :type fixnum :read-only t)) ;; used to store mprings-sink data
 
 (defclass multipath-rings-routing(routing)
   ((header-overhead :initform 14)
@@ -31,7 +31,7 @@
   (parent-network-address (submodule (node instance) 'application)))
 
 (defclass multipath-rings-routing-packet(routing-packet)
-  ((sink :type mprings-sink :initarg :sink :accessor sink))
+  ((sink :type mprings-sink :initarg :sink :accessor sink :initform nil))
   (:documentation "name is either data or topology-setup.
 	DATA packet overhead contains all fields, making its total size 13 bytes
 	SETUP packet does not contain sequence number field, making its size 12 bytes"))
@@ -43,13 +43,13 @@
   (argument packet))
 
 (defmethod duplicate((packet multipath-rings-routing-packet) &optional duplicate)
-  (setf (sink duplicate) (copy-mprings-sink (sink packet)))
+  (setf (sink duplicate) (sink packet))
   (call-next-method))
 
 (defmethod startup((instance multipath-rings-routing))
   (when (sink-p instance)
     (setf (slot-value instance 'current-sink)
-          (make-mprings-sink :id (nodeid (node instance))))
+          (make-mprings-sink :id (nodeid (node instance)) :level 0))
     (setf (connected-p instance) t)
     (send-topology-setup-packet instance)))
 
@@ -60,12 +60,13 @@
     'multipath-rings-routing-packet
     :header-overhead (setup-overhead instance)
     :name 'topology-setup
-    :sink (copy-mprings-sink (current-sink instance))
+    :sink  (current-sink instance)
     :source (network-address instance)
     :destination broadcast-network-address)
    broadcast-mac-address))
 
 (defun send-control-message(instance kind)
+  (tracelog "Sending ~A control message to application" kind)
   (send instance
         (make-instance 'multipath-rings-routing-control-message
                        :command kind
@@ -75,7 +76,10 @@
 (defun process-buffered-packets(instance)
   (while (not (empty-p (buffer instance)))
     (let ((p (dequeue (buffer instance))))
-      (setf (sink p) (current-sink instance))
+      ;; In  castelia the sink is sent when packet buffered only so that
+      ;; packets buffered before topology is completed are sent with wrong
+      ;; (null) sink details.
+      #-castelia-compatability (setf (sink p) (current-sink instance))
       (to-mac instance p broadcast-mac-address))))
 
 (defmethod handle-timer((instance multipath-rings-routing)
@@ -85,18 +89,22 @@
       ((not tmp-sink)
        (set-timer instance 'topology-setup (setup-timeout instance)))
       ((not current-sink)
-       ;; Broadcast to all nodes of currentLevel-1
+       ;; Broadcast to all nodes of current Level-1
        (setf current-sink
              (make-mprings-sink :id (mprings-sink-id tmp-sink)
                                 :level (1+ (mprings-sink-level tmp-sink))))
        (if (connected-p instance)
            (progn
              (send-control-message instance 'tree-level-updated)
-             (tracelog "Reconnected to ~A" current-sink))
+             (tracelog "Reconnected to ~D at level ~D"
+                       (mprings-sink-id current-sink)
+                       (mprings-sink-level current-sink)))
            (progn
              (setf (connected-p instance) t)
              (send-control-message instance 'connected-to-tree)
-             (tracelog "Connected to ~A" current-sink)
+             (tracelog "Connected to ~D at level ~D "
+                       (mprings-sink-id current-sink)
+                       (mprings-sink-level current-sink))
              (process-buffered-packets instance)))
        (send-topology-setup-packet instance)))
     (setf tmp-sink
@@ -139,9 +147,10 @@
              (setf tmp-sink nil))
            (when (or (not tmp-sink)
                      (> (mprings-sink-level tmp-sink)
-                        (mprings-sink-level packet)))
-             (setf tmp-sink (copy-mprings-sink (sink packet)))))))
+                        (mprings-sink-level (sink packet))))
+             (setf tmp-sink (sink packet))))))
     (data
+     (when (sink packet)
      (let ((destination (destination packet))
            (sender-level (mprings-sink-level (sink packet)))
            (mprings-sink-id (mprings-sink-id (sink packet)))
@@ -152,25 +161,26 @@
               (eql destination broadcast-network-address))
           (send instance (decapsulate packet) 'application))
          ((eql destination (sink-network-address instance))
-          (when (eql sender-level (1+ current-level))
+          (when (= sender-level (1+ current-level))
             (cond
-              ((eql mprings-sink-id (nodeid (node instance)))
+              ((= mprings-sink-id (nodeid (node instance)))
                ;;Packet is for this node, if filter passes, forward it to application
                (if (duplicate-p packet (packet-history instance))
                    (tracelog "Discarding duplicate packet from ~A" (source packet))
                    (send instance (decapsulate packet) 'application)))
-              ((eql mprings-sink-id current-sink-id)
+              ((= mprings-sink-id current-sink-id)
                ;; We want to rebroadcast this packet since we are not
                ;; its destination. For this, a copy of the packet is
                ;; created and sender level field is updated before
                ;; calling toMacLayer() function
+               (tracelog "forwarding ~A to MAC layer" packet)
                (let ((dup (duplicate packet)))
-                 (setf (mprings-sink-level (sink packet))
-                       (mprings-sink-level (current-sink instance)))
+                 (setf (sink packet) (current-sink instance))
                  (to-mac instance dup broadcast-mac-address))))))
          ((eql destination (parent-network-address instance))
           (when (and (eql mprings-sink-id current-sink-id)
                      (eql sender-level (1+ current-level)))
              (if (duplicate-p packet (packet-history instance))
                  (tracelog "Discarding duplicate packet from ~A" (source packet))
-                 (send instance (decapsulate packet) 'application)))))))))
+                 (send instance (decapsulate packet) 'application))))
+         ))))))
