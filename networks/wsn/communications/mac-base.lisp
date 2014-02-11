@@ -9,6 +9,14 @@
 (defclass mac-packet(wsn-packet)
   ())
 
+(defmethod print-object((p mac-packet) stream)
+   (print-unreadable-object(p stream :type t :identity t)
+    (format stream "~A ~A->~A (~D bytes)"
+            (name p)
+            (source p)
+            (destination p)
+            (byte-length p))))
+
 (register-signal 'mac-packet-breakdown "Statistics on mac packets")
 
 (defclass mac(comms-module)

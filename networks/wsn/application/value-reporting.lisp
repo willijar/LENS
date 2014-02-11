@@ -5,10 +5,18 @@
   location
   value)
 
+(defmethod print-object((v value-report) stream)
+  (if *print-readably*
+      (call-next-method)
+      (print-unreadable-object(v stream :type t :identity t)
+        (format stream "~A from ~A"
+              (value-report-value v)
+              (value-report-nodeid v)))))
+
 (defclass value-reporting(application)
   ((sink-network-address :parameter t :type fixnum :reader sink-network-address)
-   (header-overhead :initform 0)
-   (payload-overhead :initform 0)
+   (header-overhead :initform 8)
+   (payload-overhead :initform 12)
    (max-sample-interval :parameter t :type time-type :initform 60e0)
    (min-sample-interval :parameter t :type time-type :initform 1e0)
    (routing-level :type fixnum)
@@ -28,7 +36,6 @@ and send data to 'SINK over network"))
   (with-slots(random-back-off-interval-fraction max-sample-interval)
           application
     (setf random-back-off-interval-fraction (uniform 0 1.0))
-    ;;(tracelog "application backofff=~:/dfv:eng/s" random-back-off-interval-fraction)
     (set-timer application 'request-sample
                (* random-back-off-interval-fraction max-sample-interval))))
 
