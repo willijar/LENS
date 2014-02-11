@@ -150,6 +150,8 @@
                         (mprings-sink-level (sink packet))))
              (setf tmp-sink (sink packet))))))
     (data
+     (unless (sink packet)
+       (tracelog "No sink specified on packet."))
      (when (sink packet)
      (let ((destination (destination packet))
            (sender-level (mprings-sink-level (sink packet)))
@@ -161,7 +163,7 @@
               (eql destination broadcast-network-address))
           (send instance (decapsulate packet) 'application))
          ((eql destination (sink-network-address instance))
-          (when (= sender-level (1+ current-level))
+          (if (= sender-level (1+ current-level))
             (cond
               ((= mprings-sink-id (nodeid (node instance)))
                ;;Packet is for this node, if filter passes, forward it to application
@@ -175,7 +177,9 @@
                ;; calling toMacLayer() function
                (tracelog "forwarding ~A to MAC layer" packet)
                (let ((dup (duplicate packet)))
-                 (setf (sink packet) (current-sink instance))
+                 (setf (sink dup)
+                       (make-mprings-sink :id (mprings-sink-id (sink packet))
+                                          :level current-level))
                  (to-mac instance dup broadcast-mac-address))))))
          ((eql destination (parent-network-address instance))
           (when (and (eql mprings-sink-id current-sink-id)

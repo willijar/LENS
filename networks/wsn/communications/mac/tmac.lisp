@@ -7,7 +7,8 @@
 (in-package :lens.wsn.mac.tmac)
 
 (defclass tmac-packet(mac-packet)
-  ())
+  ()
+  (:default-initargs :name nil))
 
 ;; differe tmac packet types
 ;; mac type (1 byte)  + source + destination requires 9 bytes
@@ -15,7 +16,7 @@
 (defclass tmac-sync-packet(tmac-packet) ;; sequence number but no source/dest
   ((sync :type integer :initarg :sync) ;; 4 bytes
    (sync-id :type integer :initarg :sync-id))  ;; 4 bytes
-  (:default-initargs :byte-length 11))
+  (:default-initargs :byte-length 11 :name 'sync))
 
 (defmethod duplicate((pkt tmac-sync-packet) &optional duplicate)
   (call-next-method)
@@ -23,7 +24,7 @@
 
 (defclass tmac-rts-packet(tmac-packet)
   ((nav :type time-type :initarg :nav))
-  (:default-initargs :byte-length 13)) ;; 4 bytes
+  (:default-initargs :byte-length 13 :name 'rts)) ;; 4 bytes
 
 (defmethod duplicate((pkt tmac-rts-packet) &optional duplicate)
   (call-next-method)
@@ -31,7 +32,7 @@
 
 (defclass tmac-cts-packet(tmac-packet)
   ((nav :type time-type :initarg :nav))
-   (:default-initargs :byte-length 13))
+   (:default-initargs :byte-length 13 :name 'cts))
 
 (defmethod duplicate((pkt tmac-cts-packet) &optional duplicate)
   (call-next-method)
@@ -47,7 +48,7 @@
 
 (defclass tmac-ack-packet(tmac-packet)
   ()
-  (:default-initargs :byte-length 11))
+  (:default-initargs :byte-length 11 :name 'ack))
 
 (defstruct tmac-schedule
   offset
@@ -357,6 +358,7 @@
                  (make-instance
                   'tmac-sync-packet
                   :destination broadcast-mac-address
+                  :source (mac-address instance)
                   :sync-id (tmac-schedule-id (aref schedule-table 0))
                   :sync (- (+ current-frame-start frame-time)
                            (+ (get-clock instance)
