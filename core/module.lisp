@@ -345,7 +345,7 @@ function."
 
 (defclass compound-module-class(module-class)
   ((%localtypes :type list :initarg :types :initform nil
-           :documentation "Specified local type mapping.")network
+           :documentation "Specified local type mapping.")
    (%submodules :type list :initarg :submodules :initform nil
                 :documentation "Submodule specifications")
    (%connections :type list :initarg :connections :initform nil
@@ -381,7 +381,7 @@ initialization list"
         (connection-code-walk class connections)))
 
 (defun submodule-generators(class spec)
-  "Given the module specification form return the sizespecification
+  "Given the module specification form return the siz especification
 and initargs specification - either nil and a list for a single module
 or two functions - one of the instance to return the size and one of
 the instance and index to return the module initargs for each module

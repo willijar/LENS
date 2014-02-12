@@ -483,7 +483,6 @@
 (defmethod report((r indexed-count-recorder) os)
   (when (not (zerop (hash-table-count (recorded-value r))))
     (format os "statistic ~S ~S~%" (full-path-string (owner (owner r))) (title r))
-    (maphash
-     #'(lambda(k v)
-         (format os "field ~S ~A~%" k v))
-     (recorded-value r))))
+    (dolist(k (sort (loop :for k :being :each :hash-key :of (recorded-value r) :collect k)
+                    #'(lambda(a b) (if (numberp a) (< a b) (string< (string a) (string b))))))
+      (format os "field ~S ~A~%" k (gethash k (recorded-value r))))))

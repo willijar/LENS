@@ -136,6 +136,9 @@ definitions as per let"
          (recording-modes
           (append (getf statistic :default)
                   (when (member :all spec) (getf statistic :optional)))))
+    (when (eql (car spec) :none)
+      (setf recording-modes nil
+            spec (cdr spec)))
     (loop :for a :on spec :by #'cdr
        :when (eql (car a) '+)
        :do (pushnew (second a) recording-modes)
