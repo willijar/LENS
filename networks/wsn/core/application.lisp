@@ -155,7 +155,8 @@
 
 (defmethod handle-message ((application application)
                            (message application-packet))
-  (emit application 'packet-receive message))
+  (emit application 'packet-receive message)
+  (tracelog "Received ~A" message))
 
 (defmethod handle-message((application application) (message sensor-message))
   (handle-sensor-reading application (measurement message)))

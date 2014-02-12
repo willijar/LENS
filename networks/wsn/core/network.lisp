@@ -17,7 +17,7 @@
   (:submodules
    ;; order matters here as nodes config depends on physical processes
    (wireless-channel wireless-channel)
-   (physical-processes num-physical-processes scenario-physical-process)
+   (physical-processes num-physical-processes physical-process)
    (node num-nodes node)))
 
 (defgeneric nodes(network)

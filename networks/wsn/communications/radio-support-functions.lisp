@@ -70,12 +70,7 @@
 
 (defvar +ideal-modulation-threshold+ 5.0)
 
-(flet((ratio-to-db(ratio)
-        (if (> ratio 1e-10)
-            (* 10.0 (log ratio 10.0))
-            -100.0))
-      (db-to-ratio(db)
-        (expt 10.0 (* db 0.1))))
+(flet((db-to-ratio(db) (expt 10.0 (* db 0.1))))
 (defgeneric snr2ber(encoding snr-db &optional bits-per-noise-bandwidth)
   (:documentation "Given a particular encoding, signal to noise ratio
   in db and the ratio of data rate to noise bandwidth calculate the
@@ -289,4 +284,3 @@
              (if (> (- (snr (1+ i)) snr-db)  (- (snr i) snr-db))
                  (return (custom-modulation-ber (aref custom i)))
                  (return (custom-modulation-ber (aref custom (1+ i))))))))))))
-

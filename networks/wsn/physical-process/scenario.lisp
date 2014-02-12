@@ -10,7 +10,7 @@
             :documentation "List showing how sources evolve over time"
             :initform
             `((,(make-coord 10.0 10.0) (0.0 . 30.5) (5.0 . 45) (12.0 . 7.3)))))
-  (:default-initargs :description 'fire)
+  (:default-initargs :description "fire")
   (:metaclass module-class))
 
 (defmethod measure((process scenario-physical-process)

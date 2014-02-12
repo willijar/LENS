@@ -17,7 +17,7 @@
   (:metaclass module-class)
   (:documentation "Application that will generate packets at specified rate"))
 
-(defmethod startup((application simple-aggregation))
+(defmethod startup((instance simple-aggregation))
   (call-next-method)
   (set-timer instance 'request-sample 0))
 
@@ -33,13 +33,13 @@
                        :payload (slot-value instance 'aggregated-value))
               'application))
 
-(defmethod handle-sensor-reading((instance simple-application) value)
+(defmethod handle-sensor-reading((instance simple-aggregation) (value real))
   (with-slots(last-sensed-value aggregated-value) instance
     (setf last-sensed-value value
           aggregated-value (max aggregated-value value))))
 
-(defmethod handle-message ((application simple-aggregation)
-                           (network-control-message pkt))
+(defmethod handle-message ((instance simple-aggregation)
+                           (pkt network-control-message))
   (let ((argument (argument pkt))
         (command (command pkt)))
     (when (member command '(lens.wsn.routing.multipath-rings::tree-level-updated
@@ -47,16 +47,9 @@
       (with-slots(routing-level waiting-time-for-lower-level-data
                   sample-interval) instance
         (setf routing-level
-              (lens.wsn.routing.multipath-rings::sink-level argument))
+              (lens.wsn.routing.multipath-rings::mprings-sink-level argument))
         (setf  waiting-time-for-lower-level-data
                (* sample-interval (expt 2 routing-level)))
         (tracelog "Routing level ~D" routing-level)
         (set-timer instance
                    'send-aggregated-value  waiting-time-for-lower-level-data)))))
-
-
-
-
-
-
-

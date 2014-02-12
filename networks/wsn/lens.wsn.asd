@@ -58,9 +58,11 @@
                         (:file "tuneable-mac")
                         (:file "tmac")
                         (:file "IEEE802.15.4")))))
-     (:module "application" :depends-on ("core")
+     (:module "application" :depends-on ("core" "communications")
               :components
               ((:file "value-reporting" :depends-on ("value-propagation"))
+               (:file "simple-aggregation")
+               (:file "connectivity-map")
                (:file "value-propagation")
                (:file "throughput-test")))
      (:module "physical-process" :depends-on ("core")

@@ -19,14 +19,13 @@
 (defmethod configure :after((instance physical-process))
   (unless (slot-boundp instance 'description)
     (setf (slot-value  instance 'description)
-          (format nil "~A[~D]" (class-name (class-of instance))
-                  (index instance)))))
+          (string (class-name (class-of instance))))))
 
-(defmethod measure :around ((physical-process physical-process)
-                            measurand
-                            location time)
-  (let ((*context* physical-process))
-    (call-next-method)))
+;; (defmethod measure :around ((physical-process physical-process)
+;;                             measurand
+;;                             location time)
+;;   (let ((*context* physical-process))
+;;     (call-next-method)))
 
 (defmethod measure((physical-process physical-process)
                    (measurand (eql 'temperature))
