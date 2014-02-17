@@ -101,31 +101,32 @@
   (:documentation "Schedule a timer using local time to determine interval")
   (:method(module (timer message) interval  &optional name)
     (when (scheduled-p timer)
-      (cancel timer))
+      (cancel-timer module timer))
     (when name (setf (name timer) name))
     (if (owner timer)
         (assert (eql (owner timer) module))
         (setf (owner timer) module))
     (schedule-at module timer
-                 :delay (get-simulation-time module interval)))
-  (:method(module (timer symbol) interval &optional name)
-    (declare (ignore name))
-    (with-slots(timers) module
-      (set-timer
-       module
-       (or (timer module timer)
-           (let ((msg (make-instance 'timer-message :owner module :name timer)))
-             (push msg timers)
-             msg))
-       interval
-       timer))))
+                 :delay (get-simulation-time module interval))
+    timer)
+  (:method((module wsn-module) (timer symbol) interval &optional (name timer))
+    (let ((timer (timer module timer)))
+      (if timer
+          (cancel-timer module timer)
+          (setf timer (make-instance 'timer-message :owner module :name timer)))
+      (push timer (slot-value module 'timers))
+      (set-timer module timer interval name) )))
 
 (defgeneric cancel-timer(instance timer)
   (:method(instance (timer timer-message))
     (cancel timer))
   (:method((instance wsn-module) (name symbol))
     (let ((timer (timer instance name)))
-      (when timer (cancel timer)))))
+      (when timer (cancel timer))))
+  (:method((instance wsn-module) (timer timer-message))
+    (cancel timer)
+    (setf (slot-value instance 'timers)
+          (delete timer (slot-value instance 'timers) :key #'name))))
 
 (defmethod cancel :after((timer timer-message))
   (let ((owner (owner timer)))
