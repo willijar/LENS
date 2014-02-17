@@ -251,7 +251,8 @@
        (level-tx-power
         instance
         (- (reduce #'max (powers instance))
-           (cluster-head-info-rssi (first cluster-head-candidates))))
+          (- (cluster-head-info-rssi (first cluster-head-candidates))
+             (sensibility instance))))
        (process-buffered-packet instance)
        (set-timer instance 'end-slot slot-length)))))
 
@@ -291,8 +292,6 @@
     (to-mac instance (dequeue (buffer instance)) broadcast-mac-address)))
 
 (defun level-tx-power(instance link-budget)
-  (break "leveling to ~A" (find-if #'(lambda(p) (> p link-budget))
-                               (powers instance)))
   (to-radio
    instance
    `(lens.wsn:set-tx-output . ,(find-if #'(lambda(p) (> p link-budget))
