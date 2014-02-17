@@ -564,9 +564,9 @@
     (setf (rx-mode radio) new-mode)))
 
 (defmethod handle-control-command((radio radio) (command (eql 'set-tx-output))
-                                  (label symbol))
+                                  (power real))
   (with-slots(tx-level tx-levels) radio
-    (setf tx-level (find label tx-levels :key #'tx-level-output-power))
+    (setf tx-level (find power tx-levels :key #'tx-level-output-power))
     (assert tx-level ()
             "Invalid tx output power level ~A" label)
     (tracelog "Changed TX power output to ~A dBm consuming ~A W"
@@ -641,7 +641,7 @@
          ((empty-p (buffer radio))
           ;; just changed to TX but buffer empty so send command to change to rx
           (schedule-at radio
-                       (make-instance 'radio-command-message
+                       (make-instance 'radio-control-command
                                       :command 'set-state
                                       :argument 'rx))
           (tracelog "WARNING: just changed to TX but buffer is empty - changing to RX"))

@@ -21,12 +21,13 @@
   this generic packet."))
 
 (defmethod print-object((p routing-packet) stream)
-  (print-unreadable-object(p stream :type t :identity t)
-    (format stream "~A ~A->~A (~D bytes)"
-            (name p)
-            (source p)
-            (destination p)
-            (byte-length p))))
+  (print-unreadable-object(p stream :type t)
+     (when (slot-boundp p 'name)
+      (format stream "~A " (name p)))
+     (format stream "~A->~A (~D bytes)"
+             (source p)
+             (destination p)
+             (byte-length p))))
 
 ;; Network_GenericFrame has the following real-world
 ;; (non-simulation-specific) fields:
