@@ -51,27 +51,27 @@
    ;; implementation values
    (round-number :type fixnum :initform 0 :accessor round-number)
    (probability :type float :initform 0.0 :accessor probability)
-   (sensibility :type float :parameter t :reader sensibility
+   (sensibility :type float :parameter t :reader sensibility :initform -95
                 :documentation "dBm")
    (aggr-consumption
-    :type float :parameter t :reader aggr-consumption
+    :type float :parameter t :reader aggr-consumption :initform 5e-9
     :documentation "Energy per bit used in transmitting aggregate data packet from cluster head")
    (aggregate-buffer
-    :type list :initform nil
+    :type list :initform nil :accessor aggregate-buffer
     :documentation "Stacked up application packets for sending as aggregate")
    (temp-tx-buffer
-    :type list :initform nil
+    :type list :initform nil :accessor temp-tx-buffer
     :documentation "Temp buffer for packets received before cluster formed")
    (cluster-members
-    :type list :initform nil :reader cluster-members)
+    :type list :initform nil :accessor cluster-members)
    (cluster-head-candidates
     :type list :initform nil :accessor cluster-head-candidates)
    (powers :type list :initform nil :reader powers)
    (cluster-length :type fixnum :initform 0)
 
    ;; type
-   (cluster-head-p :type boolean :initform nil :reader cluster-head-p)
-   (end-form-cluster :type boolean :initform nil)
+   (cluster-head-p :type boolean :initform nil :accessor cluster-head-p)
+   (end-form-cluster :type boolean :initform nil :accessor end-form-cluster)
    (ct-p :type boolean :initform nil))
   (:metaclass module-class))
 
@@ -96,42 +96,53 @@
                           (packet application-packet))
   ;; from application layer
   (unless (sink-p instance)
-    (if (cluster-head-p instance)
-        (push packet (slot-value instance 'aggregate-buffer))
-        (let ((routing-packet
-               (encapsulate
-                (make-instance
-                 'leach-data-packet
-                 :name 'data
-                 :header-overhead (header-overhead instance)
-                 :sequence-number (next-sequence-number instance)
-                 :source (network-address instance)
-                 :destination (destination (control-info packet)))
-                packet)))
-          (with-slots(end-form-cluster temp-tx-buffer) instance
-            (if end-form-cluster
-                (enqueue routing-packet instance)
-                (push routing-packet temp-tx-buffer)))))))
+    (let ((routing-packet
+           (encapsulate
+            (make-instance
+             'leach-data-packet
+             :header-overhead (header-overhead instance)
+             :sequence-number (next-sequence-number instance)
+             :source (network-address instance)
+             :destination (destination (control-info packet)))
+            packet)))
+      (cond
+        ((cluster-head-p instance)
+         (push routing-packet (aggregate-buffer instance)))
+        ((end-form-cluster instance)
+         (enqueue routing-packet instance))
+        (t
+         (push routing-packet (temp-tx-buffer instance)))))))
 
 (defmethod handle-message((instance leach-routing) (pkt leach-data-packet))
   (cond
     ((and (cluster-head-p instance)
           (eql (destination pkt) (network-address instance)))
-     (push (decapsulate pkt) (slot-value instance 'aggregate-buffer)))
+     (tracelog "Aggregate data ~A" pkt)
+     (push pkt (aggregate-buffer instance)))
     ((and (sink-p instance)
           (eql (destination pkt) (sink-network-address instance)))
      (send instance (decapsulate pkt) 'application))))
 
+(defmethod sink-p((instance leach-routing))
+  (eql (sink-network-address instance) (network-address instance)))
+
 (defmethod handle-message((instance leach-routing) (pkt leach-adv-packet))
+  #+nil(when (= (nodeid (node instance)) 17)
+    (break "~A ~A ~A" (cluster-head-p instance) (sink-p instance)
+           (cluster-head-candidates instance)))
   (when (not (or (cluster-head-p instance) (sink-p instance)))
+    (tracelog "Received advertisement message from ~A with RSSI ~A"
+              (source pkt) (rssi (control-info pkt)))
     (push (make-cluster-head-info :src (source pkt)
                                   :rssi (rssi (control-info pkt)))
-          (slot-value instance 'cluster-head-candidates))))
+          (cluster-head-candidates instance))))
 
 (defmethod handle-message((instance leach-routing) (pkt leach-join-packet))
   (when (and (cluster-head-p instance)
              (eql (destination pkt) (network-address instance)))
-    (push (source pkt) (slot-value instance 'cluster-members))))
+    (tracelog "Received a Join Request. Adding ~A to cluster members"
+               (source pkt))
+    (push (source pkt) (cluster-members instance))))
 
 (defmethod handle-message((instance leach-routing) (pkt leach-tdma-packet))
   (when (not (or (cluster-head-p instance) (sink-p instance)))
@@ -141,14 +152,15 @@
         (when (eql (aref schedule i) (network-address instance))
           (to-radio instance '(set-state . sleep))
           (set-timer instance 'start-slot
-                     (* i (slot-value instance 'slot-length))))))))
+                     (* i (slot-value instance 'slot-length)))
+          (tracelog "Received ~A: I am ~Dth" pkt i))))))
 
 (defmethod handle-timer :before ((instance leach-routing) timer)
   (check-type timer leach-routing-timer))
 
 (defmethod handle-timer((instance leach-routing) (timer (eql 'start-round)))
   (to-radio instance '(set-state . rx))
-  (to-radio instance `(set-tx-output ,(reduce #'max (powers instance))))
+  (to-radio instance `(lens.wsn:set-tx-output . ,(reduce #'max (powers instance))))
   (with-slots(end-form-cluster cluster-head-candidates cluster-members
               round-number round-length percentage ct-p cluster-head-p
               probability) instance
@@ -174,6 +186,7 @@
       (when (< rnd probability)
         (set-timer instance 'send-adv timer)
         (set-timer instance 'make-tdma (+ 2d0 timer))
+        (tracelog "Is cluster Head")
         (setf cluster-head-p t))
       (unless cluster-head-p
         (set-timer instance 'join-ch (+ 1.0 timer)))
@@ -202,13 +215,15 @@
         :header-overhead (slot-value instance 'join-packet-size)
         :source (network-address instance)
         :destination (cluster-head-info-src (first cluster-head-candidates)))
-       broadcast-mac-address))))
+       broadcast-mac-address)
+      (setf (end-form-cluster instance) t))))
 
 (defmethod handle-timer((instance leach-routing) (timer (eql 'make-tdma)))
   (with-slots(cluster-head-candidates cluster-members sensibility
               slot-length cluster-length) instance
     (if cluster-members
         (progn
+          (setf cluster-length (length cluster-members))
           (to-mac
            instance
            (make-instance
@@ -216,7 +231,7 @@
             :header-overhead (slot-value instance 'tdma-packet-size)
             :source (network-address instance)
             :destination broadcast-network-address
-            :schedule (coerce cluster-members 'array))
+            :schedule (coerce (reverse cluster-members) 'vector))
            broadcast-mac-address)
           (set-timer instance 'start-slot (* cluster-length slot-length)))
         (set-timer instance 'start-slot slot-length))))
@@ -265,18 +280,20 @@
     (setf aggregate-buffer nil)))))
 
 (defun process-buffered-packet(instance)
-  (let ((dst (cluster-head-info-src
-              (first (slot-value instance 'cluster-head-candidates)))))
-    (dolist(pkt (slot-value instance 'temp-tx-buffer))
-      (setf (destination pkt) dst)
-      (enqueue pkt instance)))
-  (setf (slot-value instance 'temp-tx-buffer) nil)
+  (when (temp-tx-buffer instance)
+    (let ((dst (cluster-head-info-src
+                (first (cluster-head-candidates instance)))))
+      (dolist(pkt (reverse (temp-tx-buffer instance)))
+        (setf (destination pkt) dst)
+        (enqueue pkt instance))))
+  (setf (temp-tx-buffer instance) nil)
   (while (not (empty-p (buffer instance)))
-    (to-mac instance (dequeue (buffer instance)))))
+    (to-mac instance (dequeue (buffer instance)) broadcast-mac-address)))
 
 (defun level-tx-power(instance link-budget)
+  (break "leveling to ~A" (find-if #'(lambda(p) (> p link-budget))
+                               (powers instance)))
   (to-radio
    instance
-   `(set-tx-output . ,(find-if #'(lambda(p) (> p link-budget))
+   `(lens.wsn:set-tx-output . ,(find-if #'(lambda(p) (> p link-budget))
                                (powers instance)))))
-
