@@ -35,6 +35,8 @@
 (defclass leach-routing(routing)
   ((sink-network-address :type integer :parameter t
                          :reader sink-network-address)
+   (applicationid :parameter t :initform 'lens.wsn::throughput-test :type symbol
+                  :documentation "Default destination application for aggregates")
    (header-overhead :initform 14)
    (buffer-size :initform 32)
    (max-net-frame-size :initform 0)
@@ -107,7 +109,7 @@
             packet)))
       (cond
         ((cluster-head-p instance)
-         (push routing-packet (aggregate-buffer instance)))
+         (push packet (aggregate-buffer instance)))
         ((end-form-cluster instance)
          (enqueue routing-packet instance))
         (t
@@ -117,8 +119,7 @@
   (cond
     ((and (cluster-head-p instance)
           (eql (destination pkt) (network-address instance)))
-     (tracelog "Aggregate data ~A" pkt)
-     (push pkt (aggregate-buffer instance)))
+     (push (decapsulate pkt) (aggregate-buffer instance)))
     ((and (sink-p instance)
           (eql (destination pkt) (sink-network-address instance)))
      (send instance (decapsulate pkt) 'application))))
@@ -153,7 +154,7 @@
           (to-radio instance '(set-state . sleep))
           (set-timer instance 'start-slot
                      (* i (slot-value instance 'slot-length)))
-          (tracelog "Received ~A: I am ~Dth" pkt i))))))
+          (tracelog "Received ~A: I am ~Dth" pkt i ))))))
 
 (defmethod handle-timer :before ((instance leach-routing) timer)
   (check-type timer leach-routing-timer))
@@ -186,7 +187,6 @@
       (when (< rnd probability)
         (set-timer instance 'send-adv timer)
         (set-timer instance 'make-tdma (+ 2d0 timer))
-        (tracelog "Is cluster Head")
         (setf cluster-head-p t))
       (unless cluster-head-p
         (set-timer instance 'join-ch (+ 1.0 timer)))
@@ -257,28 +257,43 @@
        (set-timer instance 'end-slot slot-length)))))
 
 (defmethod handle-timer((instance leach-routing) (timer (eql 'end-slot)))
-  (when (not (or (sink-p instance) (cluster-head-p instance)))
+  (unless (or (sink-p instance) (cluster-head-p instance))
     (to-radio instance '(set-state . sleep))))
 
 (defun send-aggregate(instance)
-  (with-slots(aggregate-buffer) instance
+  (with-slots(aggregate-buffer data-packet-size) instance
     (when aggregate-buffer
-    (let ((aggr-packet
-           (encapsulate
-            (make-instance
-             'leach-data-packet
-             :source (network-address instance)
-             :destination (sink-network-address instance)
-             :byte-length (+ 4 (header-overhead instance)))
-            (make-instance
-             'application-packet
-             :byte-length (reduce #'+ aggregate-buffer :key #'byte-length)
-             :payload (reverse aggregate-buffer)))))
+      (let ((aggr-packet
+             (encapsulate
+              (make-instance
+               'leach-data-packet
+               :name 'clusterhead-aggregate
+               :source (network-address instance)
+               :destination (sink-network-address instance)
+               :byte-length (+ 4 (header-overhead instance)))
+              (make-instance
+               'application-packet
+               :timestamp (simulation-time)
+               :applicationid (slot-value instance 'applicationid)
+               :control-info (make-instance
+                              'app-net-control-info
+                              :destination (sink-network-address instance)
+                              :source (network-address instance))
+               :byte-length
+               #+castelia-compatability
+               (+ 4 data-packet-size)
+               #-castelia-compatability
+               (reduce #'+ aggregate-buffer :key #'byte-length)
+               :payload (reverse aggregate-buffer)))))
       ;; draw energy based on size of data
-    (emit instance 'energy-consumed
-          (* (aggr-consumption instance)  (bit-length aggr-packet)))
-    (enqueue aggr-packet instance)
-    (setf aggregate-buffer nil)))))
+        (emit instance 'energy-consumed
+              (* (length aggregate-buffer)
+                 #+castelia-compatability
+                 (* (aggr-consumption instance) data-packet-size 1000)
+                 #-castelia-compatability
+                 (bit-length aggr-packet)))
+        (enqueue aggr-packet instance)
+        (setf aggregate-buffer nil)))))
 
 (defun process-buffered-packet(instance)
   (when (temp-tx-buffer instance)
