@@ -417,12 +417,12 @@
     (unless (histogram-transformed-p r) (histogram-transform r))
     (call-next-method)
     (format stream "attr unit s~%") ;; TODO allow specification of attributes in initargs
-    (format stream "bin -INF ~D~%" (underflow-cell r))
+    (format stream "bin -INF ~6D~%" (underflow-cell r))
     (let ((b (range-min r)))
       (dotimes(k (length (cells r)))
-        (format stream "bin ~4,2f ~4D~%" b (aref (cells r) k))
+        (format stream "bin ~6,1g ~4D~%" b (aref (cells r) k))
         (incf b (cell-size r))))
-    (format stream "bin +INF ~D~%" (overflow-cell r))))
+    (format stream "bin +INF ~6D~%" (overflow-cell r))))
 
 (defgeneric probability-density-function(instance x)
   (:documentation "Returns the estimated value of the Probability
