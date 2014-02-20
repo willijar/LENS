@@ -568,7 +568,7 @@
   (with-slots(tx-level tx-levels) radio
     (setf tx-level (find power tx-levels :key #'tx-level-output-power))
     (assert tx-level ()
-            "Invalid tx output power level ~A" label)
+            "Invalid tx output power level ~A" power)
     (tracelog "Changed TX power output to ~A dBm consuming ~A W"
               (tx-level-output-power tx-level)
               (tx-level-power-consumed tx-level))))

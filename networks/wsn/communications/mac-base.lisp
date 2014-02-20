@@ -11,8 +11,8 @@
 
 (defmethod print-object((p mac-packet) stream)
    (print-unreadable-object(p stream :type t)
-      (when (slot-boundp instance 'name)
-      (format stream "~A " (name instance)))
+      (when (slot-boundp p 'name)
+        (format stream "~A " (name p)))
       (format stream "~A->~A (~D bytes)"
             (source p)
             (destination p)

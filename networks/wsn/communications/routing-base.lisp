@@ -119,8 +119,8 @@
     (error "Network module ~A attempting to send ~A to mac"
            module message))
   (:method :before ((module routing) entity &optional destination)
+    (declare (ignore destination))
     (tracelog "Sending ~A to MAC layer" entity)))
-
 
 (defmethod decapsulate((packet routing-packet))
   (let ((application-packet (call-next-method)))
