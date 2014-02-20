@@ -24,51 +24,53 @@
   (:documentation "Implementation of a log distance based path loss model"))
 
 (defmethod initialize list ((model log-distance)  &optional (stage 0))
-  (ecase stage
-    (0 nil)
-    (1
-     (let* ((channel (owner model))
-            (cells (cells channel))
-            (n (reduce #'* (array-dimensions cells)))
-            (signal-delivery-threshold (signal-delivery-threshold channel))
-            (max-tx-power (max-tx-power channel))
-            (d0 (d0 model))
-            (PLd0 (PLd0 model))
-            (exponent (exponent model))
-            (sigma (sigma model))
-            (bidirectional-sigma (bidirectional-sigma model))
-            (distance-threshold
-             (expt 10 (/ (- max-tx-power signal-delivery-threshold PLd0 (* -3 sigma))
-                         (* 10.0 exponent)))))
-       (break "distance-threshold=~A signal-delivery-threshold=~A")
-       (for(i 0 n)
-         (let ((celli (row-major-aref cells i)))
-           (push (make-path-loss :destination celli :avg-path-loss 0.0)
-                 (cell-path-loss celli))
-           (for(j (1+ i) n)
-             (let* ((cellj (row-major-aref cells j))
-                    (distance (distance (cell-coord celli) (cell-coord cellj))))
-               (when (<= distance distance-threshold)
-                 (multiple-value-bind(PLd bidirection-pathloss-jitter)
-                     (if (< distance (/ d0 10.0))
-                         (values 0.0 0.0)
-                         (values(+ PLd0 (* 10.0 exponent
-                                           (log (/ distance d0) 10.0))
-                                   (normal 0.0 sigma))
-                                (/ (normal 0.0 bidirectional-sigma) 2.0)))
-                   (when (>= (- max-tx-power (+ Pld bidirection-pathloss-jitter))
-                             signal-delivery-threshold)
-                     (push (make-path-loss
-                            :destination cellj
-                            :avg-path-loss (+ Pld bidirection-pathloss-jitter))
-                           (cell-path-loss celli)))
-                   (when (>= (- max-tx-power (- Pld bidirection-pathloss-jitter))
-                             signal-delivery-threshold)
-                     (push (make-path-loss
-                            :destination celli
-                            :avg-path-loss (- Pld bidirection-pathloss-jitter))
-                           (cell-path-loss cellj))))))))))
-     t)))
+  (when (= stage 0) (return-from initialize nil))
+  (let* ((channel (owner model))
+         (cells (cells channel))
+         (no-cells (array-total-size cells))
+         (signal-delivery-threshold (signal-delivery-threshold channel))
+         (max-tx-power (max-tx-power channel))
+         (d0 (d0 model))
+         (PLd0 (PLd0 model))
+         (path-loss-exponent (exponent model))
+         (sigma (sigma model))
+         (bidirectional-sigma (bidirectional-sigma model))
+         (distance-threshold
+          (expt 10 (/ (- max-tx-power signal-delivery-threshold PLd0 (* -3 sigma))
+                      (* 10.0 path-loss-exponent)))))
+    (for (i 0  no-cells)
+      (let ((celli (row-major-aref cells i)))
+        ;; path loss to self is zero
+        (push (make-path-loss :destination celli :avg-path-loss 0.0)
+              (cell-path-loss celli))
+        (for (j (1+ i) no-cells)
+          (let* ((cellj (row-major-aref cells j))
+                 (distance (distance (cell-coord celli) (cell-coord cellj))))
+            (when (<= distance distance-threshold)
+              (multiple-value-bind(PLd bidirection-pathloss-jitter)
+                  (if (< distance (/ d0 10.0))
+                      (values 0.0 0.0)
+                      (values (+ PLd0 (* 10.0 path-loss-exponent
+                                         (log (/ distance d0) 10.0))
+                                 (normal 0.0 sigma))
+                              (/ (normal 0.0 bidirectional-sigma) 2.0)))
+                (when (>=
+                       (- max-tx-power Pld bidirection-pathloss-jitter)
+                       signal-delivery-threshold)
+                  (push (make-path-loss
+                         :destination cellj
+                         :avg-path-loss
+                         (+ Pld bidirection-pathloss-jitter))
+                        (cell-path-loss celli)))
+                (when (>= (- max-tx-power
+                             (- Pld bidirection-pathloss-jitter))
+                          signal-delivery-threshold)
+                  (push (make-path-loss
+                         :destination celli
+                         :avg-path-loss
+                         (- Pld bidirection-pathloss-jitter))
+                        (cell-path-loss cellj))))))))))
+    t)
 
 (defclass loss-map(module)
   ((path :parameter t :type pathname :reader path :initform nil
