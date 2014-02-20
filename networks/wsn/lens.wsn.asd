@@ -57,7 +57,11 @@
                        ((:file "bypass-mac")
                         (:file "tuneable-mac")
                         (:file "tmac")
-                        (:file "IEEE802.15.4")))))
+                        (:file "IEEE802.15.4")))
+               (:module "wireless"
+                        :components
+                        ((:file "temporal-model")
+                         (:file "loss-model")))))
      (:module "application" :depends-on ("core" "communications")
               :components
               ((:file "value-reporting" :depends-on ("value-propagation"))
