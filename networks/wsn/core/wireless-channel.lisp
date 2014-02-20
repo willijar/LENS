@@ -7,7 +7,7 @@
 
 (defstruct path-loss
   (destination nil :type (or cell nil))
-  (avg-path-loss 0.0 :type float)
+  (avg-path-loss 0.0 :type real)
   (last-observed-difference-from-avg 0.0 :type float)
   (last-observation-time (simulation-time) :type time-type))
 
@@ -15,7 +15,30 @@
  'fade-depth
  "Signaled to record changes in signal power")
 
-(defclass wireless-channel(module)
+(defgeneric run-temporal-model(model time signal-variation)
+  (:documentation "Given a time period and signal-variation return new
+siugnal variation and the time processed"))
+
+(defgeneric path-loss-signal-variation(model path-loss)
+  (:documentation "Given a temporal model and path loss structure run
+  the temporal model, updating the path-loss structure and returning
+  the new signal variation.")
+  (:method(model (path-loss path-loss))
+    (let* ((time-passed (- (simulation-time)
+                         (path-loss-last-observation-time path-loss))))
+    (multiple-value-bind(signal-variation time-processed)
+        (run-temporal-model
+         model
+         time-passed
+         (path-loss-last-observed-difference-from-avg  path-loss))
+      (setf (path-loss-last-observed-difference-from-avg path-loss)
+            signal-variation)
+      (setf (path-loss-last-observation-time path-loss)
+            (- (simulation-time) (- time-passed time-processed)))
+      (emit model 'fade-depth signal-variation)
+      signal-variation))))
+
+(defclass wireless-channel(compound-module)
   ((cell-size
     :type coord :parameter t :initform (make-coord 5.0 5.0 1.0)
     :reader cell-size
@@ -23,41 +46,15 @@
    (field
     :type coord :reader field
     :documentation "wireless coverage field (may be larger than network field")
-   (path-loss-exponent
-    :parameter t :type real :initform 2.4 :initarg :path-loss-exponent
-    :accessor path-loss-exponent
-    :documentation " how fast is the signal strength fading")
-   (PLd0
-    :parameter t :type real :initform 55 :initarg :pld0 :accessor PLd0
-    :documentation "path loss at reference distance d0 (in dBm)")
-   (d0
-    :parameter t :type real :initform 1.0 :initarg :d0 :accessor d0
-    :documentation "reference distance d0 (in meters)")
-   (sigma
-    :parameter t :type real :initform 4.0 :initarg :sigma :accessor sigma
-    :documentation "how variable is the average fade for nodes at the
-    same distance from each other. std of a gaussian random variable")
-   (bidirectional-sigma
-    :parameter t :type real :initform 1.0 :initarg :bidirectional-sigma
-    :accessor bidirectional-sigma
-    :documentation "how variable is the average fade for link B->A if
-    we know the fade of link A->B. std of a gaussian random variable")
    (signal-delivery-threshold
     :parameter t :type real :initform -100.0 :initarg :signal-delivery-threshold
     :accessor signal-delivery-threshold
     :documentation "threshold in dBm above which, wireless channel
     module is delivering signal messages to radio modules of
     individual nodes")
-   (path-loss-map-file
-    :parameter t :type pathname :initarg :path-loss-map-file
-    :accessor path-loss-map-file
-    :documentation "describes a map of the connectivity based on
-    pathloss if defined, then the parameters above become irrelevant")
-   (temporal-model-parameters-file
-    :parameter t :type pathname :initarg :temporal-model-parameters-file
-    :accessor temporal-model-parameters-file
-    :documentation "the filename that contains all parameters for the
-    temporal channel variation model")
+   (temporal-model
+    :reader temporal-model
+    :documentation "the temporal channel variation model")
    (max-tx-power :type real :initform 0.0 :accessor max-tx-power)
    (receivers
     :type array :reader receivers
@@ -72,13 +69,20 @@
   (:default-initargs :num-rngs 3)
   (:gates
    (fromNodes :input))
+  (:submodules
+   (temporal-model no-temporal-model)
+   (path-loss-model log-distance))
   (:properties
    (:statistic (fade-depth :default (histogram))))
-  (:metaclass module-class)
+  (:metaclass compound-module-class)
   (:documentation "The wireless channel module simulates the wireless
   medium. Nodes sent packets to it and according to various
   conditions (fading, interference etc) it is decided which nodes can
   receive this packet."))
+
+(defmethod build-submodules :after ((instance wireless-channel))
+    (setf (slot-value instance 'temporal-model)
+          (submodule instance 'temporal-model)))
 
 (defun coord-cell(coord module)
   "Return row major aref  of cell indicies corresponding to coord for wireless
@@ -94,7 +98,7 @@ channel module"
                         (field (funcall f (field module)))
                         (a (max 0 (min coord field))))
                    (when (> coord field)
-                     (tracelog "Warning at initialization: node position out of boinds in ~A dimension!" f))
+                     (tracelog "Warning at initialization: node position out of bounds in ~A dimension!" f))
                    (floor a (funcall f (cell-size module)))))
              (load-time-value (list #'coord-x #'coord-y #'coord-z)))))))
 
@@ -104,6 +108,13 @@ channel module"
 
 (defun (setf location-cell)(index channel instance)
   (setf (gethash instance (slot-value channel 'location-cells)) index))
+
+(defun map-array(f a)
+  "Map function f over array a returning list of return values"
+  (let ((result nil))
+    (dotimes(i (array-total-size a))
+      (push (funcall f (row-major-aref a i)) result))
+    (nreverse result)))
 
 (defmethod initialize list ((wireless wireless-channel) &optional (stage 0))
   (let* ((nodes (nodes (network *simulation*))))
@@ -155,82 +166,18 @@ channel module"
                           (setf (location-cell wireless node) cell)
                           (push node (cell-occupation cell))))
                     nodes)))
-       (with-slots(max-tx-power signal-delivery-threshold
-                   d0 PLd0 sigma path-loss-exponent bidirectional-sigma)
-           wireless
-         (let* ((distance-threshold
-                 (expt 10 (/ (- max-tx-power signal-delivery-threshold PLd0
-                                (* -3 sigma))
-                             (* 10.0 path-loss-exponent))))
-                (cells (cells wireless))
-                (no-cells (reduce #'* (array-dimensions cells))))
-           (for (i 0 no-cells)
-             (let ((celli (row-major-aref cells i)))
-               ;; path loss to self is zero
-               (push (make-path-loss :destination celli :avg-path-loss 0.0)
-                     (cell-path-loss (row-major-aref cells i)))
-               (for (j (1+ i) no-cells)
-                 (let* ((cellj (row-major-aref cells j))
-                        (distance (distance (cell-coord celli)
-                                            (cell-coord cellj))))
-                   (when (<= distance distance-threshold)
-                     (multiple-value-bind(PLd bidirection-pathloss-jitter)
-                         (if (< distance (/ d0 10.0))
-                             (values 0.0 0.0)
-                             (values (+ PLd0 (* 10.0 path-loss-exponent
-                                                (log (/ distance d0) 10.0))
-                                        (normal 0.0 sigma))
-                                     (/ (normal 0.0 bidirectional-sigma) 2.0)))
-                       (when (>=
-                              (- max-tx-power Pld bidirection-pathloss-jitter)
-                              signal-delivery-threshold)
-                         (push (make-path-loss
-                                :destination cellj
-                                :avg-path-loss
-                                (+ Pld bidirection-pathloss-jitter))
-                               (cell-path-loss (row-major-aref cells i))))
-                       (when (>= (- max-tx-power
-                                    (- Pld bidirection-pathloss-jitter))
-                                 signal-delivery-threshold)
-                         (push (make-path-loss
-                                :destination celli
-                                :avg-path-loss
-                                (- Pld bidirection-pathloss-jitter))
-                               (cell-path-loss (row-major-aref cells j))))))))))
-           (tracelog "Number of space cells: ~A" no-cells)
-           (tracelog "Each cell affects ~f other cells on average."
-                     (/ (loop :for i :from 0 :below no-cells
-                           :sum (length  (cell-path-loss (row-major-aref cells i))))
-                        no-cells))))
-       (parse-path-loss-map wireless)
-       ;; TODO temporal model and maybe generate on demand.
+       nil)
+      (2
+       (let* ((cells (cells wireless))
+             (no-cells (array-total-size cells)))
+         (tracelog "Number of space cells: ~A" no-cells)
+         (tracelog "Each cell affects ~f other cells on average."
+                   (/ (reduce #'+
+                              (map-array
+                               #'(lambda(cell) (length  (cell-path-loss cell)))
+                               cells))
+                      no-cells)))
        t))))
-
-(defun parse-path-loss-map(wireless-channel)
-  "Format is list of lists of transmitter id and cons's of receiver id
-and pathloss e.g. ((transmitterid (receiverid . loss) (receiverid
-. loss) ... ) ... )"
-  (unless (slot-boundp wireless-channel 'path-loss-map-file)
-    (return-from parse-path-loss-map))
-  (let ((path-loss-map
-         (with-open-file(is (merge-pathnames
-                             (path-loss-map-file wireless-channel)))
-           (read is)))
-        (cells (cells wireless-channel)))
-    (flet ((idx(id)  (apply #'array-row-major-index cells id)))
-      (dolist(row path-loss-map)
-        (let ((src (row-major-aref cells (idx (car row)))))
-          (dolist(col (rest row))
-            (let ((dest (row-major-aref cells (idx (car col)))))
-              (update-path-loss-element src dest (cdr dest)))))))))
-
-(defun update-path-loss-element(src-cell dest-cell pathloss-db)
-  (let ((path-loss (find dest-cell (cell-path-loss src-cell)
-                         :key #'path-loss-destination)))
-    (if path-loss
-        (setf (path-loss-avg-path-loss path-loss) pathloss-db)
-        (push (make-path-loss :destination dest-cell :avg-path-loss pathloss-dB)
-              (cell-path-loss src-cell)))))
 
 ;; we encapsulate transmitted data in wireless-end message
 
@@ -299,8 +246,9 @@ and pathloss e.g. ((transmitterid (receiverid . loss) (receiverid
       (unless (cell-occupation (path-loss-destination path-loss))
         (go next))
       (let ((current-signal-received
-             (- (power-dbm message) (path-loss-avg-path-loss path-loss))))
-        ;; TODO temporal model
+             (+
+              (- (power-dbm message) (path-loss-avg-path-loss path-loss))
+              (path-loss-signal-variation (temporal-model wireless) path-loss))))
         (when (< current-signal-received (signal-delivery-threshold wireless))
           (go next))
             ;; go through all nodes in that cell and send copy of message
