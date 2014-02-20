@@ -23,8 +23,7 @@
     (:metaclass module-class)
   (:documentation "Implementation of a log distance based path loss model"))
 
-(defmethod initialize list ((model log-distance)
-                            &optional (stage 0))
+(defmethod initialize list ((model log-distance)  &optional (stage 0))
   (ecase stage
     (0 nil)
     (1
@@ -41,6 +40,7 @@
             (distance-threshold
              (expt 10 (/ (- max-tx-power signal-delivery-threshold PLd0 (* -3 sigma))
                          (* 10.0 exponent)))))
+       (break "distance-threshold=~A signal-delivery-threshold=~A")
        (for(i 0 n)
          (let ((celli (row-major-aref cells i)))
            (push (make-path-loss :destination celli :avg-path-loss 0.0)
