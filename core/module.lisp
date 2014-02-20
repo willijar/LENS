@@ -573,10 +573,6 @@ specification of a specific subclass."
                                 (list name 'typename))
                             'read)
             basetype)))
-      (assert (subtypep typename basetype)
-              ()
-              "Configuration specified type ~A is not a subtype of ~A"
-              typename basetype)
       (let ((submodule (apply #'make-instance typename initargs)))
         (if (arrayp sm)
             (vector-push-extend submodule sm)

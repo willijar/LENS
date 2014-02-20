@@ -211,38 +211,38 @@
             child)))))
 
 (defun read-ini-line(is parameter-source)
-    "Returns either a string representing a section title, a trie
+  "Returns either a string representing a section title, a trie
 representing a value, a pathname for an extension file or nil if no
  ((more data"
-    (let ((line ;; read continuation lines - ignore comments
-           (wstrim
-            (with-output-to-string(os)
-              (loop
-                 (incf (parameter-source-line-number parameter-source))
-                 (let* ((s (read-line is))
-                        (p (position #\# s :from-end t)))
-                   (when p (setf s (subseq s 0 p)))
-                   (let ((end (1- (length s))))
+  (let ((line ;; read continuation lines - ignore comments
+         (wstrim
+          (with-output-to-string(os)
+            (loop
+               (incf (parameter-source-line-number parameter-source))
+               (let* ((s (read-line is))
+                      (p (position #\# s :from-end t)))
+                 (when p (setf s (subseq s 0 p)))
+                 (let ((end (1- (length s))))
                    (unless (or (< end 0) (char= (char s 0) #\#))
                      (when (char/=  (char s end) #\\)
                        (write-string (subseq s 0 (1+ end)) os)
                        (return))
                      (write-string s os :end end)))))))))
-      (cond
-        ((and (char= (char line 0) #\[)
-              (char= (char line (1- (length line))) #\]))
-         (wstrim (subseq line 1 (1- (length line)))))
-        ((let ((p (position #\= line)))
-           (when p
-             (make-trie
-              (cons nil (split-sequence:split-sequence
-                         #\.(wstrim (subseq line 0 p))))
-              (wstrim (subseq line (1+ p)))
-              (copy-parameter-source parameter-source)))))
-        ((zerop (search "include" line :test #'char-equal))
-         (parse-namestring (wstrim (subseq line 7))))
-        (t
-         (error "Parse error in configuration file at ~A" line)))))
+    (cond
+      ((and (char= (char line 0) #\[)
+            (char= (char line (1- (length line))) #\]))
+       (wstrim (subseq line 1 (1- (length line)))))
+      ((let ((p (position #\= line)))
+         (when p
+           (make-trie
+            (cons nil (split-sequence:split-sequence
+                       #\.(wstrim (subseq line 0 p))))
+            (wstrim (subseq line (1+ p)))
+            (copy-parameter-source parameter-source)))))
+      ((zerop (search "include" line :test #'char-equal))
+       (parse-namestring (wstrim (subseq line 7))))
+      (t
+       (error "Parse error in configuration file at ~A" line)))))
 
 (defun read-configuration(pathname &optional (key "General"))
   "Read a configuration file"
