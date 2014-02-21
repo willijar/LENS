@@ -176,7 +176,8 @@
     (/ weighted-sum (- last-time start-time))))
 
 (defclass stddev(scalar-recorder)
-  ((count :type integer :initform 0 :reader result-count)
+  ((output-format :initform "~3@/dfv:eng/")
+   (count :type integer :initform 0 :reader result-count)
    (min :type float :initform nil :reader result-min)
    (max :type float :initform nil :reader result-max)
    (sum :type float :initform 0 :reader result-sum)
@@ -209,18 +210,31 @@
       (incf sum value)
       (incf sqrsum (* value value))))
 
+(defun write-fields(stream r fields)
+  (dolist(a fields)
+    (format stream "field ~A~13T~?~%"
+            (first a)
+            (or (third a) (slot-value r 'output-format) "~A")
+            (list (let ((v (second a)))
+                    (etypecase v
+                      (function (funcall v r))
+                      (number v)
+                      (string v)
+                      (symbol (slot-value r v))))))))
+
 (defmethod report((r stddev) stream)
   (unless (zerop (result-count r))
   (format stream "statistic ~S ~S~%" (full-path-string (owner (owner r))) (title r))
-  (with-slots(min max sum count sqrsum) r
-    (format stream "field count ~4D~%field mean ~8,3f~%field stddev ~6,3f~%field sum ~9,3f~%field sqrsum ~6,3f~%field min ~9,3f~%field max ~9,3f~%"
-            (result-count r)
-            (result-mean r)
-            (result-stddev r)
-            (result-sum r)
-            (result-sqrsum r)
-            (result-min r)
-            (result-max r)))))
+  (write-fields
+   stream
+   r
+   `(("count" ,#'result-count "~D")
+     ("mean" ,#'result-mean)
+     ("stddev" ,#'result-stddev)
+     ("sum" ,#'result-sum)
+     ("sqrsum", #'result-sqrsum)
+     ("min" ,#'result-min)
+     ("max" ,#'result-max)))))
 
 (defclass weighted-stddev(stddev)
   ((sum-weights :type real :initform 0)
@@ -260,11 +274,13 @@
 (defmethod report((r weighted-stddev) stream)
   (unless (zerop (result-count r))
     (call-next-method)
-    (with-slots(sum-weights sum-weighted-vals sum-squared-weights
-                            sum-weights-squared-vals) r
-      (format stream "field weights ~7,3f~%field weightedSum ~7,3f~%field sqrSumWeights ~7,3f~%field weightedSqrSum ~7,3f~%"
-              sum-weights sum-weighted-vals sum-squared-weights
-              sum-weights-squared-vals))))
+    (write-fields
+     stream
+     r
+     '(("weights" sum-weights)
+       ("weightedSum" sum-weighted-vals)
+       ("sqrSumWeights" sum-squared-weights)
+       ("weightedSqrSum" sum-weights-squared-vals)))))
 
 (defclass histogram(stddev)
   ((range-min :initarg :min :initform nil :type real :reader range-min)
@@ -283,6 +299,7 @@
               :documentation "Cell size once scale determined.")
    (array :type (array real *) :reader cells
           :documentation "Pre-collected observations or cells")
+   (units :type string :initform "s" :initarg :units)
    (underflow-cell :initform 0 :type integer :accessor underflow-cell
                    :documentation "Number of observations below range-min")
    (overflow-cell :initform 0 :type integer :accessor overflow-cell
@@ -416,13 +433,14 @@
   (unless (zerop (result-count r))
     (unless (histogram-transformed-p r) (histogram-transform r))
     (call-next-method)
-    (format stream "attr unit s~%") ;; TODO allow specification of attributes in initargs
-    (format stream "bin -INF ~6D~%" (underflow-cell r))
+    (format stream "attr unit ~A~%" (slot-value r 'units))
+    (format stream "bin -INF~13T~5D~%" (underflow-cell r))
     (let ((b (range-min r)))
       (dotimes(k (length (cells r)))
-        (format stream "bin ~6,1g ~4D~%" b (aref (cells r) k))
+        (format stream "bin ~?~13T~5D~%" (slot-value r 'output-format) (list b)
+                (aref (cells r) k))
         (incf b (cell-size r))))
-    (format stream "bin +INF ~6D~%" (overflow-cell r))))
+    (format stream "bin +INF~13T~5D~%" (overflow-cell r))))
 
 (defgeneric probability-density-function(instance x)
   (:documentation "Returns the estimated value of the Probability

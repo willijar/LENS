@@ -17,12 +17,14 @@
 
 (defgeneric run-temporal-model(model time signal-variation)
   (:documentation "Given a time period and signal-variation return new
-siugnal variation and the time processed"))
+signal variation and the time processed"))
 
 (defgeneric path-loss-signal-variation(model path-loss)
   (:documentation "Given a temporal model and path loss structure run
   the temporal model, updating the path-loss structure and returning
   the new signal variation.")
+  (:method :around (model path-loss)
+       (let ((*context* model)) (call-next-method)))
   (:method(model (path-loss path-loss))
     (let* ((time-passed (- (simulation-time)
                          (path-loss-last-observation-time path-loss))))
@@ -31,6 +33,7 @@ siugnal variation and the time processed"))
          model
          time-passed
          (path-loss-last-observed-difference-from-avg  path-loss))
+      (tracelog "Signal variation=~g" signal-variation)
       (setf (path-loss-last-observed-difference-from-avg path-loss)
             signal-variation)
       (setf (path-loss-last-observation-time path-loss)
@@ -73,7 +76,7 @@ siugnal variation and the time processed"))
    (temporal-model no-temporal-model)
    (path-loss-model log-distance))
   (:properties
-   (:statistic (fade-depth :default (histogram))))
+   :statistic (fade-depth :default ((histogram :units "dB" :format "~1@/dfv:eng/"))))
   (:metaclass compound-module-class)
   (:documentation "The wireless channel module simulates the wireless
   medium. Nodes sent packets to it and according to various

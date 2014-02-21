@@ -74,7 +74,7 @@
    :statistic (latency
                :source (latency packet-receive)
                :title "application latency"
-               :default ((histogram :min 0)))
+               :default ((histogram :min 0  :unit "s" :format "~3@/dfv:eng/")))
    :statistic (packet-receive :title "application packets received"
                               :default (count))
    :statistic (packet-receive-per-node

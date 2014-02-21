@@ -124,6 +124,10 @@ definitions as per let"
            (lambda() ,(do-expand expression))))
        signals))))
 
+(defun stat-eql(a b)
+  (flet((tp(x) (if (listp x) (first x) x)))
+    (eql (tp a) (tp b))))
+
 (defmethod initialize-instance :after ((instance statistic-listener)
                                        &key statistic &allow-other-keys)
   (setf (slot-value instance 'title)
@@ -141,10 +145,12 @@ definitions as per let"
             spec (cdr spec)))
     (loop :for a :on spec :by #'cdr
        :when (eql (car a) '+)
-       :do (pushnew (second a) recording-modes)
+       :do (setf recording-modes
+                        (cons (second a)
+                        (delete (second a) recording-modes :test #'stat-eql)))
        :when (eql (car a) '-)
        :do (setf recording-modes
-                 (delete (second a) recording-modes :test #'equal)))
+                 (delete (second a) recording-modes :test #'stat-eql)))
     (setf (slot-value instance 'recorders)
             (mapcar
              #'(lambda(recorder-mode)
@@ -163,7 +169,6 @@ definitions as per let"
 
 (defmethod title((instance result-recorder))
          (title (owner instance)))
-
 
 ;; map listener receive-signal with source onto statistic receive-signal with time
 (defmethod receive-signal((listener statistic-listener) signal
@@ -189,7 +194,8 @@ definitions as per let"
   (with-output-to-string(os) (report r os)))
 
 (defclass scalar-recorder(result-recorder)
-  ())
+  ((output-format :initform "~A" :initarg :format
+           :documentation "Format to use when outputing recorded units")))
 
 (defgeneric recorded-value(scalar-recorder)
   (:documentation "Return the value to record for a scalar recorder"))
@@ -200,8 +206,9 @@ definitions as per let"
       (report r os))))
 
 (defmethod report((r scalar-recorder) stream)
-  (format stream "scalar ~S ~S ~A~%"
-          (full-path-string (owner (owner r))) (title r) (recorded-value r)))
+  (format stream "scalar ~S ~S ~?~%"
+          (full-path-string (owner (owner r))) (title r)
+          (slot-value r 'output-format) (list (recorded-value r))))
 
 (defun add-statistics(sim)
   (labels((do-add-statistics(module)
