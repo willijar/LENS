@@ -29,7 +29,7 @@
 
 (defstruct rx-mode
   (name nil :type symbol)
-  (data-rate 0.0 :type float)
+  (data-rate 0.0 :type real)
   (modulation 'ideal :type modulation-type)
   (bits-per-symbol 1 :type fixnum)
   (bandwidth 0.0 :type float)
@@ -231,7 +231,7 @@
                        :key #'tx-level-output-power :test #'eql)
                  (elt (tx-levels radio) 0)))
        (tracelog
-        "Initalized TX power output to ~1/dfv:eng/dBm consuming ~1:/dfv:eng/W"
+        "Initalized TX power output to ~1/dfv:eng/dBm consuming ~2:/dfv:eng/W"
         (tx-level-output-power (tx-level radio))
         (tx-level-power-consumed (tx-level radio)))
        (setf (sleep-level radio)

@@ -79,11 +79,12 @@
     (* 0.5 (exp (* -0.5 (/ (db-to-ratio snr-db) bpnb)))))
   (:method((encoding (eql 'psk)) snr-db &optional bpnb)
     (* 0.5 (erfc (sqrt (/ (db-to-ratio snr-db) bpnb)))))
-  (:method((encoding (eql 'dpsk)) snr-db &optional bpnb)
+  (:method((encoding (eql 'diffdpsk)) snr-db &optional bpnb)
     (* 0.5 (exp (/ (db-to-ratio snr-db)  bpnb))))
   (:method((encoding (eql 'ideal)) snr-db &optional bpnb)
     (declare (ignore bpnb))
     (if (< snr-db +ideal-modulation-threshold+) 1.0d0 0.0d0))))
+
 
 (defun probability-of-exactly-N-errors(ber num-errors num-bits)
   (declare (double-float ber) (fixnum num-errors) (fixnum num-bits))
@@ -259,13 +260,13 @@
 		0.00000905258912	;; BER for SNR 12.0dB
 		0.00000572139679)	;; BER for SNR 12.2dB  PER(4000bits) = 0.9773
   '(array float 1))))
-(defmethod snr2ber((encoding (eql 'dqpsk)) snr-db &optional bpnb)
+(defmethod snr2ber((encoding (eql 'diffqpsk)) snr-db &optional bpnb)
   (declare (ignore bpnb) (float snr-db))
 	;; The values of the SNR parameter should be within 6.0 and 12.2 dB if not
 	;; we should issue a warning. here we just return appropriate values
   (cond
-    ((< snr-db 6.0) 1.0)
-    ((>= snr-db 12.2) 0.0)
+    ((< snr-db 6.0) 1.0d0)
+    ((>= snr-db 12.2) 0.0d0)
     (t
      (multiple-value-bind(index a) (floor (- snr-db 6.0) 0.2)
        (+ (* a (aref ber-array index))

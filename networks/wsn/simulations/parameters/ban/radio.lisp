@@ -1,14 +1,14 @@
-# ****************************************************************************
-# *  Copyright: National ICT Australia,  2009 - 2010                         *
-# *  Developed at the ATP lab, Networked Systems research theme              *
-# *  Author(s): Athanassios Boulis, Yuriy Tselishchev                        *
-# *  This file is distributed under the terms in the attached LICENSE file.  *
-# *  If you do not find this file, copies can be found by writing to:        *
-# *                                                                          *
-# *      NICTA, Locked Bag 9013, Alexandria, NSW 1435, Australia             *
-# *      Attention:  License Inquiry.                                        *
-# *                                                                          *
-# ***************************************************************************/
+;; # ****************************************************************************
+;; # *  Copyright: National ICT Australia,  2009 - 2010                         *
+;; # *  Developed at the ATP lab, Networked Systems research theme              *
+;; # *  Author(s): Athanassios Boulis, Yuriy Tselishchev                        *
+;; # *  This file is distributed under the terms in the attached LICENSE file.  *
+;; # *  If you do not find this file, copies can be found by writing to:        *
+;; # *                                                                          *
+;; # *      NICTA, Locked Bag 9013, Alexandria, NSW 1435, Australia             *
+;; # *      Attention:  License Inquiry.                                        *
+;; # *                                                                          *
+;; # ***************************************************************************/
 
 ((rx-modes
   #s(rx-mode
@@ -42,11 +42,11 @@
      :sensitivity -87.0
      :power-consumed 3.1e-3))
  (tx-levels
-  #s(tx-level :output-power -10 :power-consumed 3.00e-3) ;; dBm, and Watts
-  #s(tx-level :output-power -12 :power-consumed 2.96e-3) ;; dBm, and Watts
-  #s(tx-level :output-power -15 :power-consumed 2.93e-3) ;; dBm, and Watts
-  #s(tx-level :output-power -20 :power-consumed 2.90e-3) ;; dBm, and Watts
-  #s(tx-level :output-power -25 :power-consumed 2.90e-3)) ;; dBm, and Watts
+  #s(tx-level :output-power -10.0 :power-consumed 3.00e-3) ;; dBm, and Watts
+  #s(tx-level :output-power -12.0 :power-consumed 2.96e-3) ;; dBm, and Watts
+  #s(tx-level :output-power -15.0 :power-consumed 2.93e-3) ;; dBm, and Watts
+  #s(tx-level :output-power -20.0 :power-consumed 2.90e-3) ;; dBm, and Watts
+  #s(tx-level :output-power -25.0 :power-consumed 2.90e-3)) ;; dBm, and Watts
  (sleep-levels
   #s(sleep-level :name idle :power 0.05e-3))
  (transitions
