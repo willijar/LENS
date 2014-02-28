@@ -33,7 +33,7 @@ signal variation and the time processed"))
          model
          time-passed
          (path-loss-last-observed-difference-from-avg  path-loss))
-      (tracelog "Signal variation=~g" signal-variation)
+      (tracelog "Signal variation(~g)=~g" (path-loss-last-observed-difference-from-avg  path-loss) signal-variation)
       (setf (path-loss-last-observed-difference-from-avg path-loss)
             signal-variation)
       (setf (path-loss-last-observation-time path-loss)

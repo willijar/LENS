@@ -80,7 +80,9 @@
   t)
 
 (defun draw-from-pdf(pdf)
-  (let((v (aref pdf (intuniform 0 (1- (length pdf))))))
+  (let*((n (lens::%genintrand (length pdf) 0))
+        (v (aref pdf n)))
+    (tracelog "v(~D/~D)=~A" n (length pdf) v)
     (etypecase v
       (number v)
       (vector (draw-from-pdf v)))))
@@ -94,6 +96,7 @@
 
 (defmethod run-temporal-model((model temporal-model) time value)
   "Return the new signal variation value and remaining time processed by temporal model"
+  (let ((*context* model))
   (if (or (zerop time) (>= time (coherence-time model)))
       (values (draw-from-pdf (coherence-pdf model)) time)
       (let ((remaining-time time))
@@ -104,4 +107,4 @@
               (decf remaining-time correlation-time)
               (setf value
                     (draw-from-pdf (aref pdfs (pdf-index model value)))))))
-        (values value (- remaining-time time)))))
+        (values value (- remaining-time time))))))
