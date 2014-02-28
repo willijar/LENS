@@ -41,7 +41,9 @@ random source to seed")
   ;; ARR corresponts to "mt[]" in the reference implementation.
   ;; Probably should have called it MT after all.  Oh well.
     ((arr :type array :initform (make-array +mt-n+ :element-type '(uint 32)))
-     (mti :type fixnum :initform +mt-n+))
+     (mti :type fixnum :initform +mt-n+)
+     (seed :initarg :seed :initform nil)
+     (count :initform 0))
   (:documentation "Mersenne Twister random number generator -- a C++
   class MTRand based on code by Makoto Matsumoto, Takuji Nishimura,
   and Shawn Cokus
@@ -57,6 +59,10 @@ Reference
 M. Matsumoto and T. Nishimura, 'Mersenne Twister: A 623-Dimensionally
 Equidistributed Uniform Pseudo-Random Number Generator', ACM Transactions on
 Modeling and Computer Simulation, Vol. 8, No. 1, January 1998, pp 3-30."))
+
+(defmethod print-object((m mt-random-state) stream)
+    (print-unreadable-object(m stream :type t :identity t)
+      (format stream "~D (seed=~D)" (slot-value m 'count) (slot-value m 'seed))))
 
 (defmethod initialize-instance :after ((mt mt-random-state) &key (seed t))
   (seed mt seed))
@@ -160,6 +166,7 @@ MT-GENRAND function for clarity."
   (mod (ash n -18) +mt-k2^32+))
 
 (defun mt-genrand (mt-random-state)
+  (incf (slot-value mt-random-state 'count))
   (let ((mt-tempering-mask-b #x9d2c5680)
         (mt-tempering-mask-c #xefc60000))
      (with-slots(mti arr) mt-random-state
