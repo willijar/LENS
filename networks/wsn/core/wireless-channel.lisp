@@ -27,17 +27,19 @@ signal variation and the time processed"))
        (let ((*context* model)) (call-next-method)))
   (:method(model (path-loss path-loss))
     (let* ((time-passed (- (simulation-time)
-                         (path-loss-last-observation-time path-loss))))
+                           (path-loss-last-observation-time path-loss))))
     (multiple-value-bind(signal-variation time-processed)
         (run-temporal-model
          model
          time-passed
          (path-loss-last-observed-difference-from-avg  path-loss))
-      (tracelog "Signal variation(~g)=~g" (path-loss-last-observed-difference-from-avg  path-loss) signal-variation)
+      (tracelog "Signal variation(~gdB,~gs)=~g"
+                (path-loss-last-observed-difference-from-avg  path-loss)
+                time-processed signal-variation)
       (setf (path-loss-last-observed-difference-from-avg path-loss)
             signal-variation)
-      (setf (path-loss-last-observation-time path-loss)
-            (- (simulation-time) (- time-passed time-processed)))
+      (incf (path-loss-last-observation-time path-loss)
+            time-processed)
       (emit model 'fade-depth signal-variation)
       signal-variation))))
 
@@ -174,7 +176,7 @@ channel module"
        (let* ((cells (cells wireless))
              (no-cells (array-total-size cells)))
          (tracelog "Number of space cells: ~A" no-cells)
-         (tracelog "Each cell affects ~f other cells on average."
+         (tracelog "Each cell affects ~A other cells on average."
                    (/ (reduce #'+
                               (map-array
                                #'(lambda(cell) (length  (cell-path-loss cell)))
@@ -246,24 +248,24 @@ channel module"
          (nodeid (nodeid src-node))
          (reception-count 0))
     (dolist(path-loss (cell-path-loss cell-tx))
-      (unless (cell-occupation (path-loss-destination path-loss))
-        (go next))
-      (let ((current-signal-received
-             (+
-              (- (power-dbm message) (path-loss-avg-path-loss path-loss))
-              (path-loss-signal-variation (temporal-model wireless) path-loss))))
-        (when (< current-signal-received (signal-delivery-threshold wireless))
-          (go next))
+      (when (cell-occupation (path-loss-destination path-loss))
+        (let ((current-signal-received
+               (+
+                (- (power-dbm message) (path-loss-avg-path-loss path-loss))
+                (path-loss-signal-variation
+                 (temporal-model wireless) path-loss))))
+          (unless (< current-signal-received
+                     (signal-delivery-threshold wireless))
             ;; go through all nodes in that cell and send copy of message
-        (dolist(node (cell-occupation (path-loss-destination path-loss)))
-          (unless (eql node src-node)
-            (incf reception-count)
-            (let ((msgcopy (duplicate message))
-                  (receiver (gate node 'receive :direction :input)))
-              (setf (power-dbm msgcopy) current-signal-received)
-              (send-direct wireless receiver msgcopy)
-              (push receiver (aref (receivers wireless) nodeid))))))
-      next)
+
+            (dolist(node (cell-occupation (path-loss-destination path-loss)))
+              (unless (eql node src-node)
+                (incf reception-count)
+                (let ((msgcopy (duplicate message))
+                      (receiver (gate node 'receive :direction :input)))
+                  (setf (power-dbm msgcopy) current-signal-received)
+                  (send-direct wireless receiver msgcopy)
+                  (push receiver (aref (receivers wireless) nodeid)))))))))
     (when reception-count
       (tracelog "Signal from ~A reached ~D other nodes."
                 src-node reception-count))))

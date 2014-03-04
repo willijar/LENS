@@ -23,8 +23,7 @@
     (:metaclass module-class)
   (:documentation "Implementation of a log distance based path loss model"))
 
-(defmethod initialize list ((model log-distance)  &optional (stage 0))
-  (when (= stage 0) (return-from initialize nil))
+(defun calculate-log-distance-losses(model)
   (let* ((channel (owner model))
          (cells (cells channel))
          (no-cells (array-total-size cells))
@@ -36,8 +35,9 @@
          (sigma (sigma model))
          (bidirectional-sigma (bidirectional-sigma model))
          (distance-threshold
-          (expt 10 (/ (- max-tx-power signal-delivery-threshold PLd0 (* -3 sigma))
-                      (* 10.0 path-loss-exponent)))))
+          (expt 10
+                (/ (- max-tx-power signal-delivery-threshold PLd0 (* -3 sigma))
+                   (* 10.0 path-loss-exponent)))))
     (for (i 0  no-cells)
       (let ((celli (row-major-aref cells i)))
         ;; path loss to self is zero
@@ -69,19 +69,23 @@
                          :destination celli
                          :avg-path-loss
                          (- Pld bidirection-pathloss-jitter))
-                        (cell-path-loss cellj))))))))))
-    t)
+                        (cell-path-loss cellj)))))))))))
 
-(defclass loss-map(module)
+(defmethod initialize list ((model log-distance)  &optional (stage 0))
+  (ecase stage
+    (0 nil)
+    (1 (calculate-log-distance-losses model) t)))
+
+(defclass loss-map(log-distance)
   ((path :parameter t :type pathname :reader path :initform nil
          :documentation "Path to file with path loss map parameters"))
   (:metaclass module-class)
   (:documentation "Implementation of a file based channel temporal model"))
 
-(defmethod initialize list ((model loss-map) &optional (stage 0))
-  (case stage
-    (0 nil)
-    (1
+(defmethod initialize :around ((model loss-map) &optional (stage 0))
+  (prog1
+      (call-next-method)
+    (when (= stage 1)
      (let ((path-loss-map
             (with-open-file(is (merge-pathnames (path model)))
               (read is)))
@@ -90,8 +94,11 @@
          (dolist(row path-loss-map)
            (let ((src (row-major-aref cells (idx (car row)))))
              (dolist(col (rest row))
-               (let ((dest (row-major-aref cells (idx (car col)))))
-                 (push (make-path-loss :destination dest
-                                       :avg-path-loss (cdr col))
-                       (cell-path-loss src)) ))))))
-     t)))
+               (let* ((dest (row-major-aref cells (idx (car col))))
+                      (cell (find dest (cell-path-loss src)
+                                  :key #'path-loss-destination)))
+                 (if cell
+                     (setf (path-loss-avg-path-loss cell) (cdr col))
+                     (push  (make-path-loss :destination dest
+                                             :avg-path-loss (cdr col))
+                            (cell-path-loss src)))) ))))))))
