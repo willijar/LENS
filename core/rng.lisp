@@ -10,6 +10,10 @@
   (:method((state random-state) &optional (limit 1.0d0))
     (random limit state)))
 
+(defgeneric randExc(stream &optional limit)
+    (:documentation "Return a random real from a random stream in
+  [0,limit) of same type as limit - default for limit is 1.0"))
+
 (defun urandom(size)
   "Return an integer nbytes long read from urandom"
   (with-open-file(is "/dev/urandom" :direction :input
@@ -27,6 +31,8 @@ random source to seed")
 
 (defconstant +mt-k2^32+ (expt 2 32))
 (defconstant +mt-k-inverse-2^32f+ (expt 2.0f0 -32.0f0)
+  "1/(2^32), as a floating-point number")
+(defconstant +mt-k-inverse-2^32-1f+ (/ 1.0f0 (1- +mt-k2^32+))
   "1/(2^32), as a floating-point number")
 
 (defconstant +mt-n+ 624)
@@ -203,7 +209,11 @@ MT-GENRAND function for clarity."
             (r 0  (+ (ash r 32) (mt-genrand state))))
            ((>= bit-count bits-needed) r))
        n)
-      (* (mt-genrand state) +mt-k-inverse-2^32f+ n)))
+      (* (mt-genrand state)  +mt-k-inverse-2^32-1f+ n)))
+
+(defmethod randExc((state mt-random-state) &optional (n 1.0d0))
+  (* (mt-genrand state) +mt-k-inverse-2^32f+ n))
+
 
 ;;; --- end of file ---
 
@@ -212,8 +222,8 @@ MT-GENRAND function for clarity."
     rng-streams))
 
 (declaim (inline %gendblrand %genintrand))
-(defun %gendblrand(rng) (rand (aref (rng-map *context*) rng) 1.0d0))
-(defun %genintrand(m rng) (rand (aref (rng-map *context*) rng) m))
+(defun %gendblrand(rng) (randExc (aref (rng-map *context*) rng)))
+(defun %genintrand(m rng) (rand (aref (rng-map *context*) rng) (1- m)))
 
 (defun uniform(a b &optional (rng 0))
   "Returns a random variate with uniform distribution in the range [a,b]."
