@@ -189,6 +189,14 @@ MT-GENRAND function for clarity."
 (defmethod rand((state mt-random-state) &optional (n 1.0d0))
   (assert (plusp n))
   (if (integerp n)
+      #+castelia-compatability
+      (let ((used n))
+        (dolist(m '(1 2 4 8 16))
+          (setf used (logior used (ash used (- m)))))
+        (do((i (logand (mt-genrand state) used)
+               (logand (mt-genrand state) used)))
+           ((<= i n) i)))
+      #-castelia-compatability
       (mod
        (do ((bits-needed (log n 2))
             (bit-count 0 (+ 32 bit-count))
@@ -205,7 +213,7 @@ MT-GENRAND function for clarity."
 
 (declaim (inline %gendblrand %genintrand))
 (defun %gendblrand(rng) (rand (aref (rng-map *context*) rng) 1.0d0))
-(defun %genintrand(m rng) (rand (aref (rng-map *context*)rng) m))
+(defun %genintrand(m rng) (rand (aref (rng-map *context*) rng) m))
 
 (defun uniform(a b &optional (rng 0))
   "Returns a random variate with uniform distribution in the range [a,b]."
