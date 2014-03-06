@@ -13,10 +13,11 @@
    (print-unreadable-object(p stream :type t)
       (when (slot-boundp p 'name)
         (format stream "~A " (name p)))
+      (when (and (slot-boundp p 'source) (slot-boundp p 'destination))
       (format stream "~A->~A (~D bytes)"
             (source p)
             (destination p)
-            (byte-length p))))
+            (byte-length p)))))
 
 (register-signal 'mac-packet-breakdown "Statistics on mac packets")
 

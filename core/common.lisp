@@ -85,6 +85,15 @@ returning the modifed destination object."
         (slot-makunbound destination slot)))
   destination)
 
+(defun reinitialise-slots(slot-names instance)
+  (let ((slots (closer-mop::class-slots (class-of instance))))
+    (dolist(slot-name slot-names)
+      (setf (slot-value instance slot-name)
+            (funcall
+             (closer-mop::slot-definition-initfunction
+              (find slot-name slots
+                    :key #'closer-mop::slot-definition-name)))))))
+
 (defun wstrim(string) (string-trim '(#\space #\tab) string))
 
 (defun property-union(list1 list2)

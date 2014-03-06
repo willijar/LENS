@@ -28,7 +28,7 @@
    ;; common
    #:coord #:make-coord #:coord-x #:coord-y #:coord-z
    #:coord+ #:coord- #:coord* #:coord-op #:distance
-   #:while #:until #:filter #:for #:copy-slots #:set-slots
+   #:while #:until #:filter #:for #:copy-slots #:set-slots #:reinitialise-slots
    #:range-getf #:range-list-p
    #:queue #:make-queue #:enqueue #:dequeue #:peek #:average-queue-time #:size
    #:timestamped-queue #:packet-buffer

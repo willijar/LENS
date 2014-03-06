@@ -33,7 +33,7 @@
 (defun pdf-p(entity)
   "Check if is valid pdf"
   (and (arrayp entity)
-       (every #'(lambda(x) (or (numberp x) (pdf-p x))) entity)))
+       (every #'(lambda(x) (or (floatp x) (pdf-p x))) entity)))
 
 (defmethod initialize list ((model temporal-model)
                             &optional (stage 0))
@@ -46,9 +46,9 @@
            (setf (slot-value model name) (getf params name))))
        (with-slots (no-signals) model
          (setf no-signals
-               (1+ (/ (- (max-signal-variation model)
+               (1+ (floor (/ (- (max-signal-variation model)
                          (min-signal-variation model))
-                      (signal-variation-resolution model))))
+                      (signal-variation-resolution model)))))
          (loop
             (let* ((pdf (read is nil))
                    (time (first pdf)))

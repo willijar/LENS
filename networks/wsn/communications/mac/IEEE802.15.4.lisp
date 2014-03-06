@@ -11,7 +11,7 @@
 
 (defmethod duplicate((pkt mac802.15.4-packet) &optional duplicate)
   (call-next-method)
-  (copy-slots '(panid) pkt duplicate))
+  (copy-slots '(pan-id) pkt duplicate))
 
 ;; different packet types
 
@@ -21,7 +21,7 @@
 (defclass mac802.15.4-protocol-packet(mac802.15.4-packet)
   ((gts-length :type integer :accessor gts-length :initarg :gts-length)))
 
-(defmethod duplicate((pkt mac802.15.4-packet) &optional duplicate)
+(defmethod duplicate((pkt mac802.15.4-protocol-packet) &optional duplicate)
   (call-next-method)
   (copy-slots '(gts-length) pkt duplicate))
 
@@ -63,9 +63,9 @@
   (tx-time instance (byte-length packet-type)))
 
 (defmethod duplicate((pkt mac802.15.4-beacon-packet) &optional duplicate)
+  (call-next-method)
   (copy-slots '(beacon-order frame-order bsn cap-length gts-spec)
-              pkt duplicate)
-  (call-next-method))
+              pkt duplicate))
 
 (deftype mac802.15.4-state ()
   '(member
@@ -94,7 +94,7 @@
    ;; mac specific parameters
    (enable-slotted-csma :parameter t :type boolean :initform t)
    (enable-cap :parameter t :type boolean :initform t)
-   (is-ffd :parameter t :bype boolean :initform nil)
+   (is-ffd :parameter t :type boolean :initform nil)
    (is-pan-coordinator :parameter t :type boolean :initform nil)
    (battery-life-extension :parameter t :type boolean :initform nil)
 
@@ -102,6 +102,7 @@
    (beacon-order :parameter t :type fixnum :initform 6)
    (unit-backoff-period :parameter t :type fixnum :initform 20) ;;in symbols
    (base-slot-duration :parameter t :type fixnum :initform 60)
+   (base-superframe-duration :type fixnum)
 
    (num-superframe-slots :parameter t :type fixnum :initform 16)
    (min-be :parameter t :type fixnum :initform 5)
@@ -135,7 +136,7 @@
     :type integer :initform (random 255)
     :documentation "beacon sequence number (unused)")
    (next-packet-retries
-    :type fixnum
+    :type fixnum :initform 0
     :documentation "number of retries left for next packet to be sent")
    (lost-beacons
     :type fixnum :initform 0
@@ -154,7 +155,7 @@
     :type time-type :initform 0d0
     :documentation "Absolute time of end of CAP period for current frame")
    (current-frame-start
-    :type time-type
+    :type time-type :initform 0d0
     :documentation "Absolute recorded start time of the current frame")
    (gts-start  :type time-type :initform 0d0)
    (gts-end :type time-type :initform 0d0)
@@ -176,13 +177,14 @@
     :documentation "List of associated devices for PAN coordinator")
 
    ;; packet references  (sometimes packet is created not immediately before sending)
+   (beacon-packet :type mac802.15.4-packet :initform nil)
    (associate-request-packet :type mac802.15.4-packet :initform nil)
    (next-packet :type mac802.15.4-data-packet :initform nil)
 
    (gts-spec :type vector :initform (make-array 0 :adjustable t)
              :documentation "list of GTS specifications (for PAN coordinator)")
    ;; cached timers
-   (attempt-tx :initform (make-instance :timer-message)))
+   (attempt-tx :initform (make-instance 'timer-message)))
   (:documentation "IEEE802.15.4 MAC implementation")
   (:metaclass module-class))
 
@@ -200,8 +202,7 @@
           "Only full-function devices (isFFD=true) can be PAN coordinators")
   (with-slots(base-superframe-duration base-slot-duration num-superframe-slots
               beacon-interval frame-interval frame-order beacon-order
-              cap-length)
-      instance
+              cap-length) instance
     (assert (<= 0 frame-order beacon-order 14)
             ()
             "Invalid combination of frame-order and beacon-order parameters.")
@@ -213,17 +214,11 @@
     (assert (and (> beacon-interval 0) (> frame-interval 0))
             ()
             "Invalid parameter combination of baseSlotDuration and numSuperframeSlots"))
-  (dolist(slot-name
-           '(beacon-packet associate-request-packet next-packet
-             next-packet-response next-packet-retries
-             state mac-bsn associated-pan current-frame-start
-             gts-start gts-end cap-end lost-beacons
-             desync-time desync-time-start))
-    (setf (slot-value instance slot-name)
-          (funcall
-           (closer-mop::slot-definition-initfunction
-           (find slot-name (closer-mop::class-slots (class-of instance))
-                 :key #'closer-mop::slot-definition-name)))))
+  (reinitialise-slots
+   '(beacon-packet associate-request-packet next-packet next-packet-response
+     next-packet-retries state mac-bsn associated-pan current-frame-start
+     gts-start gts-end cap-end lost-beacons desync-time desync-time-start)
+   instance)
   (setf (fill-pointer (slot-value instance 'next-packet-state)) 0)
   (with-slots(is-ffd is-pan-coordinator associated-pan) instance
     (when (and is-ffd is-pan-coordinator)
@@ -250,6 +245,7 @@
        (let ((beacon-packet
               (make-instance
                'mac802.15.4-beacon-packet
+               :source (mac-address instance)
                :destination broadcast-mac-address
                :pan-id (mac-address instance)
                :beacon-order beacon-order
@@ -260,8 +256,8 @@
          (emit instance 'mac-packet-breakdown "sent beacons")
          (set-state instance 'in-tx)
          (to-radio instance beacon-packet)
-         (to-radio instance '(set-state 'tx))
-         (set-timer instance 'attempt-t
+         (to-radio instance '(set-state . tx))
+         (set-timer instance 'attempt-tx
                     (tx-time instance beacon-packet))
          (set-timer instance 'frame-start
                     (* beacon-interval (symbol-length (radio instance))))
@@ -269,7 +265,7 @@
                (+ (get-clock instance)
                   (transition-delay (radio instance) 'rx 'tx))))))
     (t ;; not PAN coordinator so wait for beacon
-     (to-radio instance '(set-state 'tx))
+     (to-radio instance '(set-state . tx))
      (set-state instance 'wait-for-beacon)
      (set-timer instance 'beacon-timeout
                 (* 3 (slot-value instance 'guard-time))))))
@@ -289,7 +285,7 @@
       ((/= associated-pan -1)
        (let ((delay (- (* beacon-interval (symbol-length (radio instance)))
                        (* 3 guard-time))))
-         (tracelog "Missed beacon from PAN ~A, will wake up to receiive next beacons in ~:/dfv:eng/s" associated-pan delay)
+         (tracelog "Missed beacon from PAN ~A, will wake up to receive next beacon in ~:/dfv:eng/s" associated-pan delay)
          (set-state instance 'sleep)
          (to-radio  instance '(set-state . sleep))
          (set-timer instance 'frame-start delay))))))
@@ -297,7 +293,7 @@
 (defmethod handle-timer((instance mac802.15.4) (timer (eql 'gts-start)))
   (unless (member (state instance)
                   '(wait-for-data-ack wait-for-associate-response 'processing))
-    (to-radio instance '(set-state 'rx))
+    (to-radio instance '(set-state . rx))
 		;; we delay transmission attempt by the time requred by radio to wake up
 		;; note that GTS_START timer was scheduled exactly phyDelaySleep2Tx seconds
 		;; earlier than the actual start time of GTS slot
@@ -332,7 +328,7 @@
        (cond
          ((/= csma-contention-window-length 0)
           (set-timer instance 'perform-cca
-                     (* unit-backoff-period (symbol-length (radio instance)))))
+                     (* unit-backoff-period (symbol-length instance))))
          (next-packet
           ;;CSMA-CA successful (CW == 0), can transmit the queued packet
           (transmit-next-packet instance))
@@ -398,9 +394,9 @@
                                :destination pan-addr
                                :pan-id pan-addr
                                :source (mac-address instance)))
-         (initiate-csma-ca instance 9999 'wait-for-associate-response
-                           (+ (ack-wait-duration instance)
-                              (tx-time instance next-packet))))
+         (initiate-csma-ca
+          instance 9999 'wait-for-associate-response
+          (+ (ack-wait-duration instance) (tx-time instance next-packet))))
         ((not (eql associated-pan pan-addr))
          (return-from handle-message))))
     (with-slots(current-frame-start lost-beacons frame-order beacon-order
@@ -432,7 +428,7 @@
     (cancel-timer instance 'beacon-timeout)
     (with-slots(request-gts locked-gts gts-start associated-pan
                 enable-cap cap-end gts-length) instance
-      (when request-gts
+      (unless (zerop request-gts)
         (cond
           (locked-gts
            (when (zerop gts-start)
@@ -484,7 +480,7 @@
           :pan-id (mac-address instance)
           :destination (source pkt))))
     (to-radio instance ack-packet)
-    (to-radio instance '(set-state . 'tx))
+    (to-radio instance '(set-state . tx))
     (set-state instance 'in-tx)
     (set-timer instance 'attempt-tx (tx-time instance ack-packet))))
 
@@ -543,11 +539,11 @@
     (unless (eql dst-addr (mac-address instance))
       (return-from handle-message)))
   (let ((ack-packet
-         (make-instance
           (make-instance
            'mac802.15.4-ack-packet
            :pan-id (mac-address instance)
-           :destination (source pkt)))))
+           :source (mac-address instance)
+           :destination (source pkt))))
     (to-radio instance ack-packet)
     (to-radio instance '(set-state . tx))
     (set-state instance 'in-tx)
@@ -564,18 +560,18 @@
        (setf associated-pan (pan-id pkt))
        (when (>= desync-time-start 0)
          (incf desync-time (- (get-clock instance) desync-time-start))
-         (setf desync-time-start 01))
+         (setf desync-time-start -1))
        (tracelog "associated with PAN ~A" associated-pan)
        (cancel next-packet)
        (setf next-packet nil)
-       (if request-gts
-           (issue-gts-request instance)
-           (attempt-tx instance "Associated with PAN"))))
+       (if (zerop request-gts)
+           (attempt-tx instance "Associated with PAN")
+           (issue-gts-request instance) )))
     (wait-for-data-ack
      (with-slots(is-pan-coordinator associated-pan next-packet-retries) instance
        (when (or is-pan-coordinator (eql associated-pan (source pkt)))
          (collect-packet-state instance "success")
-         (tracelog "Packet successfully transmitted to " (source pkt))
+         (tracelog "Packet successfully transmitted to ~A" (source pkt))
          (setf next-packet-retries 0)
          (attempt-tx instance "ACK received"))))
     (wait-for-gts
@@ -592,62 +588,62 @@
                  (state instance)))))
 
 (defmethod attempt-tx((instance mac802.15.4) &optional description)
- "This function will initiate a transmission (or retransmission)
+  "This function will initiate a transmission (or retransmission)
 attempt after a given delay"
- (cancel-timer instance 'attempt-tx)
- (tracelog "Attempt transmission: ~A" description)
- (let((get-clock (get-clock instance)))
-   (with-slots(enable-cap cap-end current-frame-start gts-start gts-end
-               request-gts) instance
-     (cond
-       ((> (+ current-frame-start cap-end) get-clock)
-        ; still in CAP period of the frame
-        (when enable-cap
-          (set-state instance 'idle)
-          (return-from attempt-tx)))
-       ((or (zerop request-gts) (zerop gts-start))
-        ;; not in CAP period and not in GTS - no transmission possible
-        (set-state instance 'idle)
-        (return-from attempt-tx))
-       ((or (> (+ current-frame-start gts-start) get-clock)
-            (< (+ current-frame-start gts-end) get-clock))
-        ;; outside GTS - no transmissions possible
-        (set-state instance 'idle)
-        (return-from attempt-tx)))))
- (with-slots(next-packet next-packet-state associated-pan
-             next-packet-retries tx-addr max-frame-retries)
-     instance
-   ;; if packet already queued check available retries
-   (when next-packet
-     (cond
-       ((<= next-packet-retries 0)
-        (when (typep next-packet 'mac802.15.4-data-packet)
-          (emit instance 'mac-packet-breakdown
-                (if (eql (destination next-packet) broadcast-mac-address)
-                    "Broadcast"
-                    next-packet-state)))
-        (cancel next-packet)
-        (setf next-packet nil))
-       (t
-        (tracelog "Continuing transmission of ~A, ~D retries left"
-                  next-packet next-packet-retries)
-        (initiate-csma-ca instance)
-        (return-from attempt-tx))))
-   (when (eql associated-pan -1)
-     ;; no pan cannot initate transmissions other than association requests
-     (return-from attempt-tx))
-   (unless (empty-p (buffer instance))
-     (setf next-packet (dequeue (buffer instance)))
-     (setf tx-addr (destination next-packet))
-     (setf (fill-pointer next-packet-state) 0)
-     (if (eql tx-addr broadcast-mac-address)
-         (initiate-csma-ca 0 'in-tx (tx-time instance next-packet))
-         (initiate-csma-ca
-          max-frame-retries
-          'wait-for-data-ack
-          (+ (ack-wait-duration instance) (tx-time instance next-packet))))
-     (return-from attempt-tx))
-   (set-state instance 'idle)))
+  (cancel-timer instance 'attempt-tx)
+  (tracelog "Attempt transmission: ~A" description)
+  (let((get-clock (get-clock instance)))
+    (with-slots(enable-cap cap-end current-frame-start gts-start gts-end
+                           request-gts) instance
+      (cond
+        ((> (+ current-frame-start cap-end) get-clock)
+                                        ; still in CAP period of the frame
+         (unless enable-cap
+           (set-state instance 'idle)
+           (return-from attempt-tx)))
+        ((or (zerop request-gts) (zerop gts-start))
+         ;; not in CAP period and not in GTS - no transmission possible
+         (set-state instance 'idle)
+         (return-from attempt-tx))
+        ((or (> (+ current-frame-start gts-start) get-clock)
+             (< (+ current-frame-start gts-end) get-clock))
+         ;; outside GTS - no transmissions possible
+         (set-state instance 'idle)
+         (return-from attempt-tx)))))
+  (with-slots(next-packet next-packet-state associated-pan
+                          next-packet-retries tx-addr max-frame-retries)
+      instance
+    ;; if packet already queued check available retries
+    (when next-packet
+      (cond
+        ((<= next-packet-retries 0)
+         (when (typep next-packet 'mac802.15.4-data-packet)
+           (emit instance 'mac-packet-breakdown
+                 (if (eql (destination next-packet) broadcast-mac-address)
+                     "Broadcast"
+                     next-packet-state)))
+         (cancel next-packet)
+         (setf next-packet nil))
+        (t
+         (tracelog "Continuing transmission of ~A, ~D retries left"
+                   next-packet next-packet-retries)
+         (initiate-csma-ca instance)
+         (return-from attempt-tx))))
+    (when (eql associated-pan -1)
+      ;; no pan cannot initate transmissions other than association requests
+      (return-from attempt-tx))
+    (unless (empty-p (buffer instance))
+      (setf next-packet (dequeue (buffer instance)))
+      (setf (fill-pointer next-packet-state) 0)
+      (if (eql (destination next-packet) broadcast-mac-address)
+          (initiate-csma-ca instance 0 'in-tx (tx-time instance next-packet))
+          (initiate-csma-ca
+           instance
+           max-frame-retries
+           'wait-for-data-ack
+           (+ (ack-wait-duration instance) (tx-time instance next-packet))))
+      (return-from attempt-tx))
+    (set-state instance 'idle)))
 
 (defun initiate-csma-ca(instance &optional retries next-state response)
   (with-slots(next-packet next-packet-retries next-packet-state
@@ -656,13 +652,15 @@ attempt after a given delay"
       (tracelog "Initiating new transmission of ~A, ~D retries left"
                 next-packet retries)
       (setf (fill-pointer next-packet-state) 0)
-      (with-output-to-string(os next-packet-state) (write-string next-state os))
+      (with-output-to-string(os next-packet-state)
+        (write next-state :stream os))
       (setf next-packet-retries retries
+            (slot-value instance 'next-state) next-state
             next-packet-response response)))
   (with-slots(request-gts locked-gts current-frame-start gts-start) instance
     (let ((get-clock (get-clock instance)))
       (cond
-        ((and request-gts
+        ((and (not (zerop request-gts))
               locked-gts
               (< (+ current-frame-start gts-start) get-clock))
          ;; in GTS so transmit immediately - no need for csma-ca
@@ -682,6 +680,9 @@ attempt after a given delay"
                                            min-be))
            (continue-csma-ca instance)))))))
 
+(defmethod symbol-length((instance mac802.15.4))
+  (symbol-length (radio instance)))
+
 (defun continue-csma-ca(instance)
   (unless (eql (state instance) 'csma-ca)
     (tracelog "WARNING: continue-csma-ca called when not in CSMA-CA state")
@@ -689,13 +690,13 @@ attempt after a given delay"
   (with-slots(csma-backoff-exponent unit-backoff-period enable-slotted-csma
               current-frame-start) instance
     (let* ((base-period (*  unit-backoff-period (symbol-length instance)))
-           (rnd (1+ (intuniform 1 (1- (expt 2 csma-backoff-exponent)))))
+           (rnd (intuniform 1 (expt 2 csma-backoff-exponent) 1))
            (cca-time (* rnd base-period)))
       (when enable-slotted-csma
         (multiple-value-bind(quotient backoff-boundary)
-            (ceiling (- (get-clock instance) current-frame-start) base-period)
+            (ceiling (- (get-clock instance) current-frame-start)  base-period)
           (declare (ignore quotient))
-          (incf cca-time backoff-boundary)))
+          (incf cca-time (- backoff-boundary))))
       (tracelog "Random backoff value: ~A, in ~:/dfv:eng/s"
                 rnd cca-time)
       (set-timer instance 'perform-cca cca-time))))
@@ -745,7 +746,7 @@ attempt after a given delay"
            :destination associated-pan
            :source (mac-address instance)
            :gts-length request-gts))
-    (initiate-csma-ca 9999 'wait-for-gts
+    (initiate-csma-ca instance 9999 'wait-for-gts
                       (+ (ack-wait-duration instance)
                          (tx-time instance next-packet)))))
 
