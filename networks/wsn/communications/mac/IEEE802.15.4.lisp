@@ -167,11 +167,7 @@
    (next-packet-response
     :type time-type :initform 0d0
     :documentation "Duration of timeout for receiving a reply after sending a packet")
-   (next-packet-state
-    :type string
-    :initform (make-array 0 :element-type 'base-char
-                          :fill-pointer 0 :adjustable t))
-
+   (next-packet-state :type list :initform nil)
    (associated-devices
     :type list :initform nil
     :documentation "List of associated devices for PAN coordinator")
@@ -222,9 +218,8 @@
   (reinitialise-slots
    '(beacon-packet associate-request-packet next-packet next-packet-response
      next-packet-retries state mac-bsn associated-pan current-frame-start
-     gts-start gts-end cap-end lost-beacons)
+     gts-start gts-end cap-end lost-beacons next-packet-state)
    instance)
-  (setf (fill-pointer (slot-value instance 'next-packet-state)) 0)
   (with-slots(is-ffd is-pan-coordinator associated-pan) instance
     (when (and is-ffd is-pan-coordinator)
       (setf associated-pan (mac-address instance))
@@ -317,7 +312,7 @@
               (state instance))
     (return-from handle-timer))
   (when (eql (state instance) 'wait-for-data-ack)
-    (emit instance 'mac-packet-breakdown "NoAck"))
+    (collect-packet-state instance :noack))
   (attempt-tx instance "Attempt-tx timer"))
 
 (defmethod handle-timer((instance mac802.15.4) (timer (eql 'perform-cca)))
@@ -347,7 +342,7 @@
        (setf csma-backoff-exponent (min (1+ csma-backoff-exponent) max-be))
        (cond
          ((> csma-number-backoffs max-csma-backoffs)
-          (emit instance 'mac-packet-breakdown "CSfail")
+          (collect-packet-state instance :csfail)
           (decf next-packet-retries)
           (attempt-tx instance "NB exeeded maxCSMAbackoffs"))
          (t
@@ -391,9 +386,7 @@
         ((< associated-pan 0)
        ;;if not associated - create an association request packet
          (when next-packet
-           (when (collect-packet-state instance "NoPan")
-             (emit instance 'mac-packet-breakdown next-packet-state))
-           (cancel next-packet))
+           (emit-packet-state instance :nopan))
          (setf next-packet
                (make-instance  'mac802.15.4-associate-packet
                                :destination pan-addr
@@ -572,7 +565,7 @@
     (wait-for-data-ack
      (with-slots(is-pan-coordinator associated-pan next-packet-retries) instance
        (when (or is-pan-coordinator (eql associated-pan (source pkt)))
-         (collect-packet-state instance "success")
+         (collect-packet-state instance :success)
          (tracelog "Packet successfully transmitted to ~A" (source pkt))
          (setf next-packet-retries 0)
          (attempt-tx instance "ACK received"))))
@@ -613,19 +606,18 @@ attempt after a given delay"
          (set-state instance 'idle)
          (return-from attempt-tx)))))
   (with-slots(next-packet next-packet-state associated-pan
-                          next-packet-retries tx-addr max-frame-retries)
-      instance
+              next-packet-retries tx-addr max-frame-retries) instance
     ;; if packet already queued check available retries
     (when next-packet
       (cond
         ((<= next-packet-retries 0)
          (when (typep next-packet 'mac802.15.4-data-packet)
-           (emit instance 'mac-packet-breakdown
-                 (if (eql (destination next-packet) broadcast-mac-address)
-                     "Broadcast"
-                     next-packet-state)))
-         (cancel next-packet)
-         (setf next-packet nil))
+           (if (eql (destination next-packet) broadcast-mac-address)
+               (progn
+                 (emit instance 'mac-packet-breakdown "Broadcast")
+                 (cancel next-packet)
+                 (setf next-packet nil))
+               (emit-packet-state instance nil))))
         (t
          (tracelog "Continuing transmission of ~A, ~D retries left"
                    next-packet next-packet-retries)
@@ -636,7 +628,7 @@ attempt after a given delay"
       (return-from attempt-tx))
     (unless (empty-p (buffer instance))
       (setf next-packet (dequeue (buffer instance)))
-      (setf (fill-pointer next-packet-state) 0)
+      (setf next-packet-state nil)
       (if (eql (destination next-packet) broadcast-mac-address)
           (initiate-csma-ca instance 0 'in-tx (tx-time instance next-packet))
           (initiate-csma-ca
@@ -653,9 +645,6 @@ attempt after a given delay"
     (when retries
       (tracelog "Initiating new transmission of ~A, ~D retries left"
                 next-packet retries)
-      (setf (fill-pointer next-packet-state) 0)
-      (with-output-to-string(os next-packet-state)
-        (write next-state :stream os))
       (setf next-packet-retries retries
             (slot-value instance 'next-state) next-state
             next-packet-response response)))
@@ -738,9 +727,7 @@ attempt after a given delay"
   (with-slots(next-packet next-packet-state request-gts associated-pan)
       instance
     (when next-packet
-      (when (collect-packet-state instance "NoPAN")
-        (emit instance 'mac-packet-breakdown next-packet-state))
-      (cancel next-packet))
+      (emit-packet-state instance  :nopan))
     (setf next-packet
           (make-instance
            'mac802.15.4-gts-request-packet
@@ -758,8 +745,26 @@ attempt after a given delay"
             "MAC 802.15.4 internal error: collect-packet-state called while next-packet pointer is NULL")
     (when (and (typep next-packet 'mac802.15.4-data-packet)
                (not (eql (destination next-packet) broadcast-mac-address)))
-      (with-output-to-string(os next-packet-state)
-        (when (> (length next-packet-state) 0)
-          (write-string "," os))
-        (write-string (string msg) os))
+      (setf next-packet-state (nconc next-packet-state (list msg)))
       t)))
+
+(defun emit-packet-state(instance msg)
+  (with-slots(next-packet (state next-packet-state)) instance
+    (when (collect-packet-state instance msg)
+      (cond
+        ((eql (first state) :success)
+         (emit instance 'mac-packet-breakdown "Success, first try"))
+        ((eql (first state) :broadcast)
+         (emit instance 'mac-packet-breakdown "Broadcast"))
+        ((find :success state)
+         (emit instance 'mac-packet-breakdown "Success, not first try"))
+        ((find :noack state)
+         (emit instance 'mac-packet-breakdown "Failed, no ack"))
+        ((find :csfail state)
+         (emit instance 'mac-packet-breakdown "Failed, busy channel"))
+        ((find :nopan state)
+         (emit instance 'mac-packet-breakdown "Failed, no PAN"))
+        (t
+         (tracelog "Unknown breakdown category: ~A" state)))
+      (cancel next-packet)
+      (setf state nil next-packet nil))))
