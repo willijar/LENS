@@ -102,7 +102,7 @@
    #:title
    #:sum #:mean #:constant0 #:constant1 #:last-value #:stddev #:timeavg
    #:time-average-recorder #:stddev-recorder #:histogram
-   #:indexed-count-recorder #:indexed-count
+   #:indexed-count-recorder #:indexed-count #:accumulated-time
    #:probability-density-function #:cumulative-density-function
 ))
 

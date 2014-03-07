@@ -500,7 +500,44 @@
 
 (defmethod report((r indexed-count-recorder) os)
   (when (not (zerop (hash-table-count (recorded-value r))))
-    (format os "statistic ~S ~S~%" (full-path-string (owner (owner r))) (title r))
-    (dolist(k (sort (loop :for k :being :each :hash-key :of (recorded-value r) :collect k)
-                    #'(lambda(a b) (if (numberp a) (< a b) (string< (string a) (string b))))))
+    (format os "statistic ~S ~S~%"
+            (full-path-string (owner (owner r))) (title r))
+    (dolist(k
+             (sort
+              (loop :for k :being :each :hash-key :of (recorded-value r)
+                 :collect k)
+              #'(lambda(a b) (if (numberp a)
+                                 (< a b)
+                                 (string< (string a) (string b))))))
       (format os "field ~S ~A~%" k (gethash k (recorded-value r))))))
+
+(defclass accumulated-time-recorder(scalar-recorder)
+  ((last-time :type time-type :initform 0d0
+              :documentation "Last state change recorded")
+   (fractional :initarg :fractional :initform t
+             :documentation "If true display fractional time.")
+   (state :type boolean :initform nil :initarg :initial-state
+          :documentation "Boolean state - on or off")
+   (accumulated-time :type time-type :initform 0d0)))
+
+(define-result-recorder 'accumulated-time-recorder 'accumulated-time)
+
+(defmethod record((recorder accumulated-time-recorder) time value)
+  (with-slots(last-time state accumulated-time) recorder
+    (when (and (slot-boundp recorder 'last-time) state)
+      (incf accumulated-time (- time last-time)))
+    (setf last-time time
+          state value)))
+
+(defmethod finish :before ((r accumulated-time-recorder))
+  "Take account of last interval"
+  (record r (simulation-time) (slot-value r 'state)))
+
+(defmethod recorded-value((r accumulated-time-recorder))
+  (with-slots(last-time state accumulated-time fractional) r
+    (if fractional
+        (/ accumulated-time (simulation-time))
+        accumulated-time)))
+
+
+

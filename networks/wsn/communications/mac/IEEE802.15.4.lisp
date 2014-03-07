@@ -6,6 +6,8 @@
 
 (in-package :lens.wsn.mac.802.15.4)
 
+(register-signal 'desync "Signal emitted when PAN connection lost")
+
 (defclass mac802.15.4-packet(mac-packet)
   ((pan-id :type integer :accessor pan-id :initarg :pan-id)))
 
@@ -169,8 +171,6 @@
     :type string
     :initform (make-array 0 :element-type 'base-char
                           :fill-pointer 0 :adjustable t))
-   (desync-time :type time-type :initform 0d0)
-   (desync-time-start :type time-type :initform 0d0)
 
    (associated-devices
     :type list :initform nil
@@ -185,6 +185,11 @@
              :documentation "list of GTS specifications (for PAN coordinator)")
    ;; cached timers
    (attempt-tx :initform (make-instance 'timer-message)))
+  (:properties
+   :statistic (desync
+               :title "Fraction of time without PAN connection"
+               :default ((accumulated-time :fractional t :initial-state t
+                                           :format "~,8f"))))
   (:documentation "IEEE802.15.4 MAC implementation")
   (:metaclass module-class))
 
@@ -217,7 +222,7 @@
   (reinitialise-slots
    '(beacon-packet associate-request-packet next-packet next-packet-response
      next-packet-retries state mac-bsn associated-pan current-frame-start
-     gts-start gts-end cap-end lost-beacons desync-time desync-time-start)
+     gts-start gts-end cap-end lost-beacons)
    instance)
   (setf (fill-pointer (slot-value instance 'next-packet-state)) 0)
   (with-slots(is-ffd is-pan-coordinator associated-pan) instance
@@ -273,15 +278,15 @@
 
 (defmethod handle-timer((instance mac802.15.4) (timer (eql 'beacon-timeout)))
   (with-slots(lost-beacons max-lost-beacons associated-pan locked-gts
-              desync-time-start beacon-interval guard-time) instance
+              beacon-interval guard-time) instance
     (emit instance 'mac-packet-breakdown "lost beacons")
     (cond
       ((>= (incf lost-beacons) max-lost-beacons)
        (tracelog "Lost synchronisation with PAN ~A" associated-pan)
        (set-state instance 'setup)
        (setf associated-pan -1
-             locked-gts nil
-             desync-time-start (get-clock instance)))
+             locked-gts nil)
+       (emit instance 'desync t))
       ((/= associated-pan -1)
        (let ((delay (- (* beacon-interval (symbol-length (radio instance)))
                        (* 3 guard-time))))
@@ -292,7 +297,7 @@
 
 (defmethod handle-timer((instance mac802.15.4) (timer (eql 'gts-start)))
   (unless (member (state instance)
-                  '(wait-for-data-ack wait-for-associate-response 'processing))
+                  '(wait-for-data-ack wait-for-asociate-response 'processing))
     (to-radio instance '(set-state . rx))
 		;; we delay transmission attempt by the time requred by radio to wake up
 		;; note that GTS_START timer was scheduled exactly phyDelaySleep2Tx seconds
@@ -555,12 +560,9 @@
     (return-from handle-message))
   (case (state instance)
     (wait-for-associate-response
-     (with-slots(associated-pan desync-time-start desync-time
-                 next-packet request-gts) instance
+     (with-slots(associated-pan next-packet request-gts) instance
        (setf associated-pan (pan-id pkt))
-       (when (>= desync-time-start 0)
-         (incf desync-time (- (get-clock instance) desync-time-start))
-         (setf desync-time-start -1))
+       (emit instance 'desync nil)
        (tracelog "associated with PAN ~A" associated-pan)
        (cancel next-packet)
        (setf next-packet nil)
@@ -759,5 +761,5 @@ attempt after a given delay"
       (with-output-to-string(os next-packet-state)
         (when (> (length next-packet-state) 0)
           (write-string "," os))
-        (write-string msg os))
+        (write-string (string msg) os))
       t)))
