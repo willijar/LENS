@@ -109,11 +109,12 @@
     (schedule-at module timer
                  :delay (get-simulation-time module interval))
     timer)
-  (:method((module wsn-module) (timer symbol) interval &optional (name timer))
-    (let ((timer (timer module timer)))
+  (:method((module wsn-module) (timer-name symbol) interval
+           &optional (name timer-name))
+    (let ((timer (timer module name)))
       (if timer
           (cancel-timer module timer)
-          (setf timer (make-instance 'timer-message :owner module :name timer)))
+          (setf timer (make-instance 'timer-message :owner module :name name)))
       (push timer (slot-value module 'timers))
       (set-timer module timer interval name) )))
 

@@ -78,7 +78,9 @@ signal variation and the time processed"))
    (temporal-model no-temporal-model)
    (path-loss-model log-distance))
   (:properties
-   :statistic (fade-depth :default ((histogram :units "dB" :format "~1@/dfv:eng/"))))
+   :statistic (fade-depth
+               :default ((histogram :min -50.0 :max 15.0 :num-cells 14
+                                    :units "dB" :format "~0@/dfv:eng/"))))
   (:metaclass compound-module-class)
   (:documentation "The wireless channel module simulates the wireless
   medium. Nodes sent packets to it and according to various

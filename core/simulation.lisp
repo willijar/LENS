@@ -452,7 +452,10 @@ printed out."
          (vars (mapcan #'parameter-expansion-vars exp))
          (run 0)
          (repetition 0)
-         (configname config)
+         (configname
+          (etypecase config
+            (string config)
+            (list (format nil "~{~A~^-~}" config))))
          (datetime
           (multiple-value-bind (se mi ho da mo ye)
               (decode-universal-time (get-universal-time))
@@ -463,7 +466,7 @@ printed out."
           (merge-pathnames
            (make-pathname
             :name (format nil "~A-~A" (pathname-name pathname)
-                          config))
+                          configname))
            pathname))
          (scalar-path
           (multiple-value-bind(v f-p)
@@ -493,7 +496,7 @@ printed out."
     (labels
        ((do-run()
           (setq runid (format nil "~A-~A-~A-~A"
-                              (pathname-name pathname) config run datetime))
+                              (pathname-name pathname) configname run datetime))
            (when (or (not runnumber) (= runnumber run))
              (dolist(e exp) ;; setup trie expansions
                  (setf (trie-value (parameter-expansion-trie e))
@@ -515,7 +518,7 @@ printed out."
                    (when scalar-stream
                      (format scalar-stream "run ~A~%~{attr ~A ~S~%~}"
                              runid
-                             `("configname" ,config
+                             `("configname" ,configname
                                "inifile" ,(namestring pathname)
                                "datetime" ,datetime
                                "seedset" ,(seed-set simulation)

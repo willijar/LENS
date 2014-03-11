@@ -28,11 +28,11 @@
   (copy-slots '(gts-length) pkt duplicate))
 
 (defclass mac802.15.4-associate-packet(mac802.15.4-protocol-packet)
-  ((byte-length :initform 6 :type fixnum :allocation :class
+  ((byte-length :initform 8 :type fixnum :allocation :class
                 :reader byte-length)))
 
 (defclass mac802.15.4-ack-packet(mac802.15.4-protocol-packet)
-  ((byte-length :initform 8 :type fixnum :allocation :class
+  ((byte-length :initform 6 :type fixnum :allocation :class
                 :reader byte-length)))
 
 (defclass mac802.15.4-gts-request-packet(mac802.15.4-protocol-packet)
@@ -57,8 +57,8 @@
   (+ (header-overhead pkt) (* (length (gts-spec pkt)) 3)))
 (defmethod byte-length((pkt mac802.15.4-protocol-packet))
   (byte-length (class-name (class-of pkt))))
-(defmethod byte-length((pkt (eql 'mac802.15.4-associate-packet))) 6)
-(defmethod byte-length((pkt (eql 'mac802.15.4-ack-packet))) 8)
+(defmethod byte-length((pkt (eql 'mac802.15.4-associate-packet))) 8)
+(defmethod byte-length((pkt (eql 'mac802.15.4-ack-packet))) 6)
 (defmethod byte-length((pkt (eql 'mac802.15.4-gts-request-packet))) 8)
 
 (defmethod tx-time(instance (packet-type symbol))
@@ -251,7 +251,7 @@
                :beacon-order beacon-order
                :frame-order frame-order
                :bsn (setf mac-bsn (mod (1+ mac-bsn) 255))
-               :gts-spec (mapcar #'copy-gts-spec gts-list)
+               :gts-spec (map 'list #'copy-gts-spec gts-list)
                :cap-length cap-length)))
          (emit instance 'mac-packet-breakdown "sent beacons")
          (set-state instance 'in-tx)
@@ -290,25 +290,26 @@
          (to-radio  instance '(set-state . sleep))
          (set-timer instance 'frame-start delay))))))
 
-(defmethod handle-timer((instance mac802.15.4) (timer (eql 'gts-start)))
+(defmethod handle-timer((instance mac802.15.4) (timer (eql 'start-gts)))
   (unless (member (state instance)
                   '(wait-for-data-ack wait-for-asociate-response 'processing))
     (to-radio instance '(set-state . rx))
-		;; we delay transmission attempt by the time requred by radio to wake up
-		;; note that GTS_START timer was scheduled exactly phyDelaySleep2Tx seconds
-		;; earlier than the actual start time of GTS slot
+		;; we delay transmission attempt by the time requred by radio to
+		;; wake up note that gts-start timer was scheduled exactly
+		;; phyDelaySleep2Tx seconds earlier than the actual start time of
+		;; GTS slot
     (set-state instance 'processing)
     (let ((sleep2tx (transition-delay (radio instance) 'sleep 'tx)))
-    (set-timer instance 'attempt_tx  sleep2tx)
-    ;; set a timer to go to sleep after our GTS slot ends
-    (set-Timer instance 'start_sleeping
-               (+ sleep2tx (slot-value instance 'gts-length))))))
+      (set-timer instance 'attempt-tx  sleep2tx)
+      ;; set a timer to go to sleep after our GTS slot ends
+      (set-timer instance 'start-sleeping
+                 (+ sleep2tx (slot-value instance 'gts-length))))))
 
 (defmethod handle-timer((instance mac802.15.4) (timer (eql 'attempt-tx)))
   (unless (member (state instance)
                   '(in-tx wait-for-data-ack wait-for-associate-response
                     wait-for-gts processing))
-    (tracelog "WARNING ATTEMPT_TX timer was not cancelled, macState is ~A"
+    (tracelog "WARNING ATTEMPT-TX timer was not cancelled, macState is ~A"
               (state instance))
     (return-from handle-timer))
   (when (eql (state instance) 'wait-for-data-ack)
@@ -386,7 +387,8 @@
         ((< associated-pan 0)
        ;;if not associated - create an association request packet
          (when next-packet
-           (emit-packet-state instance :nopan))
+           (emit-packet-state instance :nopan)
+           (cancel next-packet))
          (setf next-packet
                (make-instance  'mac802.15.4-associate-packet
                                :destination pan-addr
@@ -420,7 +422,7 @@
           (setf gts-start (* (1- (gts-spec-start gts)) s))
           (setf gts-end (+ gts-start (* (gts-spec-length gts) s)))
           (setf gts-length (- gts-end gts-start))
-          (tracelog "GTS slot from ~A to ~A"
+          (tracelog "GTS slot from ~7g to ~7g"
                     (+ get-clock gts-start)
                     (+ get-clock gts-end))))))
     (cancel-timer instance 'beacon-timeout)
@@ -449,7 +451,7 @@
           ;; if GTS slot exists and does not start after CAP (or CAP
           ;; is disabled) then we set GTS timer phyDelaySleep2Tx
           ;; seconds earlier as radio will be sleeping
-          (set-timer instance 'gts-start
+          (set-timer instance 'start-gts
                      (- gts-start
                         (transition-delay (radio instance) 'sleep 'tx)))))
       (with-slots(base-superframe-duration beacon-order guard-time)
@@ -498,9 +500,9 @@
       (with-slots(gts-list cap-length base-slot-duration frame-order
                   min-cap-length) instance
         (dotimes(i (length gts-list))
-          (let((gts (aref gts-list i)))
+          (let((gts (elt gts-list i)))
             (when (eql (gts-spec-owner gts) (source pkt))
-              (if (= (gts-spec-length gts) (length (gts-spec pkt)))
+              (if (= (gts-spec-length gts) (gts-length pkt))
                   (setf (gts-length ack-packet) (gts-spec-length gts))
                   (progn
                   (incf cap-length (gts-spec-length gts))
@@ -600,8 +602,9 @@ attempt after a given delay"
          ;; not in CAP period and not in GTS - no transmission possible
          (set-state instance 'idle)
          (return-from attempt-tx))
-        ((or (> (+ current-frame-start gts-start) get-clock)
-             (< (+ current-frame-start gts-end) get-clock))
+        ((> (+ current-frame-start gts-start)
+            get-clock
+            (+ current-frame-start gts-end))
          ;; outside GTS - no transmissions possible
          (set-state instance 'idle)
          (return-from attempt-tx)))))
@@ -613,11 +616,10 @@ attempt after a given delay"
         ((<= next-packet-retries 0)
          (when (typep next-packet 'mac802.15.4-data-packet)
            (if (eql (destination next-packet) broadcast-mac-address)
-               (progn
                  (emit instance 'mac-packet-breakdown "Broadcast")
-                 (cancel next-packet)
-                 (setf next-packet nil))
-               (emit-packet-state instance nil))))
+                 (emit-packet-state instance nil))
+           (cancel next-packet)
+           (setf next-packet nil)))
         (t
          (tracelog "Continuing transmission of ~A, ~D retries left"
                    next-packet next-packet-retries)
@@ -643,17 +645,20 @@ attempt after a given delay"
   (with-slots(next-packet next-packet-retries next-packet-state
               next-packet-response) instance
     (when retries
-      (tracelog "Initiating new transmission of ~A, ~D retries left"
+      (tracelog "Initiating new transmission of ~A, ~D retries left."
                 next-packet retries)
       (setf next-packet-retries retries
             (slot-value instance 'next-state) next-state
             next-packet-response response)))
-  (with-slots(request-gts locked-gts current-frame-start gts-start) instance
+  (with-slots(request-gts locked-gts current-frame-start gts-start gts-end)
+      instance
     (let ((get-clock (get-clock instance)))
       (cond
         ((and (not (zerop request-gts))
               locked-gts
-              (< (+ current-frame-start gts-start) get-clock))
+              (let ((s (+ current-frame-start gts-start)))
+                (< s get-clock (+ s gts-end))))
+
          ;; in GTS so transmit immediately - no need for csma-ca
          (tracelog "Transmitting packet in GTS")
          (transmit-next-packet instance))
@@ -698,21 +703,25 @@ attempt after a given delay"
              next-state)
       instance
     (let ((tx-time (tx-time instance next-packet))
-          (get-clock (get-clock instance)))
-      (unless
-          (cond
-            ((> (+ current-frame-start cap-end) (+ get-clock tx-time))
-             ;; still in CAP period of frame
-             (not (and (not enable-cap) (typep next-packet 'mac802.15.4-data-packet))))
-            ((or (zerop request-gts) (zerop gts-start))
-             ;; not in CAP period and not in GTS - no transmissions possible
-             nil)
-            ((or (> (+ current-frame-start gts-start) get-clock)
-                 (< (+ current-frame-start gts-end) (+ get-clock tx-time)))
-             ;; outside GTS - no transmission possible
-             nil))
+          (get-clock (get-clock instance))
+          (allow-tx t))
+      (cond
+        ((> (+ current-frame-start cap-end) (+ get-clock tx-time))
+         ;; still in CAP period of frame
+         (when (and (not enable-cap)
+                    (typep next-packet 'mac802.15.4-data-packet))
+           (setf allow-tx nil)))
+        ((or (zerop request-gts) (zerop gts-start))
+         ;; not in CAP period and not in GTS - no transmissions possible
+         (setf allow-tx nil))
+        ((or (> (+ current-frame-start gts-start) get-clock)
+               (< (+ current-frame-start gts-end) (+ get-clock tx-time)))
+         ;; outside GTS - no transmission possible
+         (setf allow-tx nil)))
+      (unless allow-tx
         (set-state instance 'idle)
         (return-from transmit-next-packet))
+      ;; transmission allowed so retry and modify states
       (decf next-packet-retries)
       (multiple-value-bind(next-state delay)
           (if (> next-packet-response 0)
@@ -727,7 +736,8 @@ attempt after a given delay"
   (with-slots(next-packet next-packet-state request-gts associated-pan)
       instance
     (when next-packet
-      (emit-packet-state instance  :nopan))
+      (emit-packet-state instance  :nopan)
+      (cancel next-packet))
     (setf next-packet
           (make-instance
            'mac802.15.4-gts-request-packet
@@ -766,5 +776,4 @@ attempt after a given delay"
          (emit instance 'mac-packet-breakdown "Failed, no PAN"))
         (t
          (tracelog "Unknown breakdown category: ~A" state)))
-      (cancel next-packet)
-      (setf state nil next-packet nil))))
+      (setf state nil))))

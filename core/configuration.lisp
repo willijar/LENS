@@ -277,8 +277,6 @@ representing a value, a pathname for an extension file or nil if no
                         (setf current-section saved-section)))))))
       (do-read-file pathname))
     ;; deal with extends (section inheritence)
-    (when (string-equal key "General")
-      (return-from read-configuration (gethash "General" sections)))
     (let ((merged nil)
           (the-section nil))
       (labels ((do-merge-section(name)
@@ -293,12 +291,14 @@ representing a value, a pathname for an extension file or nil if no
                              (if the-section
                                  (nmerge-trie the-section section)
                                  section))
-                       (if extends
+                       (when extends
                            (map 'nil #'do-merge-section
                                 (map 'list #'wstrim
-                                     (split-sequence::split-sequence #\, extends)))
-                         (do-merge-section "General")))))))
-        (do-merge-section key))
+                                     (split-sequence::split-sequence #\, extends)))))))))
+        (if (listp key)
+            (dolist(k key) (do-merge-section k))
+            (do-merge-section key))
+        (do-merge-section "General"))
       the-section)))
 
 (defun map-trie(func trie)
