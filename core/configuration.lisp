@@ -1,12 +1,12 @@
-;; Trie (prefix tree) based pattern matching for configuration file
-;; Copyright (C) 2013 Dr. John A.R. Williams
+;; Trie (prefix tree) based pattern matching for heirarchical configuration
+;; Copyright (C) 2013-2014 Dr. John A.R. Williams
 
 ;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
 ;; Keywords:
 
 ;;; Copying:
 
-;; This file is part of LENS
+;; This file is part of Lisp Educational Network Simulator (LENS)
 
 ;; This program is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -23,8 +23,15 @@
 
 ;;; Commentary:
 
-;; We start with a generic trie structure which includes glob style
-;; pattern matching - '* matches a single element and '** any subsequence
+;; read-configuration constrcuts a trie structure from a
+;; configuration file. Keys may be used to specify which
+;; configuration sections are read and in what order.
+;; inclusion of additional files and section section is supported.
+
+;; trie-match may be used to search this trie structure It includes
+;; glob style pattern matching - '* matches a single element and '**
+;; any subsequence
+
 ;; We use string-equal so package names are not needed in config file.
 
 ;;; Code:
@@ -213,7 +220,7 @@
 (defun read-ini-line(is parameter-source)
   "Returns either a string representing a section title, a trie
 representing a value, a pathname for an extension file or nil if no
- ((more data"
+ more data"
   (let ((line ;; read continuation lines - ignore comments
          (wstrim
           (with-output-to-string(os)

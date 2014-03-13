@@ -1,12 +1,12 @@
 ;; Statistics base API
-;; Copyright (C) 2013 Dr. John A.R. Williams
+;; Copyright (C) 2013-2014 Dr. John A.R. Williams
 
 ;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
 ;; Keywords:
 
 ;;; Copying:
 
-;; This file is part of LENS
+;; This file is part of Lisp Educaqtional Network Simulator (LENS)
 
 ;; This program is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by

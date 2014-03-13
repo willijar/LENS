@@ -1,3 +1,43 @@
+;; Component base class definition and implementation
+;; Copyright (C) 2013-2014 Dr. John A.R. Williams
+
+;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
+;; Keywords:
+
+;;; Copying:
+
+;; This file is part of Lisp Educational Network Simulator (LENS)
+
+;; This program is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+
+;; LENS is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+;;; Commentary:
+
+;; Component class adds in random number sequence mapping and tracing
+;; functionality on top of parameter and signal handling. Base class
+;; for all modules and channels in simulation which require these
+;; capabilities.
+
+;; Note that both tracing (using tracelog) and rng mapping depend on
+;; the *context* dynamic global variable being set to the correct component.
+;; This is set for initialize-instance, finish and for handle-message.
+;; Functions or methods designed to be used to access a component
+;; directly outside these contexts MUST explicitely bind *context* around
+;; around any dynamic context using random number generation or tracing.
+;; and SHOULD do it in all cases as a matter of safe practice.
+
+;;; Code:
+
 (in-package :lens)
 
 (defclass component(parameter-object entity-with-signals)

@@ -1,6 +1,37 @@
+;; Samples network definitions
+;; Copyright (C) 2013-2014 Dr. John A.R. Williams
+
+;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
+;; Keywords:
+
+;;; Copying:
+
+;; This file is part of Lisp Educational Network Simulator (LENS)
+
+;; This program is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+
+;; LENS is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+;;; Commentary:
+
+;;
+
+;;; Code:
+
 (in-package :lens.samples)
 
-(defparameter *tictoc* #p"/home/willijar/dev/lisp/src/lens/samples/tictoc.ini")
+(defconstant +tictoc+
+  (if (boundp '+tictoc+) +tictoc+ (merge-pathnames #p"tictoc.ini" *compile-file-truename*))
+  "Pathname to the titctoc examples configuration file.")
 
 (defclass Txc1(module)
   ()
@@ -9,7 +40,7 @@
    (out :output))
   (:metaclass module-class))
 
-(defmethod initialize :around ((module Txc1) &optional (stage 0))
+(defmethod initialize list ((module Txc1) &optional (stage 0))
   (when (and (zerop stage) (eql (name module) 'tic))
     (send module (make-instance 'message :name 'TicTocMsg) 'out))
   t)
@@ -29,21 +60,23 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defclass Txc2(Txc1)
+(defclass Txc2(module)
   ()
+  (:gates
+   (in :input)
+   (out :output))
   (:properties :display (:icon "block/routing"))
   (:metaclass module-class))
 
-(defmethod initialize :around ((module Txc2) &optional (stage 0))
+(defmethod initialize list ((module Txc2) &optional (stage 0))
   (when (and (zerop stage) (eql (name module) 'tic))
-    (write-line "Sending initial message" *trace-output*)
+    (tracelog "Sending initial message")
     (send module (make-instance 'message :name 'TicTocMsg) 'out))
   t)
 
 (defmethod handle-message((module Txc2) msg)
-  (format *trace-output* "Received message ~A, sending it out again.~%"
-          msg)
-  (call-next-method))
+  (tracelog "Received message ~A, sending it out again." msg)
+  (send module msg 'out))
 
 (defclass TicToc2(network)
   ()
@@ -64,14 +97,11 @@
 (defmethod handle-message((module Txc3) msg)
   (decf (counter module))
   (if (zerop (counter module))
-      (format *trace-output*
-              "~A's counter reached zero, not resending message.~%"
-              module)
+      (tracelog "counter reached zero, not resending message.")
       (progn
-        (format *trace-output*
-                "~A's counter is ~D, sending back message.~%"
-                module (counter module))
-        (call-next-method))))
+        (tracelog "counter is ~D, sending back message."
+                (counter module))
+        (send module msg 'out))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -79,15 +109,13 @@
   ((send-msg-on-init
     :parameter t :initarg :send-msg-on-init :initform nil :type boolean
     :reader send-msg-on-init
-    :documentation "Whether module should send message on initialization"))
+    :documentation "Whether module should send message on initialization")
+   (limit :parameter t :initform 10 :type integer))
   (:metaclass module-class))
 
-(defmethod initialize :around ((instance Txc4) &optional (stage 0))
-  (let ((limit (read-parameter instance "limit" 'integer)))
-    (when limit (setf (counter instance) limit)))
-  (when (and (zerop stage) (send-msg-on-init instance))
-    (write-line "Sending initial message" *trace-output*)
-    (send instance (make-instance 'message :name 'TicTocMsg) 'out))
+(defmethod initialize list ((instance Txc4) &optional (stage 0))
+  (when (zerop stage)
+    (setf (counter instance) (slot-value instance 'limit)))
   t)
 
 (defclass TicToc4(network)
@@ -108,27 +136,30 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defclass Txc6(Txc1)
-  ((event :type message :initform nil
+(defclass Txc6(module)
+  ((timer :type message :initform nil
           :documentation "Event object used for timing")
    (tictocmsg :initform nil
-    :type message :documentation "To remeber message until we send it again"))
+    :type message :documentation "To remember message until we send it again"))
+  (:gates
+   (in :input)
+   (out :output))
   (:metaclass module-class))
 
-(defmethod initialize :around ((instance Txc6)  &optional stage)
+(defmethod initialize list ((instance Txc6)  &optional stage)
   (when (zerop stage)
-    (with-slots(event tictocmsg) instance
-      (setf event (make-instance 'message :name 'event))
+    (with-slots(timer tictocmsg) instance
+      (setf timer (make-instance 'message :name 'event))
       (when (eql (name instance) 'tic)
         (tracelog "Scheduling first send to t=5.0s")
         (setf tictocmsg (make-instance 'message :name 'TicTocMsg))
-        (schedule-at instance event :time 5.0))))
+        (schedule-at instance timer :time 5.0))))
   t)
 
 (defmethod handle-message((instance Txc6) msg)
-  (with-slots(event tictocmsg) instance
+  (with-slots(timer tictocmsg) instance
     (cond
-      ((eql msg event)
+      ((eql msg timer)
         ;; self message arrived so sent out tictocmsg and null it out
         ;; so no confusion later
        (tracelog "Wait period is over, sending back message")
@@ -139,7 +170,7 @@
        ;;  save it and schedule our self message to send it back later"
        (tracelog "Message arrived, starting to wait 1 sec")
        (setf tictocmsg msg)
-       (schedule-at instance event :time (+ (simulation-time) 1.0))))))
+       (schedule-at instance timer :time (+ (simulation-time) 1.0))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -148,9 +179,9 @@
   (:metaclass module-class))
 
 (defmethod handle-message((instance Txc7) msg)
-  (with-slots(event tictocmsg) instance
+  (with-slots(timer tictocmsg) instance
     (cond
-      ((eql msg event)
+      ((eql msg timer)
         ;; self message arrived so sent out tictocmsg and null it out
         ;; so no confusion later
        (tracelog "Wait period is over, sending back message")
@@ -164,7 +195,7 @@
        (let ((delay (delay-time instance)))
          (tracelog "Message arrived, starting to wait ~A seconds" delay)
          (setf tictocmsg msg)
-         (schedule-at instance event :time (+ (simulation-time) delay)))))))
+         (schedule-at instance timer :time (+ (simulation-time) delay)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -196,7 +227,7 @@
    (=> (delay-channel :delay 0.1d0) (toc out) (tic in)))
   (:metaclass compound-module-class))
 
-(defmethod initialize :around ((instance Tic8) &optional stage)
+(defmethod initialize list ((instance Tic8) &optional stage)
   (when (zerop stage)
     (tracelog "Sending initial message")
     (send instance (make-instance 'message :name 'tictoc) 'out)
@@ -229,13 +260,23 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defclass Tic9(Tic8)
+(defclass Tic9(module)
   ((message :type message
-            :documentation "Message that has to be resent on timeout"))
+            :documentation "Message that has to be resent on timeout")
+   (timeout :type time-type :initform 1.0 :reader timeout)
+   (timeout-event :type message :reader timeout-event
+                  :initform (make-instance 'message :name 'timeout-event)))
+  (:gates
+   (in :input)
+   (out :output))
   (:metaclass module-class))
 
-(defclass Toc9(Toc8)
+(defclass Toc9(module)
   ()
+  (:gates
+   (in :input)
+   (out :output))
+  (:properties :display (:icon "block/process"))
   (:metaclass module-class))
 
 (defun generate-new-message()
@@ -244,7 +285,7 @@
 (defun send-message-copy(instance)
   (send instance (duplicate (slot-value instance 'message)) 'out))
 
-(defmethod initialize :around ((instance Tic9) &optional stage)
+(defmethod initialize list ((instance Tic9) &optional stage)
   (when (zerop stage)
     (tracelog "Sending initial message")
     (with-slots(message) instance
@@ -258,7 +299,8 @@
   (cond
     ((eql message (timeout-event instance))
      ;; if receive timeout event packet didn't arrive so resent
-     (tracelog "Timeout expired, resending message and restarting time")
+     (tracelog "Timeout expired, resending ~A and restarting time"
+               (slot-value instance 'message))
      (send-message-copy instance)
      (schedule-at instance (timeout-event instance)
                   :time (+ (simulation-time) (timeout instance))))
@@ -267,6 +309,7 @@
      (tracelog "Timer Cancelled")
      (cancel (timeout-event instance))
      (setf (slot-value instance 'message) (generate-new-message))
+     (tracelog "Sending new messaqge ~A"  (slot-value instance 'message))
      (send-message-copy instance)
      (schedule-at instance (timeout-event instance)
                   :time (+ (simulation-time) (timeout instance))))))
@@ -312,7 +355,7 @@
    (<= C (tic 5 in ++) (tic 4 out ++)))
   (:metaclass compound-module-class))
 
-(defmethod initialize :around ((instance Tic10) &optional stage)
+(defmethod initialize list ((instance Tic10) &optional stage)
   (when (and (zerop stage) (zerop (index instance)))
     ;; boot process with initial self message
     (schedule-at instance
@@ -326,11 +369,10 @@
   (if (= (index instance) 3)
       (tracelog "Message ~A arrived" message)
       (let* ((n (gate-size instance 'out))
-             (k (intuniform 0 (1- n))))
+             (k (if (= 1 n) 0 (intuniform 0 (1- n)))))
         (tracelog "Forwarding message ~A on port out[~D]"
-                  instance message k)
+                   message k)
         (send instance message `(out ,k)))))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -355,7 +397,7 @@
    (<=> C (tic 4 gate ++) (tic 5 gate ++)))
   (:metaclass compound-module-class))
 
-(defmethod initialize :around ((instance Tic12) &optional stage)
+(defmethod initialize list ((instance Tic12) &optional stage)
   (when (and (zerop stage) (zerop (index instance)))
     ;; boot process with initial self message
     (schedule-at instance
@@ -369,9 +411,9 @@
   (if (= (index instance) 3)
       (tracelog "Message ~A arrived" message)
       (let* ((n (gate-size instance 'gate))
-             (k (intuniform 0 (1- n))))
+             (k (if (= 1 n) 0 (intuniform 0 (1- n)))))
         (tracelog "Forwarding message ~A on port out[~D]"
-                  instance message k)
+                  message k)
         (send instance message `(gate ,k)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -381,11 +423,14 @@
    (destination :reader destination :initarg :destination)
    (hop-count :initform 0 :accessor hop-count)))
 
-(defclass Tic13(Tic12)
+(defclass Tic13(module)
   ()
+  (:gates ;; declare in and out to be vector gates
+   (gate :inout 0))
+  (:properties :display (:icon "block/routing"))
   (:metaclass module-class))
 
-(defmethod initialize :around ((instance Tic13) &optional stage)
+(defmethod initialize list ((instance Tic13) &optional stage)
   (when (and (zerop stage) (zerop (index instance)))
     ;; boot process with initial self message
     (schedule-at instance
@@ -416,7 +461,7 @@
   (:method((instance Tic13) message)
     (incf (hop-count message))
     (let* ((n (gate-size instance 'gate))
-           (k (intuniform 0 (1- n))))
+           (k (if (= 1 n) 0 (intuniform 0 (1- n)))))
         (tracelog "Forwarding message ~A on gate[~D]"
                   message k)
         (send instance message `(gate ,k)))))

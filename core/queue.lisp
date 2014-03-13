@@ -1,3 +1,34 @@
+;; Timestamped, packet and history queue definitions
+;; Copyright (C) 2013-2014 Dr. John A.R. Williams
+
+;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
+;; Keywords:
+
+;;; Copying:
+
+;; This file is part of Lisp Educational Network Simulator (LENS)
+
+;; This program is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+
+;; LENS is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+;;; Commentary:
+
+;; These queues allow for monitoring of average time on queue
+;; The packet queue also provides signals and a byte-size
+;; The history-buffer may be used to track if a packet is a duplicate.
+
+;;; Code:
+
 (in-package :lens)
 
 (register-signal 'drop
@@ -7,7 +38,7 @@
  "Signal called with queue object when its length is changed")
 
 (register-signal 'buffer-time
- "Sgnal called with a queueing time when an object ois dequeued")
+ "Sgnal called with a queueing time when an object is dequeued")
 
 (defstruct (timestamped-queue (:include alg:vector-queue))
   (average-timestamp 0.0d0 :type time-type))

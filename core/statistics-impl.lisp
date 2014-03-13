@@ -1,5 +1,5 @@
-;; Statistics base API
-;; Copyright (C) 2011 Dr. John A.R. Williams
+;; Statistics definitions
+;; Copyright (C) 2013-2014 Dr. John A.R. Williams
 
 ;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
 ;; Keywords:
@@ -23,8 +23,8 @@
 
 ;;; Commentary:
 
-;; The implementation is in a seperate file as API definitions have to be loaded
-;; to enable registration of filters and recorders.
+;; The implementation is in a seperate file as API definitions have to
+;; be loaded to enable registration of filters and recorders.
 
 ;;; Code:
 
@@ -412,10 +412,10 @@
                           :fill-pointer 0))))
 
 (defmethod record :before ((instance histogram) time (value number))
-  (assert (and (not (integerp value))
-               (not (eql (histogram-mode instance) 'integer)))
-          ()
-          "Histogram in INTEGER mode cannot accept a float value"))
+  (when (eql (histogram-mode instance) 'integer)
+    (assert (integerp value)
+          (value)
+          "Histogram in INTEGER mode cannot accept a float value")))
 
 (defmethod record((instance histogram) time value)
   (declare (ignore time))

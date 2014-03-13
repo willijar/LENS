@@ -1,10 +1,25 @@
-;; LENS Simulation Simulation and event handling
-;; Copyright 2013 Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
+;; Discrete time imulation and event handling
+;; Copyright (C) 2013-2014 Dr. John A.R. Williams
 
-;; This file is part of Lisp Educational Network Simulation (LENS)
+;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
+;; Keywords:
 
-;; This is free software released under the GNU General Public License (GPL)
-;; See the LICENSE file provided or <http://www.gnu.org/licenses>
+;;; Copying:
+
+;; This file is part of Lisp Educational Network Simulator (LENS)
+
+;; This program is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+
+;; LENS is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -106,6 +121,7 @@
           (let ((seed-set
                  (read-parameter '(nil SEED-SET) configuration '(read :package :lens))))
             (etypecase seed-set
+              (null repetition)
               (integer seed-set)
               (symbol
                (ecase seed-set

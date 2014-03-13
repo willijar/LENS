@@ -1,23 +1,39 @@
 ;; Metaclass for component classes that take parameters
-;; Copyright (C) 2013 Dr. John A.R. Williams
+;; Copyright (C) 2013-2014 Dr. John A.R. Williams
 
 ;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
 ;; Keywords:
 
-;; This file is part of LENS
+;;; Copying:
 
-;; This is free software released under the GNU General Public License (GPL)
-;; See <http://www.gnu.org/copyleft/gpl.html>
+;; This file is part of Lisp Educational Network Simulator (LENS)
+
+;; This program is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+
+;; LENS is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+
+;; You should have received a copy of the GNU General Public License
+;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
-;; Parameters are read at point of objecvt creation - instance must
+;; Classes based on the p-rameter-class metaclass allow use of the
+;; :parameter and :volatile arguments in slot definitions to specify parameters
+;; and whether they need to be evaluated on every access or once only
+
+;; Parameters are read at point of object creation - instance must
 ;; therefore have full-path available at this point to know its
 ;; address in heirarchy.
 
-;; Note properties are also covered in ths base
-;; class as parameters can have properties as can all instances which
-;; can take parameters.
+;; Note properties are also covered in ths base class as parameters
+;; can have properties as can all instances which can take parameters.
+;; This allows for extensions such as display parameters etc.
 
 ;;; Code:
 
