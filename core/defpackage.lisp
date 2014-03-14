@@ -110,6 +110,9 @@
    #:packet #:bit-length #:byte-length
    #:duration #:control-info #:bit-error-p #:header-specification
    #:unknown-message #:encapsulate #:decapsulate
+   ;; timers
+   #:with-timers #:timer-message #:timer #:set-timer #:cancel-timer
+   #:handle-timer
    ;; statistics layer
    #:define-statistic-filter #:define-result-recorder #:record #:report
    #:title

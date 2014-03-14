@@ -42,7 +42,6 @@
    ;; common
    #:startup #:shutdown #:node #:nodeid #:wsn-module #:disabled-p
    #:get-simulation-time #:get-clock
-   #:set-timer #:timer-message #:timer #:cancel-timer #:handle-timer
    #:buffer #:buffer-size #:packet-history #:last-sequence-number
    ;; application
    #:app-net-control-info #:application-packet
@@ -83,7 +82,7 @@
    ;; mobility
    #:mobility #:location #:cell #:theta #:phi
    ;; top level network
-   #:SensorNetwork #:field #:num-nodes #:deployment #:physical-processes
+   #:wsn #:field #:num-nodes #:deployment #:physical-processes
    #:nodes #:wireless-channel
    ;; node
    #:num-sensors #:network-address #:sensors
@@ -98,6 +97,7 @@
    #:tuneable-mac #:sleep-interval #:constant #:multiplying #:exponential
    #:tmac
    #:mac802.15.4
+   #:mac802.15.6
    #:bypass-routing
    #:multipath-rings-routing
    #:leach-routing

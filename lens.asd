@@ -43,6 +43,7 @@
                       :depends-on ("defpackage" "common" "compatibility"
                                     "parameters" "rng"))
                (:file "signals" :depends-on ("object"))
+               (:file "timers" :depends-on ("module"))
                (:file "model-change" :depends-on ("defpackage"))
                (:file "gate" :depends-on
                       ("object" "model-change" "channel" "message"))

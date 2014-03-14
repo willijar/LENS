@@ -8,7 +8,6 @@
 \renewcommand*{\abstractname}{Summary}
 \renewcommand{\logo}{~\\\vfill}
 \newcommand{\acr}[1]{\acrshort{#1}}
-\newcommand{\file}[1]{{\tt #1}}
 
 \title{LENS: Lisp Educational Network Simulator}
 \author{Dr. J.A.R. Williams}
@@ -544,7 +543,7 @@ of named signals which may be emitted with useful information in the
 model implementation code and which can then be collected and analysed
 by listeners attached to the various modules in the simulation.
 
-The function \lstinline{(defun register-signal(symbol &optional
+The function \lstinline{(defun register-signal(symbol \&optional
   documentation))} is normally called as a top level form to register a
 particular named signal with the symbol. Adding documentation is
 recommended so that other implements may reuse it if they have similar

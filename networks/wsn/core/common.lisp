@@ -63,10 +63,8 @@
 (defvar *simulations*
   #p"/home/willijar/dev/lisp/src/lens/networks/wsn/simulations/")
 
-(defclass wsn-module(module)
-  ((disabled-p :initform t :initarg :disabled-p :reader disabled-p)
-   (timers :type list :initform nil
-           :documentation "Active Timers which aren't cached in slots"))
+(defclass wsn-module(with-timers module)
+  ((disabled-p :initform t :initarg :disabled-p :reader disabled-p))
   (:metaclass module-class))
 
 (defmethod initialize list ((module wsn-module) &optional (stage 0))
@@ -104,6 +102,11 @@
     (node-shutown (unless (disabled-p instance) (shutdown instance)))
     (node-startup (when (disabled-p instance) (startup instance)))))
 
+(defmethod set-timer((instance wsn-module) (timer timer-message) interval
+                     &optional name)
+  (call-next-method
+   instance timer (get-simulation-time instance interval) name))
+
 (defgeneric get-simulation-time(instance local-time)
   (:documentation "Convert a local time value into a simulation time")
   (:method(instance local-time)
@@ -113,60 +116,3 @@
   (:documentation "Return local absolute time")
   (:method(instance)
     (get-clock (submodule (node instance) 'resources))))
-
-(defclass timer-message(message)
-  ())
-
-(defmethod print-object((m timer-message) stream)
-  (print-unreadable-object(m stream :type t :identity t)
-    (format stream "~A ~:[~;~A~]" (name m) (scheduled-p m) (arrival-time m))))
-
-(defgeneric timer(module name)
-  (:method((module wsn-module) (name symbol))
-    (if (slot-exists-p module name)
-        (slot-value module name)
-        (find name (slot-value module 'timers) :key #'name))))
-
-(defgeneric set-timer(module timer interval &optional timer-name)
-  (:documentation "Schedule a timer using local time to determine interval")
-  (:method(module (timer message) interval  &optional name)
-    (when (scheduled-p timer)
-      (cancel-timer module timer))
-    (when name (setf (name timer) name))
-    (if (owner timer)
-        (assert (eql (owner timer) module))
-        (setf (owner timer) module))
-    (schedule-at module timer
-                 :delay (get-simulation-time module interval))
-    timer)
-  (:method((module wsn-module) (timer-name symbol) interval
-           &optional (name timer-name))
-    (let ((timer (timer module name)))
-      (if timer
-          (cancel-timer module timer)
-          (setf timer (make-instance 'timer-message :owner module :name name)))
-      (push timer (slot-value module 'timers))
-      (set-timer module timer interval name) )))
-
-(defgeneric cancel-timer(instance timer)
-  (:method(instance (timer timer-message))
-    (cancel timer))
-  (:method((instance wsn-module) (name symbol))
-    (let ((timer (timer instance name)))
-      (when timer (cancel timer))))
-  (:method((instance wsn-module) (timer timer-message))
-    (cancel timer)
-    (setf (slot-value instance 'timers)
-          (delete timer (slot-value instance 'timers) :key #'name))))
-
-(defmethod cancel :after((timer timer-message))
-  (let ((owner (owner timer)))
-    (when (and owner (not (slot-exists-p owner (name timer))))
-      (with-slots(timers) owner
-        (setf timers (delete timer timers))))))
-
-(defgeneric handle-timer(module timer-name)
-  (:documentation "Called when a timer message arrives with the message name"))
-
-(defmethod handle-message((module wsn-module) (message timer-message))
-  (handle-timer module (name message)))
