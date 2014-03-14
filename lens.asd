@@ -1,5 +1,5 @@
 ;;; LENS System definition -*- Lisp -*-
-;; Copyright (C) 2007-2010 Dr. John A.R. Williams
+;; Copyright (C) 2007-2014 Dr. John A.R. Williams
 
 ;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
 ;; Keywords:

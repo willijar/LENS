@@ -1,4 +1,4 @@
-;;; LENS System definition -*- Lisp -*-
+;;; Wireless Sensor Network Smulation System definition -*- Lisp -*-
 ;; Copyright (C) 2013 Dr. John A.R. Williams
 
 ;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
