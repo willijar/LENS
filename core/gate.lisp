@@ -220,33 +220,33 @@ to disconnect a gate; use disconnect() for that.")
            (end-module (parent-module end-gate)))
       (when (has-listeners module 'pre-model-change)
         (emit module 'pre-model-change
-            (make-instance 'pre-gate-connect-notification
-                           :gate from :target-gate to :channel channel)))
+              `(pre-gate-connect-notification
+                :gate ,from :target-gate ,to :channel ,channel)))
       (when (or (has-listeners start-module 'pre-model-change)
                 (has-listeners end-module 'pre-model-change))
         (let ((notification
-               (make-instance 'pre-path-create-notification
-                 :start-gate start-gate :end-gate end-gate
-                 :changed-gate from)))
+               `(pre-path-create-notification
+                 :start-gate ,start-gate :end-gate ,end-gate
+                 :changed-gate ,from)))
           (emit start-module 'pre-model-change notification)
           (emit end-module 'pre-model-change notification)))
-    (setf (slot-value from 'next-gate) to
-          (slot-value to 'previous-gate) from)
-    (when channel
-      (setf (channel from) channel)
-      (configure channel)
-      (when (and (not leave-uninitialized) (parent-module channel)
-                 (not (initialized-p (parent-module channel))))
-        (initialize channel)))
-    (when (has-listeners module 'post-model-change)
-      (emit module 'post-model-change
-            (make-instance 'post-gate-connect-notification :gate from)))
-    (when (or (has-listeners start-module 'post-model-change)
-              (has-listeners end-module 'post-model-change))
+      (setf (slot-value from 'next-gate) to
+            (slot-value to 'previous-gate) from)
+      (when channel
+        (setf (channel from) channel)
+        (configure channel)
+        (when (and (not leave-uninitialized) (parent-module channel)
+                   (not (initialized-p (parent-module channel))))
+          (initialize channel)))
+      (when (has-listeners module 'post-model-change)
+        (emit module 'post-model-change
+              `(post-gate-connect-notification :gate ,from)))
+      (when (or (has-listeners start-module 'post-model-change)
+                (has-listeners end-module 'post-model-change))
         (let ((notification
-               (make-instance 'post-path-create-notification
-                 :start-gate start-gate :end-gate end-gate
-                 :changed-gate from)))
+               `(post-path-create-notification
+                 :start-gate ,start-gate :end-gate ,end-gate
+                 :changed-gate ,from)))
           (emit start-module 'post-model-change notification)
           (emit end-module 'post-model-change notification))))
     channel))
@@ -265,14 +265,13 @@ The method has no effect i(load-system :lens.wsn)f the gate is not connected.")
            (end-module (parent-module end-gate)))
       (when (has-listeners module 'pre-model-change)
         (emit module 'pre-model-change
-              (make-instance 'pre-gate-disconnect-notification
-                             :gate gate)))
+              `(pre-gate-disconnect-notification :gate ,gate)))
       (when (or (has-listeners start-module 'pre-model-change)
                 (has-listeners end-module 'pre-model-change))
         (let ((notification
-               (make-instance 'pre-path-cut-notification
-                 :start-gate start-gate :end-gate end-gate
-                 :changed-gate gate)))
+               `(pre-path-cut-notification
+                 :start-gate ,start-gate :end-gate ,end-gate
+                 :changed-gate ,gate)))
           (emit start-module 'pre-model-change notification)
           (emit end-module 'pre-model-change notification)))
       (let ((next-gate (next-gate gate))
@@ -282,16 +281,14 @@ The method has no effect i(load-system :lens.wsn)f the gate is not connected.")
               (slot-value next-gate 'previous-gate) nil)
         (when (has-listeners module 'post-model-change)
           (emit module 'post-model-change
-              (make-instance 'post-gate-disconnect-notification
-                             :gate gate
-                             :target-gate next-gate
-                             :channel channel)))
+              `(post-gate-disconnect-notification
+               :gate ,gate :target-gate ,next-gate :channel ,channel)))
       (when (or (has-listeners start-module 'post-model-change)
                 (has-listeners end-module 'post-model-change))
         (let ((notification
-               (make-instance 'post-path-cut-notification
-                 :start-gate start-gate :end-gate end-gate
-                 :changed-gate gate)))
+               `(post-path-cut-notification
+                 :start-gate ,start-gate :end-gate ,end-gate
+                 :changed-gate ,gate)))
           (emit start-module 'post-model-change notification)
           (emit end-module 'post-model-change notification)))))))
 

@@ -30,14 +30,45 @@
 ;; Basic types
 
 (defconstant +c+ 299792458d0 "Speed of Light in m/sec")
-
+*standard-output*
 (defvar *simulation* nil "The global simulation instance")
 
 (defparameter *context* nil
-  "Current global context in which evaluation (e.g. random functions)
-  is to be done.")
+  "Current global component context in which evaluation is taking
+  place. It is used to determine mapping for random number streams and
+  for providing tracing context. This should be bound for the extent
+  of exposed interfaces to components. The kernel binds it around
+  the [[handle-message]] and [[initialize]] methods. ")
 
-(defvar *time-format* "~9,7f"  "Time output format control")
+(defun sec(stream arg &optional colon-p at-p
+                 (d 3) (padchar #\space) (exponentchar #\E))
+  "* Arguments
+- stream :: An output stream designator.
+- arg :: time format argument
+- colon-p :: ignored
+- at-p :: ignored
+- D :: number of digits to print after decimal point
+- padchar :: character to print leading the output
+- exponentchar :: character to print before exponent.
+
+* Description
+
+Simulation Time formatter function outputs a time argument =arg= to =stream=
+in engineering format.
+
+* Example
+;;; (format nil \"~3/lens:sec/\" 0.5689)
+;;; => \"568.900ms\"
+
+* See also
+- [[dfv:eng]]
+"
+  (declare (ignore colon-p at-p))
+  (dfv:eng stream arg t t d padchar exponentchar)
+   (write-char #\s stream))
+
+(defvar *time-format* "~7/lens::sec/" "The time format control used
+when tracing.")
 
 ;; base class for in simulation errors (not program errors)
 (define-condition simulation-condition(condition)())
@@ -56,39 +87,69 @@
     ,@body))
 
 (defmacro filter(test lst &key (key '#'identity))
-  "Return a list of the elements in `lst` for which `test` (applied to `key`)
-is true.
-
-Arguments:
-
-- `test`: a designator for a function of one argument which returns a
+  "* Arguments
+- test :: a designator for a function of one argument which returns a
           generalised boolean
-- `lst`: a proper list
-- `key`: a designator for a function of one argument
+- lst :: a proper list
+- key :: a designator for a function of one argument
 
-Returns:
+* Returns
 
-- `result`: a list"
+- result :: a list
+
+* Description
+Return a list of the elements in =lst= for which =test= (applied to =key=)
+is true."
   `(mapcan #'(lambda(it)
                (when (funcall ,test (funcall ,key it))
                  (list it)))
     ,lst))
 
 (defmacro for ((var start stop) &body body)
+  "* Arguments
+- var ::  a variable name (not evaluated)
+- start :: an integer (evaluated)
+- stop :: an integer (evaluated)
+- body :: a list of +forms+
+
+* Description
+
+Iterate from the value supplied by =start= upto but not including the
+value supplied by =end= setting =var= to each value in turn before
+evaluating the +body+"
+(loop
   (let ((gstop (gensym)))
     `(do ((,var ,start (1+ ,var))
           (,gstop ,stop))
       ((>= ,var ,gstop))
-      ,@body)))
+      ,@body))))
 
 (defun set-slots(instance defs)
+"* Arguments
+- instance :: a class instance
+- defs :: a list of lists
+
+* Description
+
+Used to set multiple slot values in a class instance. defs is a list
+of slot setting options. The first element of each option is the
+slot name and the second element is the value to set the slot to."
   (dolist(def defs)
     (if (listp def)
         (setf (slot-value instance (first def)) (second def))
         (setf (slot-value instance def) nil))))
 
 (defun copy-slots(slots source destination)
-  "Copies anemd slot values shallowly from source to destination
+  "* Arguments
+- slots :: a list of slot names
+- source :: a class instance
+- destination :: a class instance
+
+* Returns
+- destination :: a class instance
+
+* Description
+Copies named slot values shallowly from source to destination
 returning the modifed destination object."
   (dolist(slot slots)
     (if (slot-boundp source slot)
@@ -97,6 +158,14 @@ returning the modifed destination object."
   destination)
 
 (defun reinitialise-slots(slot-names instance)
+  "* Arguments
+- slots-names :: a list of slot names
+- source :: a class instance
+
+* Description
+
+Reset the names slots in instance to their initial values as defined
+in the slot definitions for the instance class"
   (let ((slots (closer-mop::class-slots (class-of instance))))
     (dolist(slot-name slot-names)
       (setf (slot-value instance slot-name)
@@ -105,13 +174,34 @@ returning the modifed destination object."
               (find slot-name slots
                     :key #'closer-mop::slot-definition-name)))))))
 
-(defun wstrim(string) (string-trim '(#\space #\tab) string))
+(defun wstrim(string)
+"* Arguments
+- string :: a string
+
+* Returns
+- trimmed :: a string
+
+* Description
+
+Returns a new string with leading and trailing white space removed."
+(string-trim '(#\space #\tab) string))
 
 (defun property-union(list1 list2)
-  "Returns a merged property list combining properties from list1 and
-list2. list1 property will have priority excepti if the property
+  "* Arguments
+- list1 :: a property list
+- list2 :: a property list
+
+* Returns
+- list :: a property list
+
+* Description
+
+This is intended to implement property inheritence.
+
+Returns a merged property list combining properties from list1 and
+list2. list1 property will have priority except if the property
 values are themselves a list in which case the result is list2 value
-appended onto end of list1 value"
+appended onto end of list1 value."
   (let ((result (copy-list list2)))
     (loop :for a :on list1 :by #'cddr
        :for k = (car a)
@@ -131,33 +221,40 @@ appended onto end of list1 value"
                                            (coord-y c)
                                            (zerop (coord-z c))
                                            (coord-z c)))))
+  "A spatial coordinate"
   (x 0.0 :type float :read-only t)
   (y 0.0 :type float :read-only t)
   (z 0.0 :type float :read-only t))
 
 (defun coord+(a b)
+  "Add two [[coord]]s together returning result [[coord]]"
   (make-coord (+ (coord-x a) (coord-x b))
               (+ (coord-y a) (coord-y b))
               (+ (coord-z a) (coord-z b))))
 
 (defun coord-(a b)
+  "Return a-b for [[coord]]s"
   (make-coord (- (coord-x a) (coord-x b))
               (- (coord-y a) (coord-y b))
               (- (coord-z a) (coord-z b))))
 
 (defun coord*(a b)
+  "Return element wise (scalar) multiplation of [[coord]]s a and b."
   (make-coord (* (coord-x a) b)
               (* (coord-y a) b)
               (* (coord-z a) b)))
 
 (defun coord-op(op &rest coords)
-  "Given a function and a set of coordinates apply op to each set of ordinates"
+  "Given a function and a set of coordinates apply op to each set of
+ordinates"
   (apply
    #'make-coord
    (mapcar #'(lambda(f) (coerce (apply op (mapcar f coords)) 'float))
            (load-time-value (list #'coord-x #'coord-y #'coord-z)))))
 
 (defgeneric distance(a b)
+  (:documentation "Return the Euclidean distance between two entities
+  =a= and =b=")
   (:method((a coord) (b coord))
     (let ((d (coord- a b)))
       (sqrt (+ (* (coord-x d) (coord-x d))
@@ -165,7 +262,33 @@ appended onto end of list1 value"
                (* (coord-z d) (coord-z d)))))))
 
 (defun range-getf(spec index)
-  "Helper function allowing range based plists - returns value and lower index"
+  "* Arguments
+- spec :: a range property list
+- index :: a number
+
+* Results
+- result :: a value corresponding to =index= in =spec= or =nil= if no match
+- index :: the lower index of range corresponding to match
+
+* Description
+
+Range property lists are plists where the property indicator is
+either a number indicating a single value or a cons of a lower and
+upper range.
+
+[[range-getf]] finds the property in =spec= that either === the =index= or where=index= lies between the upper and lower bound of the specified range.
+
+Property ranges are typically used to specify parameters that vary depending on an index.
+
+* Examples
+
+;;; (range-getf '(1  A (2 6) B 7 C (8 10) D) 1)
+;;; => A,1
+;;; (range-getf '(1  A (2 6) B 7 C (8 10) D) 5)
+;;; => B,2
+;;; (range-getf '(1  A (2 6) B 7 C (8 10) D) 0)
+;;; =>nil,0
+"
   (let ((default nil))
     (or
      (loop :for a :on spec :by #'cddr
@@ -173,13 +296,18 @@ appended onto end of list1 value"
         :for value = (cadr a)
         :do
         (typecase key
-          (number (when (= key index) (return (values value key))))
+          (number (when (= key index)
+                    (return-from range-getf (values value key))))
           (list (when (<= (car key) index (cadr key))
-                  (return (values value (car key)))))
+                  (return-from range-getf (values value (car key)))))
           (symbol (when (eql key t) (setf default value)))))
      (values default 0))))
 
 (defun range-list-p(spec)
+  "Return true if =spec= is a valid range property list.
+
+* See Also
+[[range-getf]]"
   (and (listp spec)
        (let ((first (first spec)))
          (or (listp first) (numberp first) (eql first t)))))

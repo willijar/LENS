@@ -29,9 +29,10 @@
 (in-package :lens)
 
 (defclass channel(component)
-  ((source-gate :initarg :source-gate :accessor source-gate))
+  ((source-gate :initarg :source-gate :accessor source-gate
+                :documentation "The gate which sends messages over the channel."))
   (:metaclass parameter-class)
-  (:documentation "Base class for channels"))
+  (:documentation "Base class for all channels."))
 
 (defclass ideal-channel(channel)
   ()
@@ -42,52 +43,97 @@
 (defclass transmission-channel(channel)
   ()
   (:metaclass parameter-class)
-  (:documentation "base classe for all transmission channels"))
+  (:documentation "Base classe for all transmission channels"))
 
 (defstruct channel-result
+  "* Slots
+- DELAY :: The propagation delay of the channel
+- DURATION :: The transmition duration of the packet.
+- DISCARD :: If true packet packet will be discarded (was lost in transmission)
+
+* Description
+Structure containg result of process-message from a channel"
   (delay 0.0d0 :type time-type)
   (duration 0.0d0 :type time-type)
   (discard nil :type boolean))
 
 (defgeneric process-message(channel message time)
-  (:documentation "This method encapsulates the channel's
-  functionality. The method should model the transmission of the given
-  message starting at the given t time, and return the propagation
-  delay, transmission duration, and discard flag in the channel-result
-  object.
+  (:documentation "* Arguments
+- channel :: an instance of [[class channel]]
+- message :: the [[class message]] to be processed
+- time :: [[time-type]] the time message is to be processed
+
+* Returns
+- channel-result :: a [[structure channel-result]]
+
+* Description
+This method encapsulates the channel's functionality. The method
+should model the transmission of the given message starting at the
+given time, and return the propagation delay, transmission
+duration, and discard flag in the channel-result object.
 
 Transmission duration and bit error modeling only applies to packets
-i.e. to instances of cPacket, where cMessage's isPacket() returns true,
-it should be skipped for non-packet messages. The method does not need
-to call the setDuration method on the packet; this is
-done by the simulation kernel. However, the method should call
-setBitError(true) on the packet if error modeling results
- in bit errors.
+i.e. to instances of [[class packet]], it should be skipped for
+non-packet messages. The method does not need to set the [[duration]]
+of the packet; this is done by the simulation kernel. However, the
+method should call [[function (setf bit-error)]] on the packet if
+error modeling results in bit errors.
 
 If the method sets the discard flag in the result object, it means
 that the message object should be deleted by the simulation kernel;
 this facility can be used to model that the message gets lost in the
 channel.
 
-The method does not need to throw error on overlapping transmissions,
+The method does not need to throw errors on overlapping transmissions,
 or if the packet's duration field is already set; these checks are
-done by the simulation kernel before processMessage() is called.")
+done before [[process-message]] is called.
+
+* Simulation Events
+
+- message-discarded :: [[structure timestamped]] with message
+  as value should be emited if the [[class message]] is being discarded
+
+- message-sent :: [[structure message-sent-signal-value]] should
+  be emitted if message is successfully delivered with both the
+  [[class message]] and [[structure channel-result]] objects.
+
+* See also
+[[structure channel-result]]
+
+")
   (:method(channel message time) nil))
 
 (defgeneric nominal-datarate(channel)
-  (:documentation "For transmission channels: Returns the nominal data
-  rate of the channel. The number returned from this method should be
-  treated as informative; there is no strict requirement that the
-  channel calculates packet duration by dividing the packet length by
-  the nominal data rate. For example, specialized channels may add the
-  length of a lead-in signal to the duration.")
+  (:documentation "* Arguments
+- channel :: a [[class transmission-channel]]
+
+* Returns
+- nominal-datarate :: a =number=, bits per second
+
+* Description
+
+Returns the nominal data rate of the channel in bits per
+second (bps). The number returned from this method should be treated
+as informative; there is no strict requirement that the channel
+calculates packet duration by dividing the packet length by the
+nominal data rate. For example, specialized channels may add the
+length of a lead-in signal to the duration.")
   (:method(channel) 0))
 
 (defgeneric calculate-duration(channel message)
-  (:documentation "For transmission channels: Calculates the
-transmission duration of the message with the current channel
-configuration (datarate, etc); it does not check or modify channel
-state. For non-transmission channels this method returns zero.
+  (:documentation "* Arguments
+- channel :: a [[transmission-channel]]
+- message :: a [[message]]
+
+* Returns
+- duration :: a [[time-type]]
+
+* Description
+
+Calculates the transmission duration of the message with the current
+transmission channel configuration (datarate, etc); it does not check
+or modify channel state. For non-transmission channels this method
+returns zero.
 
 This method is useful for transmitter modules that need to determine
 the transmission time of a packet without actually sending the packet.
@@ -98,30 +144,56 @@ the value returned by this method. The difference may be caused by
 changed channel parameters (i.e. datarate being overwritten), or by a
 non-time-invariant transmission algorithm.
 
-Note that there is no requirement that processMessage() relies on this
-method to calculated the packet duration. That is, to change the
-duration computation algorithm via subclassing you need to redefine
-BOTH the processMessage() and calculateDuration() methods.")
+Note that there is no requirement that [[method process-message]]
+relies on this method to calculated the packet duration. That is, to
+change the duration computation algorithm via subclassing you need to
+redefine *both* [[method process-message]] and [[method
+calculate-duration]].")
   (:method(channel message) (declare (ignore message)) 0.0d0))
 
 (defgeneric transmission-finish-time(channel)
-  (:documentation "For transmission channels: Returns the simulation time
-the sender gate will finish transmitting. If the gate is not
-currently transmitting, the result is unspecified but less or equal
-the current simulation time.")
+  (:documentation "* Arguments
+- channel :: a [[transmission-channel]]
+
+* Returns
+- duration :: a [[time-type]]
+
+* Description
+
+Returns the simulation time the sender gate will finish transmitting
+over a transmission channel. If the gate is not currently
+transmitting, the result is unspecified but less or equal the current
+simulation time.")
   (:method(channel) (simulation-time)))
 
 (defgeneric busy-p(channel)
-  (:documentation "For transmission channels: Returns whether the sender gate
-is currently transmitting, ie. whether transmission-finish-time
+  (:documentation "* Arguments
+- channel :: a [[transmission-channel]]
+
+* Returns
+- busy :: a =boolean=
+
+* Description
+
+For transmission channels: returns whether the sender gate
+is currently transmitting, ie. whether [[transmission-finish-time]]
 is greater than the current simulation time.")
    (:method((channel ideal-channel)) nil)
    (:method(channel) (< (simulation-time) (transmission-finish-time channel))))
 
 (defgeneric (setf transmission-finish-time)(channel time)
-  (:documentation "For transmission channels: Forcibly overwrites the
+  (:documentation "* Arguments
+- channel :: a [[transmission-channel]]
+- time :: a [[time-type]]
+
+* Returns
+- time :: a [[time-type]]
+
+* Description
+
+For transmission channels: Forcibly overwrites the
 finish time of the current transmission in the channel (see
-transmission-finish-time).
+[[transmission-finish-time]]).
 
 This method is a crude device that allows for implementing aborting
 transmissions; it is not needed for normal packet transmissions.
@@ -161,21 +233,32 @@ receiver has to understand."))
 
 (defclass delay-channel(channel)
   ((delay :type time-type :initform 0.0d0 :accessor delay :parameter t
-          :initarg :delay :documentation "Delay in seconds")
+          :initarg :delay :documentation "The propagation delay in seconds")
    (disabled-p :type bool :initform nil :accessor disabled-p :parameter t
              :initarg :disabled :documention "If true packets are discarded"))
   (:metaclass parameter-class)
-  (:documentation "Channel with propagation delay."))
+  (:documentation "A [[channel]] with propagation delay."))
 
 (register-signal 'message-sent)
 (register-signal 'message-discarded)
 
 (defstruct message-sent-signal-value
+  "* Slots
+- timestamp :: a [[time-type]] - the time message was sent
+- message :: a [[message]] being sent.
+- result :: a [[channel-result]]
+
+* Description
+
+Structure used to to pass information on +message-sent+ signal
+conataining the time it was sent, the message and the channel result."
   (timestamp (simulation-time) :type time-type)
   message
   (result (make-channel-result) :type channel-result))
 
 (defmethod process-message((channel delay-channel) message time)
+  "For a delay channel we discard messages if channel is disable,
+otherwise successfully send with specvified delay."
   (cond
     ((disabled-p channel)
      (emit channel 'message-discarded (make-timestamped :value message))
@@ -185,5 +268,5 @@ receiver has to understand."))
        (when (may-have-listeners channel (signal-id 'message-sent))
          (emit channel 'message-sent
                (make-message-sent-signal-value
-                :message  message :result result)))
+                :message message :result result)))
        result))))

@@ -30,8 +30,26 @@
 
 (in-package :cl-user)
 
-(defpackage :lens
-  (:documentation "LENS Simulator Base")
+(defpackage :lisp-educational-network-simulator
+  (:documentation "
+Simulations are represented as a heirarchical network of
+modules interconnected using channels. Every simulation must have one
+top level network module which will specify submodules and their
+interconnections. These submodules may be compound modules which can
+contain further submodules or simple modules which contain
+implementations. All module types are declared as CLOS classes
+inheriting from [[network]], [[compound-module]] and
+[[module]] base classes as appropriate. In addition module classes
+must declare a metaclass - [[compound-module-class]] for
+networks and compound modules and [[module-class]] for simple
+modules. These meta-classes allow for the declaration of parameter
+slots (where the value may be initialised from the configuration
+file), gates, submodules and connections in the class definition.
+When a simulation is run the network type is read from the parameter
+file and created. This will then create the submodules and so on until
+the whole network is created.
+")
+  (:nicknames :lens)
   (:use :closer-common-lisp :closer-common-lisp-user :data-format-validation)
   (:import-from :alg
                  #:enqueue #:dequeue #:make-binary-heap #:empty-p #:size
@@ -56,7 +74,7 @@
    #:read-configuration #:format-from-type #:read-parameter
    #:parameter-class #:parameter-object #:configure #:number-or-expression
    ;; simulation kernel
-   #:*simulation* #:*simulation-init-hooks* #:*time-format* #:time-type
+   #:*simulation* #:*simulation-init-hooks* #:*time-format* #:time-type #:sec
    #:configuration #:simulation #:network #:sim-time-limit #:cpu-time-limit
    #:simulation-time #:schedule #:scheduled-p #:cancel #:stop
    #:run-simulations

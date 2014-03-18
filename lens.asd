@@ -44,9 +44,8 @@
                                     "parameters" "rng"))
                (:file "signals" :depends-on ("object"))
                (:file "timers" :depends-on ("module"))
-               (:file "model-change" :depends-on ("defpackage"))
                (:file "gate" :depends-on
-                      ("object" "model-change" "channel" "message"))
+                      ("object" "channel" "message"))
                (:file "channel" :depends-on ("signals" "component"))
                (:file "module" :depends-on
                       ("message" "gate" "component" "parameters" "simulation"))
