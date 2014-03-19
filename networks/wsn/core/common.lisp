@@ -104,6 +104,7 @@
 
 (defmethod set-timer((instance wsn-module) (timer timer-message) interval
                      &optional name)
+  "Schedule a timer using local time to determine interval"
   (call-next-method
    instance timer (get-simulation-time instance interval) name))
 
