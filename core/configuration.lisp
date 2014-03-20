@@ -44,6 +44,8 @@
                   (format os "\"~A\" line ~A"
                           (parameter-source-pathname s)
                           (parameter-source-line-number s)))))
+  "Structure used to record file path and line number of source used
+  for parameters stored in a trie."
   pathname
   line-number)
 
@@ -87,6 +89,8 @@
   (:documentation "Delete branch from a trie matching pattern"))
 
 (defmethod make-trie((pattern list) value  &optional source)
+  "Given an ordered list of the heirarchical pattern and a value
+create a new trie structure. If source provided record it in trie."
   (if (rest pattern)
       (make-instance 'trie
                      :prefix (first pattern)
@@ -252,7 +256,62 @@ representing a value, a pathname for an extension file or nil if no
        (error "Parse error in configuration file at ~A" line)))))
 
 (defun read-configuration(pathname &optional (key "General"))
-  "Read a configuration file"
+  "* Arguments
+- pathname :: a path designator for a a configuration file
+- key :: string or list of strings designating sections (default \"General\")
+
+* Returns
+- trie :: A trie containing configuration
+
+* Description
+
+This functions reads the configuration keys from a source file
+designated by =pathname= one or more sections designated by =key= and
+returns a trie containing the fully resolved
+configuration. Configuration files are used to specify the parameters
+for the simulation and the heirachy of components therein.
+
+If a list of sections is given in =key= they are read in the specified order.
+If the \"General\" section is not listed it will be read at the end.
+
+* Configuration File Format
+
+The configuration data have the following syntax.
+
+- comments :: #<comment>
+- section :: [<section-title>]
+- file-inclusion :: include <path>
+- parameter-definition :: <parameter-name> = <parameter-value>
+- parameter-name :: (<name-part>.*)<name-part>
+- name-part :: <name>|<glob>|<index>
+- glob :: <*>|<**>
+- index :: <integer> | <range>
+- name :: <character>+
+- range :: <integer>-<integer>
+
+Configuration data is read line per line. Everything after # on a line
+is considered a comment. If a line ends with a #\\ it is assumed the
+following line is a continuation line. All parameters are read into
+named sections designated by the previous <section> or \"General\"
+section if no previous section title is given.
+
+<file-inclusion> is used to insert the contents of another file at the
+given point. It is exactly as if the lines from that file where
+inserted at that point.
+
+The <parameter-name> is used to specify which durind simulation
+Parameters for the simulation have heirarchical names which correspond
+to the heirarchy of named components in the simulation. Globs may be
+used to specify an any match. \* corresponds to matching a single
+paramater-name whereas ** will match a sequence of names in the
+heirarchy. For indexed components the index may either be a single
+integer or a range of values seperated with -.
+
+** Examples
+
+See ini files included with source code.
+
+"
   (let ((sections (make-hash-table :test #'equal))
         (current-section "General"))
     (labels((do-read-file(pathname)

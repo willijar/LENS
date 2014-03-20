@@ -47,9 +47,9 @@
 
 (defstruct channel-result
   "* Slots
-- DELAY :: The propagation delay of the channel
-- DURATION :: The transmition duration of the packet.
-- DISCARD :: If true packet packet will be discarded (was lost in transmission)
+- delay :: The propagation delay of the channel
+- duration :: The transmition duration of the packet.
+- discard :: If true packet packet will be discarded (was lost in transmission)
 
 * Description
 Structure containg result of process-message from a channel"
@@ -147,8 +147,7 @@ non-time-invariant transmission algorithm.
 Note that there is no requirement that [[method process-message]]
 relies on this method to calculated the packet duration. That is, to
 change the duration computation algorithm via subclassing you need to
-redefine *both* [[method process-message]] and [[method
-calculate-duration]].")
+redefine *both* [[process-message]] and [[calculate-duration]].")
   (:method(channel message) (declare (ignore message)) 0.0d0))
 
 (defgeneric transmission-finish-time(channel)
@@ -250,7 +249,7 @@ receiver has to understand."))
 
 * Description
 
-Structure used to to pass information on +message-sent+ signal
+Structure used to to pass information on =message-sent= signal
 conataining the time it was sent, the message and the channel result."
   (timestamp (simulation-time) :type time-type)
   message
@@ -258,7 +257,7 @@ conataining the time it was sent, the message and the channel result."
 
 (defmethod process-message((channel delay-channel) message time)
   "For a delay channel we discard messages if channel is disable,
-otherwise successfully send with specvified delay."
+otherwise successfully send with specified delay."
   (cond
     ((disabled-p channel)
      (emit channel 'message-discarded (make-timestamped :value message))

@@ -52,8 +52,8 @@
     can be extracted from the message object, by its duration()
     method."))
   (:documentation "Represents a module gate. Created and managed by modules;
-the user typically does not want to directly create or destroy cGate
-objects. However, they are important if a simple module algorithm
+the user typically does not want to directly create or destroy gate
+objects. However, they are important if a module algorithm
 needs to know about its surroundings."))
 
 (defclass gate-slot(owned-object)

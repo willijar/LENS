@@ -30,7 +30,7 @@
 
 (in-package :cl-user)
 
-(defpackage :lisp-educational-network-simulator
+(defpackage :lens
   (:documentation "
 Simulations are represented as a heirarchical network of
 modules interconnected using channels. Every simulation must have one
@@ -49,7 +49,7 @@ When a simulation is run the network type is read from the parameter
 file and created. This will then create the submodules and so on until
 the whole network is created.
 ")
-  (:nicknames :lens)
+  (:nicknames :lisp-educational-network-simulator)
   (:use :closer-common-lisp :closer-common-lisp-user :data-format-validation)
   (:import-from :alg
                  #:enqueue #:dequeue #:make-binary-heap #:empty-p #:size
@@ -93,7 +93,7 @@ the whole network is created.
    #:gate-size #:size #:end-module
    #:gate-type #:path-start-gate #:path-end-gate #:connect #:disconnect
    #:deliver #:connected-p #:connected-outside-p #:connect-inside-p
-   #:deliver-on-reception-start-p
+   #:deliver-on-reception-start-p #:busy-p
    #:channel #:transmission-channel #:ideal-channel #:channel-result
    #:process-message #:nominal-datarate #:calculate-duration
    #:transmission-finish-time #:delay-channel #:delay #:disabled-p
