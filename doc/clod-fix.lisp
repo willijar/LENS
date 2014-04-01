@@ -27,6 +27,22 @@
     (write-bullet-point "Properties: ~(~A~)"
                         (lens::slot-definition-properties slot))))
 
+(defgeneric write-class-extras(class)
+  (:method(class) (declare (ignore class)))
+  (:method((c lens::parameter-class))
+    (writing-section ("Parameters")
+      (dolist (slot (class-direct-slots c))
+        (when (typep slot 'lens::parameter-direct-slot-definition)
+          (let ((properties (lens::slot-definition-properties slot)))
+          (write-out
+           "- ~(~A~) :: ~@[a =~(~S~)=.~] ~@[Default: =~A=.~] ~@[=Volatile=~*~]~A"
+           (lens::slot-definition-parameter-name slot)
+           (if (getf properties :format)
+               (lens::slot-definition-format slot)
+               (lens::slot-definition-type slot))
+           (lens::slot-definition-initform slot)
+           (lens::slot-definition-volatile slot)
+           (documentation slot t))))))))
 
 (defmethod document :around ((slot slot-definition)
                              (doctype (eql :slot)))
@@ -82,6 +98,7 @@
                         #'class-name
                         (class-direct-subclasses c))))
               (list "None.")))))
+        (write-class-extras c)
         (write-docstring-section "Description" (documentation c t))
         (writing-section ("Direct slots")
           (dolist (slot (class-direct-slots c))

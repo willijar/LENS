@@ -32,7 +32,8 @@
   ((source-gate :initarg :source-gate :accessor source-gate
                 :documentation "The gate which sends messages over the channel."))
   (:metaclass parameter-class)
-  (:documentation "Base class for all channels."))
+  (:documentation "Base class for all channels entities in the
+  simulations. Channells are attached to their source gate."))
 
 (defclass ideal-channel(channel)
   ()
@@ -67,6 +68,7 @@ Structure containg result of process-message from a channel"
 - channel-result :: a [[structure channel-result]]
 
 * Description
+
 This method encapsulates the channel's functionality. The method
 should model the transmission of the given message starting at the
 given time, and return the propagation delay, transmission

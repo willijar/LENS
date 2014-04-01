@@ -37,7 +37,10 @@
               :documentation "to ensure increasing timestamp order")
    (recorded-vector :initform (make-array 1024 :element-type 'timestamped
                                  :adjustable t :fill-pointer 0)
-                    :reader recorded-vector)))
+                    :reader recorded-vector))
+  (:documentation "Recorder class which records the a vector of time
+  and values using [[record]]. Ensures times are increasing order and
+  reports the vector of stored values in [[report]]."))
 
 (define-result-recorder 'vector-recorder 'vector)
 
@@ -65,27 +68,33 @@
        (recorded-vector r)))
 
 (define-statistic-filter count(value (count 0))
+  "Count the number of values received."
   (declare (ignore value))
   (incf count))
 
 (define-statistic-filter sum(value (sum 0d0))
+  "Return the sum of all received values."
   (incf sum value))
 
 (define-statistic-filter mean(value (sum 0d0) (count 0))
+  "Return the average value value received so far."
   (/ (incf sum value) (incf count)))
 
 (define-statistic-filter min(value min)
+  "Return the minimum value received so far."
   (when (or (not min) (< value min)) (setf min value)))
 
 (define-statistic-filter max(value max)
+  "Return the maximum value received so far."
   (when (or (not max) (> value max)) (setf max value)))
 
-(define-statistic-filter constant0(value) 0)
+(define-statistic-filter constant0(value) "Always return 0" 0)
 
-(define-statistic-filter constant1(value) 1)
+(define-statistic-filter constant1(value) "Always return 1" 1)
 
 (defclass count-recorder(scalar-recorder)
-  ((count :accessor recorded-value :initform 0)))
+  ((count :accessor recorded-value :initform 0))
+  (:documentation "Record the number of signals received."))
 
 (define-result-recorder 'count-recorder 'count)
 
@@ -99,7 +108,8 @@
     (call-next-method)))
 
 (defclass sum(scalar-recorder)
-  ((sum :accessor recorded-value :initform 0)))
+  ((sum :accessor recorded-value :initform 0))
+  (:documentation "Record the sum of the numeric values received."))
 
 (define-result-recorder 'sum)
 
@@ -109,7 +119,8 @@
 
 (defclass mean(scalar-recorder)
   ((sum :initform 0)
-   (count :initform 0)))
+   (count :initform 0))
+  (:documentation "Record the mean of the numeric values received."))
 
 (define-result-recorder 'mean)
 
@@ -125,7 +136,8 @@
       (/ sum count))))
 
 (defclass last-value(scalar-recorder)
-  ((value :initform nil :accessor recorded-value)))
+  ((value :initform nil :accessor recorded-value))
+  (:documentation "Record the last value received."))
 
 (define-result-recorder 'last-value)
 
@@ -133,7 +145,9 @@
   (declare (ignore time))
   (setf (recorded-value r) value))
 
-(defclass min-recorder(last-value)())
+(defclass min-recorder(last-value)
+  ()
+  (:documentation "Record the minimum value received."))
 
 (define-result-recorder 'min-recorder 'min)
 
@@ -142,7 +156,9 @@
   (when (or (not (recorded-value r)) (< value (recorded-value r)))
     (setf (recorded-value r) value)))
 
-(defclass max-recorder(last-value)())
+(defclass max-recorder(last-value)
+  ()
+  (:documentation "Record the maximum value received."))
 
 (define-result-recorder 'max-recorder 'max)
 
@@ -155,7 +171,8 @@
   ((start-time :initform -1 :type timetype)
    (last-time :type timetype)
    (weighted-sum :type real :initform 0)
-   (last-value :type real :initform 0)))
+   (last-value :type real :initform 0))
+  (:documentation "Record the time averaged value received."))
 
 (define-result-recorder 'timeavg)
 
@@ -181,7 +198,9 @@
    (min :type float :initform nil :reader result-min)
    (max :type float :initform nil :reader result-max)
    (sum :type float :initform 0 :reader result-sum)
-   (sqrsum :type float :initform 0 :reader result-sqrsum)))
+   (sqrsum :type float :initform 0 :reader result-sqrsum))
+  (:documentation "Output basic statistics (cound,min,max,mean and
+  stddev) of numeric values received."))
 
 (define-result-recorder 'stddev)
 
@@ -240,7 +259,10 @@
   ((sum-weights :type real :initform 0)
    (sum-weighted-vals :type real :initform 0)
    (sum-squared-weights :type real :initform 0)
-   (sum-weights-squared-vals :type real :initform 0)))
+   (sum-weights-squared-vals :type real :initform 0))
+  (:documentation "Output basic statistics (cound,min,max,mean and
+  stddev) of [[weighted]] values received taking acount of the
+  [[weighted-weight]] of these values."))
 
 (define-result-recorder 'weighted-stddev)
 
@@ -322,15 +344,15 @@
      will be transferred into the new histogram structure and their
      store is deleted -- this is done by the transform() function.
 
-   You may also explicitly specify the lower or upper limit and have
-   the other end of the range estimated automatically. The setRange...()
-   member functions of cDensityEstBase deal with setting
-   up the histogram range. It also provides pure virtual functions
-   transform() etc.
+You may also explicitly specify the lower or upper limit and have
+the other end of the range estimated automatically. The setRange...()
+member functions of cDensityEstBase deal with setting
+up the histogram range. It also provides pure virtual functions
+transform() etc.
 
-   Subsequent observations are placed in the histogram structure.
-   If an observation falls out of the histogram range, the *underflow*
-   or the *overflow* *cell* is incremented."))
+Subsequent observations are placed in the histogram structure.
+If an observation falls out of the histogram range, the *underflow*
+or the *overflow* *cell* is incremented."))
 
 (define-result-recorder 'histogram)
 
@@ -488,7 +510,17 @@
 
 (defclass indexed-count-recorder(scalar-recorder)
   ((count :initform (make-hash-table :test #'equal)
-          :accessor recorded-value)))
+          :accessor recorded-value))
+  (:documentation "Indexed count records the number of times a
+  particular value is received. Values are compare using EQL. If a
+  CONS is recieved using [[record]] the =car= is taken as the index
+  key and the =cdr= is the amount the count is to be incremented.
+
+  This provides a means e.g. to record the number of packets received
+  by source at a destination etc.
+
+  The recorder reports as a statistic with the keys as field names.
+"))
 
 (define-result-recorder 'indexed-count-recorder 'indexed-count)
 
@@ -518,7 +550,12 @@
              :documentation "If true display fractional time.")
    (state :type boolean :initform nil :initarg :initial-state
           :documentation "Boolean state - on or off")
-   (accumulated-time :type time-type :initform 0d0)))
+   (accumulated-time :type time-type :initform 0d0))
+  (:documentation "Rcords the accumulated time when a =boolean= value
+  is true. It is assumed that the initial state is false. If
+  =:fractional= initialization argument is true the recorder will
+  report the statistic as a fraction of total time, otherwise it will
+  output the accumulated time for which the state was true."))
 
 (define-result-recorder 'accumulated-time-recorder 'accumulated-time)
 

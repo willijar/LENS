@@ -49,7 +49,7 @@
 (defclass simulation (named-object parameter-object)
   ((clock :type time-type :initform 0.0d0
 	  :accessor clock :initarg :start-time
-	  :documentation "simulation virtual time")
+	  :documentation "Simulation virtual time")
    (halted :type boolean :initform t :accessor halted)
    (thread :initform nil :reader simulation-thread
 	    :documentation "Thread running simulation")
@@ -66,7 +66,7 @@
                   :initform nil
                   :documentation "Configuration data used for simulation")
    (rng-map :type array :reader rng-map
-            :documentation "Top level rng-map.")
+            :documentation "Top level array of rngs")
    (seed-set :type integer :documentation "Seed set used in this simulation"
              :reader seed-set)
    (num-rngs :parameter t :type fixnum :initform 1 :reader num-rngs
@@ -77,7 +77,7 @@
                   :documentation "Warmup period for statistics collection")
    (cpu-time-limit
     :parameter t :type time-type :initform 300 :reader cpu-time-limit
-    :documentation "Max cpu time for run")
+    :documentation "Max cpu time for run.")
    (sim-time-limit :parameter t :type time-type :initform (* 100 60 60 60)
                    :documentation "Maximum simulation run time"
                    :reader sim-time-limit)
@@ -93,7 +93,9 @@
                   :documentation "Destination stream for scalar results"))
   (:metaclass parameter-class)
   (:default-initargs :name nil :owner nil :configuration-path (list nil))
-  (:documentation "The simulation object"))
+  (:documentation "The main discrete time event simulation class reads
+  global parameters, creates the network being simulated and manages
+  the queue of events for the simulation. "))
 
 (defmethod print-object((simulation simulation) stream)
   (print-unreadable-object (simulation stream :type t :identity t)
@@ -148,7 +150,13 @@
                        :owner sim)))
 
 (declaim (inline simulation-time))
-(defun simulation-time(&optional (simulation *simulation*)) (clock simulation))
+(defun simulation-time(&optional (simulation *simulation*))
+  "Return the simulation time of the current running simulation."
+  (clock simulation))
+
+(defgeneric arrival-time(event)
+  (:documentation
+   "Return the simulation time at which an event is to be handled"))
 
 (defclass event()
   ((rank :type fixnum :initform -1
@@ -168,7 +176,7 @@
    priority are scheduled in order of scheduling" :reader uid)
    (root-event :type event :reader root-event
                :documentation "Top level root for cloned messages"))
-  (:documentation "Class representing a scheduled event"))
+  (:documentation "Class representing a scheduled event on a simulation."))
 
 (declaim (inline scheduled-p))
 (defun scheduled-p(event) (>= (slot-value event 'rank) 0))
@@ -190,7 +198,8 @@
   (= (arrival-time a) (arrival-time b)))
 
 (defun event-queue-consistent-p(simulation)
-  "Do a consistency check on event-queue by dequeing and checking order and then reinqueueing"
+  "Do a consistency check on event-queue by dequeing and checking
+order and then reinqueueing"
   (let ((q (event-queue simulation))
         (result t)
         (events nil))
@@ -224,8 +233,10 @@
 
 (defclass simple-event(event)
   ((handler :reader handler :initarg :handler
-            :documentation "The handler function for this event"))
-  (:documentation "Class for simple events where handler is invoked"))
+            :documentation "The handler for this event (an entity on
+            which [[handle]] has been specialised. Support provided
+            for functions and lisp function forms."))
+  (:documentation "Class for simple events where a handler is invoked."))
 
 (defun event-rank(a &optional b)
   (if b (setf (slot-value a 'rank) b) (slot-value a 'rank)))
@@ -243,7 +254,22 @@
   (:method((event simple-event)) (handle (handler event))))
 
 (defgeneric schedule(event &key delay time)
-  (:documentation "Schedule event for given time")
+  (:documentation "* Arguments
+
+- event :: and [[event]]
+
+* Keyword Arguments
+
+- delay :: a positive =real=
+- time :: a positive =real=
+
+* Description
+
+Schedule event to be handled at the given simulation time /time/ or
+/delay/ after current simulation time. If no /delay/ or /time/ is
+provided the [[arrival-time]] value of the event is used. The
+scheduled time must be >= current simulation-time i.e. in the
+future.")
   (:method((event event) &key delay (time (arrival-time event) time-p))
     (let ((now (simulation-time)))
       (assert (not (scheduled-p event)))
@@ -258,7 +284,13 @@
     (schedule (make-instance 'simple-event :handler handler) :time time)))
 
 (defgeneric cancel(event)
-  (:documentation "Cancel an event")
+  (:documentation "* Arguments
+
+- event :: an [[event]]
+
+* Description
+
+Cancel event /event/ if it was scheduled.")
   (:method((event event))
     (when (>= (slot-value event 'rank) 0)
       (alg:delete event (slot-value *simulation* 'event-queue))
@@ -269,21 +301,46 @@
          (and (typep event 'simple-event) (eql handler (handler event))))
      (slot-value *simulation* 'event-queue))))
 
-(defgeneric stop(entity &key abort)
-  (:documentation "Stop a process entity - optional agument abort will
-abort current activity too.")
+(defgeneric stop(simulation &key abort)
+  (:documentation "* Arguments
+
+- simulation :: a [[simulation]] object
+
+* Keyword Arguments
+
+- abort :: a =boolean=
+
+* Description
+
+Stop the /simulation/. If /abort/ is teu this will stop immediately by killing the thread in which the simulation is running otherwise it will stop after it has finished processing the current [[even]].")
   (:method((simulation simulation) &key abort)
     (setf (slot-value simulation 'halted) t)
     (when abort
-    (when (slot-value simulation 'thread)
-      (ignore-errors (kill-thread (slot-value simulation 'thread)))
-      (setf (slot-value simulation 'thread) nil)))))
+      (when (slot-value simulation 'thread)
+        (ignore-errors (kill-thread (slot-value simulation 'thread)))
+        (setf (slot-value simulation 'thread) nil)))))
 
 (defun run(simulation &key (granularity 10000) step )
-  "Execute the simulation returning the running
-thread. granularity is the number of event to dispatch before
-yielding the thread (default 10000). If granularity is nil all events
-are dispatched in current thread"
+  "* Arguments
+
+- simulation :: a [[simulation]] object
+
+* Keyword Arguments
+
+- granularity :: an =integer= > 1
+- step :: a =function=
+
+* Returns
+
+-- thread :: a thread object
+
+* Description
+
+Executes the simulation returning the running thread. /granularity/ is
+the number of events to dispatch before yielding the thread (default
+10000). If /granularity/ is nil all events are dispatched in current
+thread. If a /step/ function is provided it will be called before each
+[[event]] is dispatched."
   (flet((run(simulation)
           (setf (halted simulation) nil)
           (let ((*context* simulation)
@@ -322,8 +379,32 @@ are dispatched in current thread"
         (funcall #'run simulation))))
 
 (defgeneric initialize(component &optional stage)
-  (:documentation "Allowed depth-first staged initialization. Return
-  true if finished initializing in list methods")
+  (:documentation "* Arguments
+
+- component :: a simulation [[component]]
+- stage :: a positive =integer=
+
+* Return
+
+- finished :: a boolean
+
+* Description
+
+This method is called for every comonent in the simulation after the
+whole simulation is created but before the first event is executed. It
+allows depth-first staged initialization and configuration for
+components which may depend on other components having being
+created. It will be called multiple times with /stage/ increasing by
+1 (from an initial value of 0) every time until it returns /finished/
+as true. This allows for multiple stage initialisation between
+codependent object types. Implementations should therefore check the
+/stage/ value to insure they don't initialise more than once. An
+object is only deemed to be initialised once it [[initialize]] method
+and the [[intialize]] method of all subcomponents return true.
+
+list method combination is used so that when subclassing all the
+relevant [[initialize]] methods must return true for the effective
+method to return true.")
   (:method-combination list)
   (:method :around(component &optional stage)
     (declare (ignore stage))
@@ -342,17 +423,33 @@ are dispatched in current thread"
          (when (initialize (network simulation) (incf stage))
            (return t))))))
 
-(defgeneric initialized-p(entity)
-  (:documentation "Return true if an entity has finished its initialization")
+(defgeneric initialized-p(component)
+  (:documentation "* Arguments
+
+- component ::  a simulation [[component]]
+
+* Description
+
+Returns true if an entity has finished its initialization using the
+[[initialize]] method.")
   (:method((simulation simulation)) (initialized-p (network simulation))))
 
-(defgeneric finish(entity)
-  (:documentation "Called depth first at end of simulation")
+(defgeneric finish(component)
+  (:documentation "* Arguments
+
+- component ::  a simulation [[component]]
+
+* Description
+
+Called depth first for every /component/ at end of simulation. May bee used to finalise statistics and alalysis summary.")
+  (:method(entity)
+    (warn "No finish method defined for a ~A" entity))
   (:method((simulation simulation))
     (stop simulation)
     (finish (network simulation))))
 
-(defvar *simulation-trace-stream* *standard-output*)
+(defvar *simulation-trace-stream* *standard-output*
+  "The stream on which tracing information (using [[tracelog]]) is to be written.")
 
 (let ((last-context nil))
   (defun %tracelog(&rest args)
@@ -366,14 +463,43 @@ are dispatched in current thread"
     (write-char #\newline *simulation-trace-stream*)))
 
 (defmacro tracelog(&rest args)
+  "* Rest Arguments
+
+- args :: list of format arguments.
+
+* Description
+
+Write to [[\*simulation-trace-stream\*]] using /args/ provided the
+[[collect-trace-info]] parameter for the current [[\*context\*]] is true.
+
+This is designed to enable efficient configuration file controlled
+tracing of simulation execution."
   `(when (slot-value *context* 'collect-trace-info)
      (%tracelog ,@args)))
 
 (defstruct timestamped
+  "* Slots
+
+- time :: a /time-type/ (default [[simulation-time]])
+- value :: a value
+
+* Description
+
+Structure associating a time with a value."
   (time (simulation-time) :type time-type)
   value)
 
 (defgeneric latency(entity)
+  (:documentation "* Arguments
+
+- entity :: an object
+
+* Description
+
+Return the latency of the packet or timestampted /entity/ - the time
+difference between current [[simulation-time]] and the time the
+/rntity/ was timestamped.
+")
   (:method((entity timestamped))
     (- (simulation-time) (timestamped-time entity))))
 
@@ -455,13 +581,29 @@ are dispatched in current thread"
 
 (defun run-simulations(pathname &key (config "General")
                        (repeat 1) runnumber preview)
-  "Return list of simulation parameters for given
-configuration. Pathname is the path of parameter file for this
-configuration, config is the configuration name within that parameter
-file, repeat is how many times to repeat the simulation, runnumber
-specifies a single run within a sequence. If preview is true
-simulations are not run but vonfiguration parameters for each run are
-printed out."
+  "* Arguments
+
+- pathname :: a path designator
+
+* Keyword Arguments
+
+- config :: a =string= or list of strings (default \"General\")
+- repeat :: an =integer= >= 1 (default 1)
+- runnumber :: an =integer= >= 1
+- preview :: a =boolean=
+
+* Description
+
+Executes one or more simulations using the configuration file at
+/pathname/. /config/ lists one or more sections of the configuration
+file to use for this run. They will be loaded in order and the
+\"General\" section will always be read last. /repeat/ specifies how
+many times to run the simulation. Each run will be with different seed
+parameters of the random number generators. If /runnumber/ is
+specified then it specifies a single run within a sequence if the
+configuration file specifies iteration over some parameters.  If
+/preview/ is true simulations are not run but onfiguration parameters
+for each run are printed out."
   (let* ((trie (read-configuration pathname config))
          (exp (sort (get-expansions trie) #'<
                     :key #'parameter-expansion-order))

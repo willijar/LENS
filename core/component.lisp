@@ -33,7 +33,7 @@
 (defclass component(parameter-object entity-with-signals)
   ((collect-trace-info
     :type boolean :initform nil :parameter t
-    :documentation "If true tracelog outputs will be traced for this component")
+    :documentation "If true tracelog outputs will be traced for this component.")
    (rng-map :type array :reader rng-map
             :documentation "RNG map for this component")
    (initialized-p
@@ -47,16 +47,14 @@ number sequence mapping and tracing functionality on top of parameter
 and signal handling. It is the base class for all modules and channels
 in simulation which require these.
 
-* Parameters
+** Additional Parameters
 
-- collect-trace-info :: a boolean. If set to true tracing will be turned
-                        on for this component
-- rng-<n> :: integer. Specifies the global random number sequence number
+- rng-<n> :: a =integer=. Specifies the global random number sequence number
   to be mapped to the =n= th sequence for this component
-- scalar-recording :: boolean. If true scalar recording will be activated for
-   statistics objects associated with this component.
-- vector-recording :: boolean. If true vector recording will be activated for
-   statistics objects associated with this component.
+- scalar-recording :: a =boolean=. If true scalar recording will be activated
+   for statistics objects associated with this component.
+- vector-recording :: a =boolean=. If true vector recording will
+    be activated for statistics objects associated with this component.
 
 * Notes
 
@@ -66,7 +64,7 @@ This is set for initialize-instance, finish and for handle-message.
 Functions or methods designed to be used to access a component
 directly outside these contexts /must/ explicitely bind =*context*= around
 around any dynamic context using random number generation or tracing.
-and /should/ do it in all cases as a matter of safe practice."))
+and /should/ do it in all such cases as a matter of safe practice."))
 
 (defmethod print-object((m component) os)
   (print-unreadable-object(m os :type t :identity nil)

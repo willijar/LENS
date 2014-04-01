@@ -51,10 +51,12 @@
     start of the reception. The duration that the reception will take
     can be extracted from the message object, by its duration()
     method."))
-  (:documentation "Represents a module gate. Created and managed by modules;
-the user typically does not want to directly create or destroy gate
-objects. However, they are important if a module algorithm
-needs to know about its surroundings."))
+  (:documentation "Represents a module gate. Created and managed by
+modules; the user typically does not want to directly create or
+destroy gate objects. However, they are important if a module
+algorithm needs to know about its surroundings. Module gates connect
+only in one direction. Bidirectional connections result in two chains
+of gates going in each direction."))
 
 (defclass gate-slot(owned-object)
   ((input :reader input :initform nil :reader input-gate-p
@@ -92,6 +94,7 @@ needs to know about its surroundings."))
             (third (full-name gate)))))
 
 (defun gate-direction(gate)
+  "Return the direction of a gate object (either :input or :output)."
   (let ((input (input (owner gate))))
     (cond  ((eql gate input) :input)
            ((eql gate (output (owner gate))) :output)
@@ -104,6 +107,9 @@ needs to know about its surroundings."))
       (if (vectorp d) (map nil operator d) (funcall operator d)))))
 
 (defgeneric gate(entity address &key index &allow-other-keys)
+  (:documentation "Look up a gate object on entity by address. For a
+  module the address will be a list of the gate name, the gate
+  direction and if it is a gate array the index of the gate.")
   (:method((entity gate-slot) direction &key index &allow-other-keys)
     (let ((s (ecase direction
                (:input (input entity))
@@ -152,6 +158,7 @@ inout gate-slot)"
     (setf (slot-value gate-slot 'output) (make-gates)))))
 
 (defun gate-type(gate-slot)
+  "Return gate type for a gate slot - :input, :output or :inout"
   (if (input-gate-p gate-slot)
       (if (output-gate-p gate-slot)
           :inout
@@ -178,14 +185,17 @@ inout gate-slot)"
         "not connected")))
 
 (defun path-start-gate(gate)
+  "Return the first gate in the sequence of gates connected to a gate"
   (do((gate gate (previous-gate gate)))
      ((not (previous-gate gate)) gate)))
 
 (defun path-end-gate(gate)
+  "Return the last gate in the sequence of gates connected to a gate"
   (do((gate gate (next-gate gate)))
      ((not (next-gate gate)) gate)))
 
 (defun check-channels(gate)
+  "Ensure that a gate connectes to at most one transmission channel."
   (do* ((gate (path-start-gate gate) (next-gate gate))
         (end-gate (path-end-gate gate))
         (n 0))
@@ -201,7 +211,7 @@ inout gate-slot)"
 channel object (if one is specified). This method can be used to
 manually create connections for dynamically created modules.
 
-This method invokes callInitialize() on the channel object, unless the
+This method invokes [[initialize]] on the channel object, unless the
 compound module containing this connection is not yet
 initialized (then it assumes that this channel will be initialized as
 part of the compound module initialization process.) To leave the
@@ -210,7 +220,21 @@ parameter.
 
 If the gate is already connected, an error will occur. The gate
 argument cannot be nil, that is, you cannot use this function
-to disconnect a gate; use disconnect() for that.")
+to disconnect a gate; use [[disconnect]] for that.
+
+* Simulation Events
+
+- pre-model-change :: a =list=. Emitted before the gate is connected
+- post-model-change :: a =list=. Emitted after the gate is connected.
+
+Model change events are emiited with a list describing the
+change. This list has a descriptive symbol followed by keyword
+arguments of the elements involved in the change. [[connect]] provides
+the following model change notifications.
+
+- gate-connect-notification :: signalled in the module containing this gate
+- path-create-notification :: signalled to the start and end modules of path
+")
   (:method((from gate) (to gate)  &key channel leave-uninitialized)
     (assert (and (not (next-gate from)) (not (previous-gate to))))
     (let* ((module (parent-module from))
@@ -220,12 +244,12 @@ to disconnect a gate; use disconnect() for that.")
            (end-module (parent-module end-gate)))
       (when (has-listeners module 'pre-model-change)
         (emit module 'pre-model-change
-              `(pre-gate-connect-notification
+              `(gate-connect-notification
                 :gate ,from :target-gate ,to :channel ,channel)))
       (when (or (has-listeners start-module 'pre-model-change)
                 (has-listeners end-module 'pre-model-change))
         (let ((notification
-               `(pre-path-create-notification
+               `(path-create-notification
                  :start-gate ,start-gate :end-gate ,end-gate
                  :changed-gate ,from)))
           (emit start-module 'pre-model-change notification)
@@ -240,11 +264,11 @@ to disconnect a gate; use disconnect() for that.")
           (initialize channel)))
       (when (has-listeners module 'post-model-change)
         (emit module 'post-model-change
-              `(post-gate-connect-notification :gate ,from)))
+              `(gate-connect-notification :gate ,from)))
       (when (or (has-listeners start-module 'post-model-change)
                 (has-listeners end-module 'post-model-change))
         (let ((notification
-               `(post-path-create-notification
+               `(path-create-notification
                  :start-gate ,start-gate :end-gate ,end-gate
                  :changed-gate ,from)))
           (emit start-module 'post-model-change notification)
@@ -254,8 +278,22 @@ to disconnect a gate; use disconnect() for that.")
 (defgeneric disconnect(gate)
   (:documentation "Disconnects the gate, and also deletes the
   associated channel object if one has been set. disconnect() must be
-  invoked on the source gate (from side) of the connection.
-The method has no effect i(load-system :lens.wsn)f the gate is not connected.")
+  invoked on the source gate (from side) of the connection.  The
+  method has no effect if the gate is not connected.
+
+* Simulation Events
+
+- pre-model-change :: a =list=. Emitted before the gate is disconnected
+- post-model-change :: a =list=. Emitted after the gate is disconnected.
+
+Model change events are emiited with a list describing the
+change. This list has a descriptive symbol followed by keyword
+arguments of the elements involved in the change. [[disconnect]] provides
+the following model change notifications.
+
+- gate-disconnect-notification :: signalled in the module containing this gate
+- path-cut-notification :: signalled to the start and end modules of path
+")
   (:method((gate gate))
     (unless (next-gate gate) (return-from disconnect))
     (let* ((module (parent-module gate))
@@ -265,11 +303,11 @@ The method has no effect i(load-system :lens.wsn)f the gate is not connected.")
            (end-module (parent-module end-gate)))
       (when (has-listeners module 'pre-model-change)
         (emit module 'pre-model-change
-              `(pre-gate-disconnect-notification :gate ,gate)))
+              `(gate-disconnect-notification :gate ,gate)))
       (when (or (has-listeners start-module 'pre-model-change)
                 (has-listeners end-module 'pre-model-change))
         (let ((notification
-               `(pre-path-cut-notification
+               `(path-cut-notification
                  :start-gate ,start-gate :end-gate ,end-gate
                  :changed-gate ,gate)))
           (emit start-module 'pre-model-change notification)
@@ -281,18 +319,23 @@ The method has no effect i(load-system :lens.wsn)f the gate is not connected.")
               (slot-value next-gate 'previous-gate) nil)
         (when (has-listeners module 'post-model-change)
           (emit module 'post-model-change
-              `(post-gate-disconnect-notification
+              `(gate-disconnect-notification
                :gate ,gate :target-gate ,next-gate :channel ,channel)))
       (when (or (has-listeners start-module 'post-model-change)
                 (has-listeners end-module 'post-model-change))
         (let ((notification
-               `(post-path-cut-notification
+               `(path-cut-notification
                  :start-gate ,start-gate :end-gate ,end-gate
                  :changed-gate ,gate)))
           (emit start-module 'post-model-change notification)
           (emit end-module 'post-model-change notification)))))))
 
 (defgeneric (setf channel)(channel source-gate)
+  (:documentation "Set the channel associated with a gate. It is an
+  error if the gate alreay has a channel or if the number of
+  transmission channels in a path would be more than one. The signal
+  flags on the channel will be updated to reflect parent listeners if
+  necessary.")
   (:method(channel (gate gate))
     (assert (null (channel gate)))
     (setf (slot-value channel 'source-gate) gate
@@ -317,11 +360,9 @@ The method has no effect i(load-system :lens.wsn)f the gate is not connected.")
          ((typep (channel g) 'transmission-channel) (channel g))))))
 
 (defgeneric deliver(message gate time)
-  (:documentation "This function is called internally by the send()
-  functions and channel classes' deliver() to deliver the message to
-  its destination. A false return value means that the message object
-  should be deleted by the caller. (This is used e.g. with parallel
-  simulation, for messages leaving the partition.)")
+  (:documentation "This function is called internally by the [[send]]
+  functions and channel classes' [[deliver]] to deliver the message to
+  its destination.")
   (:method(message (gate gate) time)
     (cond
       ((not (next-gate gate))
@@ -336,11 +377,22 @@ The method has no effect i(load-system :lens.wsn)f the gate is not connected.")
          (when transmission-p
            (assert (> time (transmission-finish-time channel))
                    ()
-                   "Error sending message ~A on gate ~A: channel is currently busy with an ongoing transmission -- please rewrite the sender simple module to only send when the previous transmission has  already finished, using cGate::getTransmissionFinishTime(), scheduleAt(), and possibly a cQueue for storing messages waiting to be transmitted" message gate)
+                   "Error sending message ~A on gate ~A: channel is
+                   currently busy with an ongoing transmission --
+                   please rewrite the sender simple module to only
+                   send when the previous transmission has already
+                   finished, using [[get-transmission-finish-time]],
+                   [[schedule-at]], and possibly a [[queue]] for
+                   storing messages waiting to be transmitted" message
+                   gate)
            (assert (or (not (typep message 'packet))
                        (zerop (duration message)))
                     ()
-                    "Packet ~A already has a duration set; there may be more than one channel with data rate in the connection path, or it was sent with a sendDirect() call that specified duration as well" message))
+                    "Packet ~A already has a duration set; there may
+                    be more than one channel with data rate in the
+                    connection path, or it was sent with a
+                    sendDirect() call that specified duration as well"
+                    message))
          (let ((result (process-message channel message time)))
            (unless (channel-result-discard result)
              (when (and transmission-p (typep message 'packet))
@@ -349,11 +401,13 @@ The method has no effect i(load-system :lens.wsn)f the gate is not connected.")
                       (+ time (channel-result-delay result))))))))))
 
 (defun connected-outside-p(gate)
+  "Return true if a gate is connected to the outside of its module."
   (if (eql (gate-direction gate) :input)
       (previous-gate gate)
       (next-gate gate)))
 
 (defun connected-inside-p(gate)
+  "Return true if a gate is connected to the inside of its compound-module."
   (if (eql (gate-direction gate) :input)
       (next-gate gate)
       (previous-gate gate)))

@@ -30,15 +30,50 @@
 (in-package :lens)
 
 (defgeneric title(instance)
-  (:documentation "Return the publishable title for a result"))
+  (:documentation "* Arguments
+
+- instance :: a [[statistic-listener]]
+
+* Description
+
+Return the publishable title for a result from a [[statistic-listener]]. Declared in the arguments to the =:statistic= property of a [[component]]."))
 
 (defgeneric record(recorder time value)
-  (:documentation "Must be implemented for all result recorders"))
+  (:documentation "* Arguments
+
+- recorder :: a [[result-recorder]]
+- time :: a [[time-type]]
+- value :: a =number=
+
+* Description
+
+Must be specialised for all [[result-recorder]] classes to record the
+/value/ at simulation time /time/. /value/ will usually be a number
+but could be a structure containing more information or treated as a
+boolean for simple counting recorders."))
 
 (defgeneric report(recorder stream)
-  (:documentation "Report results from recorder to stream"))
+  (:documentation "* Arguments
 
-(defstruct weighted ;; structure for collecting weighted values
+- recorder :: a [[result-recorder]]
+- stream :: a /stream-designator/
+
+* Description
+
+Must be specialised for all [[result-recorder]] classes to report the
+statistic value to /stream/. Defined for the [[scalar-recorder]] class
+to output the value returned from [[recorded-value]] using the
+[[output-format]] format string and for [[vector-recorder]] to output
+the vector returned from [[recorded-vector]] at full precision.
+
+* Notes
+
+The [[finish]] method will be called on the [[result-recorder]] in
+order for it to complete its statistics analysis at the simulation
+termination time beforer any calls to [[report]]"))
+
+(defstruct weighted
+  "Structure for storing weighted values for statistical purposes."
   (weight 1.0 :type double-float)
   (value))
 
@@ -47,15 +82,37 @@
   (record recorder time (weighted-value value)))
 
 (defvar *statistic-filter-generators* (make-hash-table)
-  "Mapping betetween statistic filter names and function generators")
+  "Mapping betetween statistic filter names and the function
+  generators for this statistic generated using
+  [[define-statistic-filter]].")
 
 (defvar *result-recorders* (make-hash-table)
-  "Mapping between statistic recorder name and classes")
+  "Mapping between statistic recorder recorder name and the
+  implementation classes defined using [[define-result-recorder]]")
 
 (defmacro define-statistic-filter(name (var &rest statevars) &body body)
-  "Define and register a statistic filter function. var is the
-numberic value to be processed, statevars are the state value
-definitions as per let"
+  "* Arguments
+
+- name :: a =symbol= (evaluated)
+- var :: a =symbol= (evaluated)
+- statevars :: a binding form*
+- body :: form*
+
+* Description
+
+Define and register a statistic filter function. /var/ is the name
+used in /body/ to refer to the input value. statevars are the state
+value definitions as per let which are bound outside the
+finction. /body/ must return the filter value or null to abort
+filtering.
+
+* Example
+
+;;; (define-statistic-filter count(value (count 0))
+;;;   (declare (ignore value))
+;;;   (incf count))
+
+"
   (eval-when(:load-toplevel :execute)
     (setf
      (gethash name *statistic-filter-generators*)
@@ -63,7 +120,8 @@ definitions as per let"
       (eval
       `(let (,@statevars)
           (function (lambda(,var)
-            (or (progn ,@body)
+            ,(when (stringp (first body)) (first body))
+            (or (progn ,@(if (stringp (first body)) (rest body) body))
                 (throw 'filter-abort ,name)))))))))))
 
 (defun make-statistic-filter(name)
@@ -71,6 +129,16 @@ definitions as per let"
     (when f (funcall f))))
 
 (defun define-result-recorder(classname &optional (name classname))
+  "* Arguments
+
+- classname :: a =symbol=
+- name :: a =symbol=
+
+* Description
+
+Register the class denoted by /classname/ as a result recorder which
+can be denoted by name /name/ in configuration files and =:statistic=
+propery definitons of simulation components."
   (setf (gethash name *result-recorders*)
         (find-class classname)))
 
@@ -83,7 +151,7 @@ definitions as per let"
                  (nconc (list :name name :owner owner) args))
           (error "Unknown result recorder ~A" name)))))
 
-(defclass statistic-listener(listener)
+(defclass statistic-listener()
   ((title :type string :reader title)
    (signal-values :type list :initform nil :accessor signal-values
                   :documentation "Cache of last signal values received")
@@ -91,7 +159,11 @@ definitions as per let"
            :documentation "Filter function for this statistic")
    (recorders :initarg :recorder :initform nil :reader recorders
               :documentation "The result recorders for this statistic"))
-  (:documentation "Listener for statistics"))
+  (:documentation "Listener class for statistic recording. Statistics
+  are declared using =:statistic= property in simulation component
+  definitions and created after the simulation network has been
+  created on the basis of the configuration parameters. There may be
+  more than one such definition per component."))
 
 (defmethod finish((instance statistic-listener))
   (map nil #'finish (recorders instance)))
@@ -165,7 +237,10 @@ definitions as per let"
 
 (defclass result-recorder(owned-object)
   ()
-  (:documentation "A base class for all result recorders"))
+  (:documentation "The base class for all result recorders.
+  [[receive-signal]] is specialised on this class to call [[record]]
+  on the instance with appropriate values after the simulation
+  [[warmup-period]]."))
 
 (defmethod title((instance result-recorder))
          (title (owner instance)))
@@ -195,7 +270,11 @@ definitions as per let"
 
 (defclass scalar-recorder(result-recorder)
   ((output-format :initform "~A" :initarg :format
-           :documentation "Format to use when outputing recorded units")))
+           :documentation "Format to use when outputing recorded units"))
+  (:documentation "Base class for all scalar value [[result-recorder]]
+  classes. Specialises [[report]] to output the value returned by
+  [[recorded-value]] using the format specified in the =:format
+  initialisation argument. "))
 
 (defgeneric recorded-value(scalar-recorder)
   (:documentation "Return the value to record for a scalar recorder"))

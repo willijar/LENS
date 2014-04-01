@@ -40,14 +40,19 @@
 (in-package :lens)
 
 (defgeneric configuration(instance)
-  (:documentation "Return the parameter source associated with an instance")
+  (:documentation "Return the configuration trie with an instance. By
+  default this will be the configuration read at the start of the
+  simulation.")
   (:method(instance)
     (declare (ignore instance))
     (configuration *simulation*)))
 
 (defgeneric read-parameter(full-path source format)
-  (:documentation "Actually read a fully named parameter from source
-  using specified format")
+  (:documentation "Loopup a fully named parameter from a configuration
+  trie and convert from string to internal representation using
+  [[parse-input]] with the specified format. If the format is a
+  pathname it may be relative to the path of the source file from
+  which the parameter was read.")
   (:method((full-path list) (trie trie) format)
     (multiple-value-bind(txt found-p source) (trie-match full-path trie)
       (when found-p
@@ -75,7 +80,7 @@
         (values p found-p source))))
 
 (defgeneric format-from-type(type)
-  (:documentation "Given a type declaration return a format declaration")
+  (:documentation "Given a type declaration return a format declaration suitable for use in [[parse-input]] to covert a parameter string to internal representation.")
   (:method((type list)) (cons (format-from-type (first type)) (rest type)))
   (:method((type symbol))
     (if (subtypep type 'number)
@@ -168,11 +173,47 @@
 (defmethod  slot-definition-format((slot parameter-volatile-effective-slot-definition))
   'read)
 
+(defgeneric properties(instance)
+  (:documentation "Return an a-list of properties associated with an
+  instance of a [[parameter-object]]. These may be used to specify
+  parameters that may be used outside the simulation itself such as
+  statistics gathers for components or display properties etc. The may
+  be specified on a per class or per instance basis with instance
+  overriding class values."))
+
 (defclass parameter-class(standard-class)
   ((properties :initform nil :type list :reader properties
                :documentation "The properties for this class"))
   (:documentation "Metaclass for classes which have slots initialised
-  from an external source"))
+  from an external parameter source.
+
+* Additional class options
+
+- properties :: an /alist/
+
+The /properties/ class option specifies the default set of properties
+all classes of this metaclass will take as a default. These are in
+addiiton to the instance properties that may be specified. The
+instance properties take precedence.
+
+* Additional slot options
+
+- parameter :: a =boolean=
+- volatile :: a =boolean=
+- properties :: an /alist/
+
+If /parameter/ is true then this is a parameter slot and the value for
+this slot will be initialised from the simulation configuration file
+as a priority over the default value specified in the =:initform= slot
+option. If /volatile/ is specified for a parameter slot then the
+parameter will be evaluated upon every initialisation allowing random
+initialisation for different instances. The /properties/ of a
+parameter slot specify additional properties in an alist. By default
+the following properties are currently understood.
+
+- format :: specifies a format form to used in [[parse-input]] when reading the parameter - overrides the default reading format for the slot type.
+
+"))
 
 (defmethod direct-slot-definition-class ((class parameter-class)
                                          &rest initargs)
@@ -184,8 +225,8 @@ it is a parameter direct slot"
 
 (defmethod sb-pcl::compute-effective-slot-definition-initargs
     ((class parameter-class) direct-slot-definitions)
-  "Only if the highest priority direct slot is a parameter slot do we need
-any parameter initargs - they aren't inherited."
+  "Only if the highest priority direct slot is a parameter slot do we
+need any parameter initargs - they aren't inherited."
   (let ((initargs (call-next-method))
         (slot (first direct-slot-definitions))
         (parameter-slot-definitions
@@ -246,7 +287,13 @@ any parameter initargs - they aren't inherited."
 (defclass parameter-object()
   ((properties :initarg :properties :initform nil
                :documentation "Per instance property list"))
-  (:metaclass parameter-class))
+  (:metaclass parameter-class)
+  (:documentation
+"Base class for all components which can have slots initialoised from
+parameters. See the [[parameter-class]] metaclass for the additional
+slot options available and their affect. The =:properties= /initarg/
+may be used to specify instance specific properties (see
+[[properties]])." ))
 
 (defmethod properties((obj parameter-object))
   (append (slot-value obj 'properties) (properties (class-of obj))))

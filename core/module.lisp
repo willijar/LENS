@@ -33,109 +33,224 @@
 
 (in-package :lens)
 
-(defgeneric build-gates(instance)
-  (:documentation "Initialise gates on instance using gatespec in class."))
+(defgeneric build-gates(module)
+  (:documentation "* Arguments
 
-(defgeneric build-submodules(instance)
-  (:documentation "Build submodules inside a  module. A compound module will do this on the basis of the class definition.")
-  (:method(instance) (declare (ignore instance))))
+- module :: a [[module]]
 
-(defgeneric build-connections(instance)
-  (:documentation "Build connectiuons between submodules and gates in
-  a compound module"))
+* Description
 
-(defgeneric for-each-submodule(module operator)
-  (:documentation "Objects with submodules must provide this to
-  iterate over submodules. module and compound module class provide
-  implementations automatically.")
-  (:method(module operator) (declare (ignore module operator))))
+Build the module gates on the basis of the gate specification from the
+=:gates= argument in the [[module-class]] specification.
 
-(defgeneric build-inside(instance)
-  (:documentation "create submodules and connect them (in a compound
-  module) - then build their insides recursively")
+This method is called during a [[module]] instance initialisation."))
+
+(defgeneric build-inside(module)
+  (:documentation "* Arguments
+
+- module :: a [[module]]
+
+* Description
+
+Build the the submodules (calling [[build-submodules]]) of
+[[compound-module]] /module/ as per the =:submodules= class argument and
+connect them (calling [[build-connections]] as per the
+=:connections= class argument.
+
+This method is recursively called upon [[network]] creation.")
   (:method(instance) (for-each-submodule instance #'build-inside)))
 
-(defgeneric arrived(module message gate time)
-  (:documentation "Called when a message arrives at a gate which is not further
-    connected (that is, next-gate is NULL)"))
+(defgeneric build-submodules(module)
+  (:documentation "* Arguments
 
-(defgeneric send(from-module message gateid &key delay)
-  (:documentation "Sends a message through the gate with given delay"))
+- module :: a [[compound-module]]
 
-(defgeneric send-direct(from-module
+* Description
+
+Build the submodules inside a [[compound-module]]
+as per the =:submodules= class argument. This may be specialised
+usefully to add in additional submodule creation algoritmically.")
+  (:method(instance) (declare (ignore instance))))
+
+(defgeneric build-connections(module)
+  (:documentation "* Arguments
+
+- module :: a [[compound-module]]
+
+* Description
+
+Build connections between submodules and gates of /module/ as per the
+=:connections=. This may be specialised usefully to add in build the
+network connections algorithmically."))
+
+(defgeneric for-each-submodule(module operator)
+  (:documentation "* Arguments
+
+- module :: a [[module]]
+- operator :: a =function=
+
+* Description
+
+Applies /operator/ over each submodule of a /module/.
+
+Objects with submodules must provide this to iterate over
+submodules. [[module]] and [[compound-module]] classes provide
+implementations automatically however if additional submodules
+beyond those specified in the class are created it may be necessary
+to specialise this function to include them..")
+  (:method(module operator) (declare (ignore module operator))))
+
+(defgeneric arrived(module message gate arrival-time)
+  (:documentation "* Arguments
+
+- module :: a [[module]]
+- message :: a [[message]]
+- gate :: a [[gate]]
+- arrival-time :: a [[time-type]]
+
+*Description
+
+Called when the /message/ arrives at the /gate/ which is not further
+connected (that is, next-gate is NULL) of of /module/. /arrival-time/
+is when the message is to be delivered.
+
+The default implementation will fill in the arrival gate details in the /message/ and schedule it for delivery at the /arrival-time/. Packets will be schedule at the /arrival-time/ + their [[duration]] unless [[deliver-on-reception-start-p]] is set true for the gate in which case they will the [[reception-start-p]] will be set true for the packet and they will be delivered at /arrival-time/.
+"))
+
+(defgeneric send(module message gateid &key delay)
+  (:documentation "* Arguments
+
+- module :: a [[module]]
+- message :: a [[message]]
+- gateid :: a gate descriptor (a [[gate]] or list of gate name, direction and index.
+- delay :: a [[time-type]]
+
+* Description
+
+Schedule sending /message/ through the specified /gate/ of given
+/module/ after given /delay/. The /delay/ is added onto the current
+[[simulation-time]] to determine delivery time and the source gate of
+the message will be sent. [[deliver]] is called to actually schedule
+the /message/. "))
+
+(defgeneric send-direct(module
                         togate message &key propagation-delay duration)
-  (:documentation "Send a message directly to another module.
+  (:documentation "* Arguments
 
- If the target gate is further connected (i.e. getNextGate()!=NULL),
- the message will follow the connections that start at that gate.  For
- example, when sending to an input gate of a compound module, the
- message will follow the connections inside the compound module.
+- module :: a [[module]]
+- togate :: a  [[gate]]
+- message :: a [[message]]
 
- It is permitted to send to an output gate, which will also cause the
- message to follow the connections starting at that gate.  This can be
- useful, for example, when several submodules are sending to a single
- output gate of their parent module.
+* Keyword Arguments
 
- It is not permitted to send to a gate of a compound module which is
- not further connected (i.e. getNextGate()==NULL), as this would cause
- the message to arrive at a compound module.
+- propagation-delay :: a [[time-type]]
+- duration :: a [[time-type]]
 
- Also, it is not permitted to send to a gate which is otherwise
- connected i.e. where getPreviousGate()!=NULL. This means that modules
- MUST have dedicated gates for receiving via sendDirect(). You cannot
- have a gate which receives messages via both connections and
- sendDirect().
+* Description
 
- When a nonzero duration is given, that signifies the duration of the
- packet transmission, that is, the time difference between the
- transmission (or reception) of the start of the packet and that of
- the end of the packet.  The destination module can choose whether it
- wants the simulation kernel to deliver the packet object to it at the
- start or at the end of the reception. The default is the latter; the
- module can change it by calling setDeliverOnReceptionStart() on the
- final input gate (that is, on
- inputGate->getPathEndGate()). setDeliverOnReceptionStart() needs to
- be called in advance, for example in the initialize() method of the
- module.  When a module receives a packet, it can call the
- isReceptionStart() and getDuration() methods on the packet to find
- out whether it represents the start or the end of the reception, and
- the duration of the transmission.
+Send /message/ directly to the /togate/ gate of another module.
 
- For messages that are not packets (i.e. not subclassed from cPacket),
- the duration parameter must be zero."))
+If the target /togate/ is further connected
+the message will follow the connections that start at that gate.  For
+example, when sending to an input gate of a [[compound-module]], the
+message will follow the connections inside the compound module.
+
+It is permitted to send to an output gate, which will also cause the
+message to follow the connections starting at that gate.  This can be
+useful, for example, when several submodules are sending to a single
+output gate of their parent module.
+
+It is not noramlly permitted to send to a gate of a [[compound-module]] which is
+not further connected unless [[function handle-message]] has been specialised for that [[compound-module]] class.
+
+Also, it is not permitted to send to a gate which is otherwise
+connected i.e. which has a [[previous-gate]]. This means that modules
+*must* have dedicated gates for receiving via [[send-direct]]. You cannot
+have a gate which receives messages via both connections and
+[[send-direct]].
+
+When a nonzero /duration/ is given, that signifies the duration of the
+packet transmission, that is, the time difference between the
+transmission (or reception) of the start of the packet and that of the
+end of the packet. The destination module can choose whether it wants
+the simulation kernel to deliver the packet object to it at the start
+or at the end of the reception. The default is the latter; the module
+can change it by calling [[deliver-on-reception-start]] on the final
+input gate (that is the [[path-end-gate]]). [[deliver-on-reception-start]]
+needs to be called in advance, for example in the [[initialize]] method of
+the module. When a module receives a packet, it can call the
+[[reception-start-p]] and [duration]] methods on the packet to find out
+whether it represents the start or the end of the reception, and the duration of
+the transmission.
+
+For messages that are not packets the /duration/ must be zero."))
 
 (defgeneric schedule-at(module message &key time delay)
   (:documentation
-"Schedules a self-message. It will be delivered back to the module
- via  handle-message() at simulation time. This method
- is the way you can implement timers or timeouts. Timers can also
- be cancelled via cancelEvent() (See below.)
+"* Arguments
 
- When the message is delivered at the module, you can call
- <tt>msg->isSelfMessage()</tt> to tell it apart from messages arriving
- from other modules. <tt>msg->getKind()</tt> can be used to further
- classify it, or of you need to manage an unbounded number of timers,
- you can set <tt>msg->getContextPointer()</tt> before scheduling to
- point to the data structure the message belongs to -- this way
- you can avoid having to search through lists or other data structures
- to find out where a just-arrived self-message belongs.
+- module :: a [[module]]
+- message :: a [[message]]
 
- cancelEvent() can be used to cancel the self-message before it arrives.
- This is useful for implementing timeouts: if the event occurs 'in time'
+* Keyword Arguments
+- time :: a [[time-type]]
+- delay :: a [[time-type]]
+
+* Description
+
+Schedule a self-message. The /message/ will be delivered back to
+/module/ via [[handle-message]] either at absolute simulation time
+/time/ or after delay /delay/ which will be added onto the current
+simulation time. This function is the way you can implement timers or
+timeouts. Timers can also be cancelled via [[cancel]].
+When the message is delivered at the module, you can call
+[[self-message]] to tell it apart from messages arriving
+from other modules.
+
+[[cancel]] can be used to cancel the self-message before it arrives.
+This is useful for implementing timeouts: if the event occurs 'in time'
  (before timeout), the scheduled self-message can be cancelled.
 
- Given a cMessage pointer, you can check whether it is currently
- scheduled by calling <tt>msg->isScheduled()</tt>. If it is scheduled,
- you cannot schedule it again without calling cancelEvent() first.
- However, after the message was delivered to the module or cancelled,
- you can schedule it again -- so you can reuse the same message
- object for timeouts over and over during the whole simulation."))
+Given a message you can check whether it is currently
+scheduled by calling [[scheduled-p]]. If it is scheduled,
+you cannot schedule it again without calling [[cancel]] first.
+However, after the message was delivered to the module or cancelled,
+you can schedule it again -- so you can reuse the same message
+object for timeouts over and over during the whole simulation.
+
+ * Notes
+
+The preferred way of implementing timers is now provided using
+[[timer-message]]s, [[set-timer]] and [[cancel-timer]].
+
+"))
 
 (defclass module-class(parameter-class)
   ((%gatespec
     :type list :initform nil
-    :documentation "Gate specification used to build gates for this class"))
-  (:documentation "Metaclass for entities with gates"))
+    :documentation "The parsed gate specification used to build gates for this class"))
+  (:documentation "* Additional Class Options
+- gates :: ( (/gate-name/ /direction/ [/size]/)*)
+
+           * /gate-name/ : a =symbol=
+
+           * /direction/ : =(:input | :output | :inout)=
+
+           * /size/ : an =integer=
+
+* Description
+
+Metaclass for entities with gates. Must be used as
+metaclass for [[module]] classes.
+
+The gates class option specified what gates are to be created for
+instances of classes of this type. The /gate-name/ specifies the
+symbolic name to be used to identify the gate and must be unique for
+this module. If /direction/ is specified as =:inout= both input
+and output gates will be created. If /size/ is specified an array
+of gates will be created. A size of zero can be useful to allow for
+the automatic creation of the gates on demand depending on the
+connections the module."))
 
 ;; metaclass inheritance helper functions
 (defun named-specifications-inheritance
@@ -206,8 +321,23 @@ function."
 
 (defclass module(component)
   ((gate-slots
-    :type hash-table :initform (make-hash-table) :reader gate-slots))
-  (:metaclass module-class))
+    :type hash-table :initform (make-hash-table) :reader gate-slots
+    :documentation "Hash table mapping gate names to [[gate-slot]]
+    instances as specified in the =:gates= slot option in the class
+    specification of subclasses." ))
+  (:metaclass module-class)
+  (:documentation "Base class for all [[module]]s which must have
+  metaclass [[module-class]].
+
+Modules are used to implement protocols by specialising on the
+following methods.
+
+- [[initialize]] method may be used to specify initial configuration
+  of the module after creation but before the simulation starts. It
+  may for example send a self message to initiate some process.
+- [[handle-message]] is used to receive and process all incoming messages.
+- [[send]] is used to send messages out of a gate.
+- [[schedule-at]] is used to schedule self messages."))
 
 (defgeneric from-gate(message)
   (:method((message message))
@@ -383,7 +513,70 @@ function."
                 :documentation "Submodule specifications")
    (%connections :type list :initarg :connections :initform nil
                  :documentation "Connection specification for this class"))
-  (:documentation "Metclass for entities with gates"))
+  (:documentation "* Additional Class Options
+
+- types :: ( (/typename/ /initargs/)* )
+
+           * /typename/ : a =symbol=
+
+           * /initargs/ : (classname {keyword argument}*)
+
+- submodules :: ( (/submodule-name/ [/sizespec/] ((/classname/ | /typename/) {/keyword/ /argument/}* ) *)
+
+           * /submodule-name/ : a =symbol=
+
+           * /sizespec/ : (integer | (sizeof gate-name) | slot-name)
+
+- connections :: ( /(gate-specifier/ [/channel-spec/] /direction/ /gate-specifier/)* )
+
+            * /gate-specifier/ : (/gate-name/ | (/submodule-name/ /gate-name/))
+
+            * /channel-spec/ : ((/classname/ | /typename/) {/keyword/ /argument/}* )
+
+            * /direction/ : (=> | <=> | <=)
+
+* Description
+
+Metaclass for all compound modules classes - the base class for
+modules with gates, submodules and connections between those
+submodules and gates. Must be used as metaclass for
+[[compound-module]] classes.
+
+See [[module-class]] for details on the =:gates=  class option.
+
+The =:types= class option provides a way of providing a mapping
+between a single symbolic /typename/ and a list of /initargs/ which
+would correspond to the /classname/ and keyword arguments passed in
+construction of either a submodule or channel. These names thus
+provide a useful shortcut when defining submodules or channels. If a
+/typename/ is specified with some additional arguments they will
+override the default ones.
+
+The =:submodules= class option provides a list of submodule class
+specifications consisting of the local name for the submodule, an
+optional /sizespec/ if an array of submodules is to be created and the
+arguments to =make-instance= to be used. A previously defined local
+type shortcut may be used instead of the classname. At creation the
+=:owner= keywword will be added to the /initargs/ with the current
+instance as the argument. A /sizespec/ may either be an integer, a
+symbolic slot-name corresponding to one of the slots in the class or
+=(sizeof gate-name)= which will correspond to the size of the array of
+gates with the given gate-name.
+
+The =:connections= class option specifies connections between
+gates.  Gates are specified either as the gate name if a gate in the
+current module or a list of submodule name and gate name for
+submodules. They may additionally have an index parameter if
+corresponding to gate arrays. The direction specifier specifies the
+direction of connection, =<\=>= may be used to provide connections in
+both directions between =:inout= gates. An optional channel specifier
+may be used as the second argument specifying the channel type and
+initargs for creating the channel. The type may be a local type
+definied with the =:types= slot option. The =:name= argument may be
+used to give individual channels names - otherwise they will be named
+after their type name. The =:owner= keyword argument will be added
+with the current object instance as the argument.
+"))
 
 (defmethod sb-mop:validate-superclass ((class compound-module-class)
                                        superclass )
@@ -563,7 +756,19 @@ return the gate given by spec. Validates spec based on class definitions"
    ((submodules :type hash-table :initform (make-hash-table)
                  :reader submodules)
     (channels :type list :initform nil :reader channels))
-  (:metaclass compound-module-class))
+  (:metaclass compound-module-class)
+  (:documentation "Base class for all compound-modules using the [[compound-module-class]] metaclass. See [[class compound-module-class]] for details of the additional class slot options available.
+
+Typically no further implementation beyond the class specification is
+used with compound modules as messages will be automatically routed in
+the gates of submodules as per the =:connections= specifications. It
+is however allowed to have unconnected gates in which case
+[[handle-message]] must be implemented to receive the messages. This
+would allow some implementation in compound modules which they might
+then send to several contained submodules.
+
+The [[build-submodules]] and [[build-connections]] may be usefully
+extended to allow algorithmic creation of the contained network."))
 
 (defmethod size((module module))
   (let ((v (gethash (name module) (submodules (owner module)))))
@@ -635,8 +840,26 @@ specification of a specific subclass."
   (let ((*context* module))
     (map nil #'eval (slot-value (class-of module) '%connections))))
 
-(defgeneric submodule(module name &key index)
-  (:documentation "Return submodule of given name (and index if in an array)")
+(defgeneric submodule(module address &key index)
+  (:documentation "* Arguments
+
+- module :: a [[module]]
+
+- address :: a /submodule-specifier/
+
+   * /submodule-specifier/ : ( (/submodule-name/ | ( /submodule-name/ index))*)
+
+   * /submodule-name/ : a =symbol=
+
+   * /index/ L an =integer=
+
+* Description
+
+Return the submodule of a module given a heirarchical address. This
+will recurse throguh the submodule structure in order if the address
+is a list of submodules names. At each stage the submodule name or the
+name and index are used to recurse further down. It will return an
+error if there is no such named submodule.")
   (:method((module compound-module) (name symbol) &key index)
     (let ((submodule (gethash name (submodules module))))
       (assert submodule (submodule)
@@ -698,8 +921,10 @@ specification of a specific subclass."
   ((gate-slots :initform nil))
   (:default-initargs :gates nil)
   (:metaclass compound-module-class)
-  (:documentation "Base class for networks
- - essentially compound modules without gates"))
+  (:documentation "Base class for networks. This is the required type
+  for the top-level [[compound-module]] of a simulation network and it
+  is required that it has no gate specification. It is specified in
+  the =network= simulation parameter."))
 
 (defmethod initialize-instance :after((network network) &key &allow-other-keys)
   (assert (null (slot-value (class-of network) '%gatespec)))

@@ -31,7 +31,13 @@
 (in-package :cl-user)
 
 (defpackage :lens
-  (:documentation "
+  (:documentation "This package provides the main simulation
+  framework. It is intended that every simulation system will be
+  defined in its own package which will use this package to import the
+  public API. Simulations should be run from within the dynamic
+  context of their specific simulation package so that symbolic
+  configuration parameters will be read into the correct package.
+
 Simulations are represented as a heirarchical network of
 modules interconnected using channels. Every simulation must have one
 top level network module which will specify submodules and their
@@ -47,8 +53,7 @@ slots (where the value may be initialised from the configuration
 file), gates, submodules and connections in the class definition.
 When a simulation is run the network type is read from the parameter
 file and created. This will then create the submodules and so on until
-the whole network is created.
-")
+the whole network is created.")
   (:nicknames :lisp-educational-network-simulator)
   (:use :closer-common-lisp :closer-common-lisp-user :data-format-validation)
   (:import-from :alg
@@ -111,17 +116,12 @@ the whole network is created.
    #:intuniform #:bernoulli #:binomial #:geometric #:negbinomial #:poisson
    #:do-histogram
    ;; model change notifications
-   #:pre-module-add-notification #:post-module-add-notification
-   #:pre-module-delete-notification #:post-module-delete-notification
-   #:pre-module-reparent-notification #:post-module-reparent-notification
-   #:pre-gate-add-notification #:post-gate-add-notification
-   #:pre-gate-delete-notification #:post-gate-delete-notification
-   #:pre-gate-vector-resize-notification #:post-gate-vector-resize-notification
-   #:pre-gate-connect-notification #:post-gate-connect-notification
-   #:pre-gate-disconnect-notification #:post-gate-disconnect-notification
-   #:pre-path-create-notification #:post-path-create-notification
-   #:pre-path-cut-notification #:post-path-cut-notification
-   #:pre-parameter-change-notification #:post-parameter-change-notification
+   #:module-add-notification #:module-delete-notification
+   #:module-reparent-notification #:gate-add-notification
+   #:gate-delete-notification #:gate-vector-resize-notification
+   #:gate-connect-notification #:gate-disconnect-notification
+   #:path-create-notification #:path-cut-notification
+   #:parameter-change-notification
    ;; messages and packets
    #:message #:creation-time #:to-gate #:from-gate #:to-module #:from-module
    #:timestamp #: #:handle-message #:send-message #:self-message-p

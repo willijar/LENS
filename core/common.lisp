@@ -31,7 +31,7 @@
 
 (defconstant +c+ 299792458d0 "Speed of Light in m/sec")
 *standard-output*
-(defvar *simulation* nil "The global simulation instance")
+(defvar *simulation* nil "The global [[simulation]] instance")
 
 (defparameter *context* nil
   "Current global component context in which evaluation is taking

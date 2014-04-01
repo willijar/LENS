@@ -32,13 +32,15 @@
 
 (defclass lens-object()
   ()
-  (:documentation "Lightweight base class."))
+  (:documentation "Lightweight base class for all LENS objects."))
 
 (defclass named-object(lens-object)
   ((name :type symbol :initarg :name :accessor name
-         :documentation "Name of this object")
+         :documentation "Name of this object - used when addressing
+         the object internally or through simulation paramaters.")
    (index :initarg :index :reader index :type fixnum
-          :documentation "Position in an object vector")))
+          :documentation "Position in an object vector (if it is in an
+          object array)")))
 
 (defclass owned-object(named-object)
   ((owner :initarg :owner :type named-object :initform nil :accessor owner
@@ -58,19 +60,28 @@ brackets;")
 
 (defgeneric full-path(o)
   (:documentation "Returns the full path of the object in the object
-hierarchy, like '(net host 2 tcp winsize)'.")
+hierarchy, like '(net host 2 tcp winsize)'. This path could be used as
+an address to locate the object later in the network.
+
+If there is an owner object, this method returns the owner's [[full-path]]
+with this object's [[full-name]] appended, otherwise it simply
+returns full-name.")
   (:method((o named-object))
-    "if there is an owner object, this method returns the owner's fullPath
-     plus this object's fullName, separated by a dot; otherwise it simply
-     returns full-name."
+    "."
     (nconc (full-path (parent-module o)) (full-name o))))
 
 (defun full-path-string(o)
+  "Convert a the [[full-path]] into a dotted strign format suitable as
+a parameter adssress."
   (format nil "~{~A~^.~}" (rest (full-path o))))
 
 (defgeneric for-each-child(parent operator)
   (:documentation "Enables traversing the object tree, performing some
-  operation on each object.")
+  operation on each object. Tyhe default [[module]] and
+  [[compound-module]] provide implementations that will recurse over
+  gates, submodules and channels if stored in the usual
+  way. Implementations may wish to overwrite if storing some
+  subelements that may be considered as children differently.")
   (:method((parent sequence) (operator function))
     (map 'nil operator parent))
   (:method(dummy operator)
@@ -101,7 +112,11 @@ wherever it is feasible to display a multi-line string.")
   exact copy of this object. The default implementation just throws an
   error, to indicate that the method was not redefined. The second
   argument, if defined should be the instance that the object is being
-  duplicated into.")
+  duplicated into. By default this will be a new instance of the same
+  class as the object to be duplicated.
+
+For packets this does a shallow copy i.e. copies fields only and does
+not recurse into the encapsulated packets.")
   (:method :around((object standard-object) &optional duplicate)
       (if duplicate
           (call-next-method)
@@ -115,7 +130,7 @@ wherever it is feasible to display a multi-line string.")
       (copy-slots '(name) entity duplicate))))
 
 (defgeneric serialise(o stream)
-  (:documentation "Serialise an object into a stream")
+  (:documentation "Serialise an object into a stream. Fur future use.")
   (:method :around ((o standard-object) (os stream))
       (write (class-name (class-of o)) :stream os)
       (call-next-method o os))
@@ -132,7 +147,7 @@ wherever it is feasible to display a multi-line string.")
   returns a pointer to it or NULL if the object has not been found. If
   deep is false, only objects directly contained will be searched,
   otherwise the function searches the whole subtree for the object. It
-  uses the for-each-child() mechanism.")
+  uses the [[for-each-child]] mechanism.")
   (:method (parent name &optional (deep t))
     (for-each-child
      parent
