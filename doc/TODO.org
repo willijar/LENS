@@ -1,0 +1,10 @@
+- refine layer4 interface
+- tcp
+- tcp app
+- test tcp 
+- ipv4 segmentation and reassembly
+- half-duplex-link for e.g. csma/cd interfaces
+- ethernet
+- test ethernet using cbr-application
+- test arp over ethernet using cbr-applications
+  Wireless (802.11)
