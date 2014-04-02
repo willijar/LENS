@@ -1,0 +1,43 @@
+ 
+  html { font-family: Times, serif; font-size: 12pt; }
+  .title  { text-align: center; }
+  .todo   { color: red; }
+  .done   { color: green; }
+  .tag    { background-color: #add8e6; font-weight:normal }
+  .target { }
+  .timestamp { color: #bebebe; }
+  .timestamp-kwd { color: #5f9ea0; }
+  p.verse { margin-left: 3% }
+  pre {
+	border: 1pt solid #AEBDCC;
+	background-color: #F3F5F7;
+	padding: 5pt;
+	font-family: courier, monospace;
+        font-size: 90%;
+        overflow:auto;
+  }
+  table { border-collapse: collapse; }
+  td, th { vertical-align: top; }
+   dl { border: 3px double #ccc; padding: 0.5em; } 
+   dt { float: left; clear: left; width: auto; text-align: left; font-style: italic; font-weight: normal; padding-right: 1em; } 
+  dt:after { content: " ---"; }
+  dd {  margin: 0 0 0 auto; padding: 0 0 0.5em 0.5em; }
+
+  dt { font-weight: italic; display: compact; }
+  div.figure { padding: 0.5em; }
+  div.figure p { text-align: center; }
+  .linenr { font-size:smaller }
+  .code-highlighted {background-color:#ffff00;}
+  .org-info-js_info-navigation { border-style:none; }
+  #org-info-js_console-label { font-size:10px; font-weight:bold;
+                               white-space:nowrap; }
+  .org-info-js_search-highlight {background-color:#ffff00; color:#000000;
+                                 font-weight:bold; }
+  h6 { font-size: 110%; } 
+  h5 { font-size: 120%; } 
+  h4 { font-size: 130%; } 
+  h3 { font-size: 140%; } 
+  h2 { font-size: 150%; } 
+  h6 { padding: 0 0 0 0;  margin: 0 0 0 0;}
+  .outline-6:  { padding: 0 0 0 0; margin: 0 0 0 0;}
+  code { font-size: 80%; }
