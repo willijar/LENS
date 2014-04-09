@@ -8,3 +8,4 @@
 #+INCLUDE: "introduction.org"
 #+INCLUDE: "manual.org" 
 #+INCLUDE: "lens.org"
+#+INCLUDE: "lens-wsn.org"

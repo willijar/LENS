@@ -1,27 +1,51 @@
+#+AUTHOR: Dr. John A.R. Williams
+#+EMAIL: J.A.R.Williams@aston..ac.uk
+#+LINK: hs http://www.lispworks.com/reference/HyperSpec//%s
+#+STARTUP: showall
+
 * Summary
 
-LENS provides a Common Lisp environment for network simulations.  It
-includes a set of packages, classes and libraries to represent network
-elements and protocols. Simulations may be configured and run
-interactively in the :lens-user package which includes a number of
-procedures to assist you in setting up your simulation and analysing
-the results.
+Lisp Educational Network Simulator (LENS) is a discrete event
+simulation framework written in Common Lisp. It provides a generic
+architecture for modelling in problem domains where the system may be
+represented by the exchanging of messages between entities. It is
+being used to develop simulations for research into Wireless Sensor
+Networks. 
 
-The architecture is based on that of the Georgia Tech Network
-Simulator (GTNetS) which was written in C++ and NS-2 written in C++
-and Tcl, however, where possible, advantage has been taken of the
-features of Common Lisp to simplify and provide higher level
-abstractions than is the case for network simulators written in lowert
-level or mixed languages. Additionally Common Lisp provides an
-interactive environment with complete object introspection and accesss
-to the programming language itself making it easier to do explorative
-simulations and simulation development. In LENS the simulations are
-run in a separate thread to the normal Common Lisp read-eval loop so
-the user can probe or modify the simulation even while it is running.
+** Why Use LENS?
 
-It is hoped that LENS will be easier to develop for than other network
-simulators and will be more suitable as a tool for teaching network
-principles.
+
+LENS is easier to extend and develop for than other network
+simulators.
+
+The decision to write a new network simulator in |LISP| was based upon a
+number of observations:
+
+- Simulation environments require a core model and a means for
+  specifying particular simulations at run time. Most simulators have
+  the core model written in a compiled language (e.g. C++) for
+  efficiency and have a separate embedded run time interpreter
+  (e.g. Tcl or a domain specific language) for describing the
+  particular simulation. |LISP| provides the full language and
+  compiler environment at run-time so there is no need for this
+  separation.
+- Users of a simulator will want to describe their problem in a way
+  which matches their particular domain. |LISP| is an extensible
+  language which is especially good for writing domain specific
+  languages.
+- LISP enables introspection of all aspects of the simulated system
+  while it is running without any additional programming. Most other
+  simulators provide only limited introspection capabilities which
+  have to be explicitly programmed in.
+- In modern LENS the simulations are run in a separate thread to the
+  normal Common Lisp read-eval loop so the user can probe or modify
+  the simulation even while it is running.
+
+The architecture of LENS is inspired by the
+[[http://www.omnetpp.org/ [OMNET++]] simulator 
+framework written in C++ however may aspects of that design become
+simpler when implemented in LISP.
+** Dependences
 
 LENS has been developed using the SBCL <http://sbcl.sourceforge.net/>
 Common Lisp implementation. Implementation specific features are
@@ -34,32 +58,53 @@ changes to encorporate back into the main distribution.
 
 LENS is dependant on the following additional Common Lisp libraries
 
-asdf: <http://www.cliki.net/asdf>
-split-sequence: <http://www.cliki.net/SPLIT-SEQUENCE>
-trivial-gray-streams: http://www.cliki.net/trivial-gray-streams
+- asdf: http://www.cliki.net/asdf
+- Closer-MOP: http://common-lisp.net/project/closer/
+- split-sequence: http://www.cliki.net/SPLIT-SEQUENCE
+- trivial-gray-streams: http://www.cliki.net/trivial-gray-streams
+- data-format-validation : http://www.cliki.net/CL-DATA-FORMAT-VALIDATION
+- clrs : https://github.com/willijar/clrs
 
-The file `lens.asd` provides the asdf system definition for LENS. You
-should place a symbolic link to this file in a system definition
-directory searched by asdf. Then in the Common Lisp environment
+** Installation
 
-  (asdf:operate 'asdf:compile-op :lens)
-  (asdf:operate 'asdf:load-op :lens)
-  (in-package :lens-user)
+LENS is available from the GIT repository. You can clone and install
+LENS like this:
 
-will compile and load LENS and put you into the :lens-user package to
-build your simulation.
+: cd ~/src/
+: git clone https://github.com/willijar/LENS.git
 
-Development releases of LENS will be made available
-at http://www.jarw.org.uk/lisp/lens/
+** How to Use
 
-If you wish to aid in the development it is recommended you use the 
-GIT version control system and clone the release using
+1. The file =lens.asd= provides the asdf system definition for
+   LENS. You should place a symbolic link to this file in a system
+   definition directory where ASDF can find it. Similarly for 
+2. Load LENS with
+   #+BEGIN_SRC lisp
+   (asdf:operate 'asdf:load-op :lens)
+   #+END_SRC
+3. Load the simulation system you want with
+   #+BEGIN_SRC lisp
+   (asdf:operate 'asdf:load-op :simulation-system-name)
+    #+END_SRC
+   e.g. =(asdf:operate 'asdf:load-op :lens.samples)= for the provided
+   example `samples` network.
+4. Make the simulation package your current package 
+   #+BEGIN_SRC lisp
+   (asdf:operate 'asdf:load-op :simulation-package-name)
+    #+END_SRC
+   e.g. =(in-package :lens.samples)=  for the provided
+   example networks.
+5. Load and run a simulation configuration from a configuration file 
+   #+BEGIN_SRC lisp
+   (run-simulations "configuration-file.ini" :config "section-name")
+   #+END_SRC
+   e.g. =(run-simulations +tictoc+ :config "TicToc2")= will run the
+   sample simulation specified by section "TicToc2" in the samples
+   configuration file (=+tictoc+= is defined in the =:lens.samples=
+   package to point to this file)
 
-git clone http://www.jarw.org.uk/lisp/lens/
-
-
-
-* Installation
-** Dependencies
-** Getting LENS
 ** Feedback
+
+If you have have questions, remarks, or ideas about LENS or want to
+submit a bug report then please email me at
+<mailto:J.A.R.Williams@aston.ac.uk>

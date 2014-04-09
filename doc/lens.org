@@ -17,7 +17,14 @@
     lisp-user][closer-common-lisp-user]], [[package data-format-validation][data
     format-validation]]
 - Used by:
-    None.
+    [[package lens.samples][lens.samples]], [[package
+    lens.wsn.mac.802.15.4][lens.wsn.mac.802.15.4]], [[package
+    lens.wsn.mac.tmac][lens.wsn.mac.tmac]], [[package
+    lens.wsn.mac.tuneable][lens.wsn.mac.tuneable]], [[package
+    lens.wsn.routing.multipath-rings][lens.wsn.routing.multipath-rings]], [[package
+    lens.wsn.routing.leach][lens.wsn.routing.leach]], [[package
+    lens.wsn][lens.wsn]]
+
 
 ** Description
 
@@ -58,7 +65,7 @@ the whole network is created.
 # link target: <<class channel>>
 
 
-**** External Class: =channel=                                                :class:
+**** Inherited Class: =channel=                                               :class:
 
 
 ***** Inheritance
@@ -92,7 +99,7 @@ Base class for all channels entities in the
 # link target: <<slot source-gate>>
 
 
-****** Internal Slot: =source-gate=                                              :slot:
+****** Slot: =source-gate=                                                       :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -113,7 +120,7 @@ The gate which sends messages over the channel.
 # link target: <<slot-accessor source-gate>>
 
 
-******** Internal Slot Accessor: =source-gate=                            :reader:writer:
+******** Slot Accessor: =source-gate=                                     :reader:writer:
 
 
 ********* Syntax
@@ -139,7 +146,7 @@ The gate which sends messages over the channel.
 # link target: <<slot initialized-p>>
 
 
-****** External Slot: =initialized-p=                                            :slot:
+****** Inherited Slot: =initialized-p=                                           :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -156,7 +163,7 @@ True if this component has been initialized.
 # link target: <<slot rng-map>>
 
 
-****** External Slot: =rng-map=                                                  :slot:
+****** Inherited Slot: =rng-map=                                                 :slot:
 
 - Value type: =array=
 - Initial value: =NIL=
@@ -173,7 +180,7 @@ RNG map for this component
 # link target: <<slot collect-trace-info>>
 
 
-****** Internal Slot: =collect-trace-info=                                       :slot:
+****** Slot: =collect-trace-info=                                                :slot:
 
 - Value type: =boolean=
 - Initial value: =NIL=
@@ -190,7 +197,7 @@ If true tracelog outputs will be traced for this component.
 # link target: <<slot properties>>
 
 
-****** Internal Slot: =properties=                                               :slot:
+****** Slot: =properties=                                                        :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -207,7 +214,7 @@ Per instance property list
 # link target: <<slot has-ancestor-listeners>>
 
 
-****** Internal Slot: =has-ancestor-listeners=                                   :slot:
+****** Slot: =has-ancestor-listeners=                                            :slot:
 
 - Value type: =simple-bit-vector=
 - Initial value: =NIL=
@@ -225,11 +232,11 @@ A bit map recording which signals have ancestor
 # link target: <<slot has-local-listeners>>
 
 
-****** Internal Slot: =has-local-listeners=                                      :slot:
+****** Slot: =has-local-listeners=                                               :slot:
 
 - Value type: =simple-bit-vector=
-- Initial value: =(MAKE-ARRAY +SIGNAL-CACHE-SIZE+ :ELEMENT-TYPE 'BIT           
-                   :INITIAL-ELEMENT 0)=
+- Initial value: =(MAKE-ARRAY LENS::+SIGNAL-CACHE-SIZE+ :ELEMENT-TYPE 'BIT     
+                         :INITIAL-ELEMENT 0)=
 - Initargs: none
 - Allocation: instance
 
@@ -243,7 +250,7 @@ A bit map recording which signals have local listeners.
 # link target: <<slot signal-table>>
 
 
-****** Internal Slot: =signal-table=                                             :slot:
+****** Slot: =signal-table=                                                      :slot:
 
 - Value type: =hash-table=
 - Initial value: =(MAKE-HASH-TABLE)=
@@ -261,7 +268,7 @@ Hash by signal of lists of registered listeners
 # link target: <<slot owner>>
 
 
-****** External Slot: =owner=                                                    :slot:
+****** Inherited Slot: =owner=                                                   :slot:
 
 - Value type: =named-object=
 - Initial value: =NIL=
@@ -278,7 +285,7 @@ Object which owns this in object heirarchy
 # link target: <<slot index>>
 
 
-****** External Slot: =index=                                                    :slot:
+****** Inherited Slot: =index=                                                   :slot:
 
 - Value type: =fixnum=
 - Initial value: =NIL=
@@ -296,7 +303,7 @@ Position in an object vector (if it is in an
 # link target: <<slot name>>
 
 
-****** External Slot: =name=                                                     :slot:
+****** Inherited Slot: =name=                                                    :slot:
 
 - Value type: =symbol=
 - Initial value: =NIL=
@@ -319,7 +326,7 @@ Name of this object - used when addressing
 # link target: <<class component>>
 
 
-**** External Class: =component=                                              :class:
+**** Inherited Class: =component=                                             :class:
 
 
 ***** Inheritance
@@ -374,7 +381,7 @@ and /should/ do it in all such cases as a matter of safe practice.
 # link target: <<slot collect-trace-info>>
 
 
-****** Internal Slot: =collect-trace-info=                                       :slot:
+****** Slot: =collect-trace-info=                                                :slot:
 
 - Value type: =boolean=
 - Initial value: =NIL=
@@ -393,7 +400,7 @@ If true tracelog outputs will be traced for this component.
 # link target: <<slot rng-map>>
 
 
-****** External Slot: =rng-map=                                                  :slot:
+****** Inherited Slot: =rng-map=                                                 :slot:
 
 - Value type: =array=
 - Initial value: =NIL=
@@ -414,7 +421,7 @@ RNG map for this component
 # link target: <<slot-accessor rng-map>>
 
 
-******** External Slot Accessor: =rng-map=                                :reader:writer:
+******** Inherited Slot Accessor: =rng-map=                               :reader:writer:
 
 
 ********* Syntax
@@ -438,7 +445,7 @@ RNG map for this component
 # link target: <<slot initialized-p>>
 
 
-****** External Slot: =initialized-p=                                            :slot:
+****** Inherited Slot: =initialized-p=                                           :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -459,7 +466,7 @@ True if this component has been initialized.
 # link target: <<slot-accessor initialized-p>>
 
 
-******** External Slot Accessor: =initialized-p=                          :reader:writer:
+******** Inherited Slot Accessor: =initialized-p=                         :reader:writer:
 
 
 ********* Syntax
@@ -496,7 +503,7 @@ Returns true if an entity has finished its initialization using the
 # link target: <<slot properties>>
 
 
-****** Internal Slot: =properties=                                               :slot:
+****** Slot: =properties=                                                        :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -513,7 +520,7 @@ Per instance property list
 # link target: <<slot has-ancestor-listeners>>
 
 
-****** Internal Slot: =has-ancestor-listeners=                                   :slot:
+****** Slot: =has-ancestor-listeners=                                            :slot:
 
 - Value type: =simple-bit-vector=
 - Initial value: =NIL=
@@ -531,11 +538,11 @@ A bit map recording which signals have ancestor
 # link target: <<slot has-local-listeners>>
 
 
-****** Internal Slot: =has-local-listeners=                                      :slot:
+****** Slot: =has-local-listeners=                                               :slot:
 
 - Value type: =simple-bit-vector=
-- Initial value: =(MAKE-ARRAY +SIGNAL-CACHE-SIZE+ :ELEMENT-TYPE 'BIT           
-                   :INITIAL-ELEMENT 0)=
+- Initial value: =(MAKE-ARRAY LENS::+SIGNAL-CACHE-SIZE+ :ELEMENT-TYPE 'BIT     
+                         :INITIAL-ELEMENT 0)=
 - Initargs: none
 - Allocation: instance
 
@@ -549,7 +556,7 @@ A bit map recording which signals have local listeners.
 # link target: <<slot signal-table>>
 
 
-****** Internal Slot: =signal-table=                                             :slot:
+****** Slot: =signal-table=                                                      :slot:
 
 - Value type: =hash-table=
 - Initial value: =(MAKE-HASH-TABLE)=
@@ -567,7 +574,7 @@ Hash by signal of lists of registered listeners
 # link target: <<slot owner>>
 
 
-****** External Slot: =owner=                                                    :slot:
+****** Inherited Slot: =owner=                                                   :slot:
 
 - Value type: =named-object=
 - Initial value: =NIL=
@@ -584,7 +591,7 @@ Object which owns this in object heirarchy
 # link target: <<slot index>>
 
 
-****** External Slot: =index=                                                    :slot:
+****** Inherited Slot: =index=                                                   :slot:
 
 - Value type: =fixnum=
 - Initial value: =NIL=
@@ -602,7 +609,7 @@ Position in an object vector (if it is in an
 # link target: <<slot name>>
 
 
-****** External Slot: =name=                                                     :slot:
+****** Inherited Slot: =name=                                                    :slot:
 
 - Value type: =symbol=
 - Initial value: =NIL=
@@ -625,7 +632,7 @@ Name of this object - used when addressing
 # link target: <<class compound-module>>
 
 
-**** External Class: =compound-module=                                        :class:
+**** Inherited Class: =compound-module=                                       :class:
 
 
 ***** Inheritance
@@ -640,7 +647,8 @@ Name of this object - used when addressing
     object]], [[class standard-object][standard-object]], [[class slot-object][slot
     object]], [[class t][t]]
 - Direct subclasses:
-    [[class network][network]]
+    [[class wireless-channel][wireless-channel]], [[class node][node]], [[class
+    communications][communications]], [[class network][network]]
 
 
 ***** Parameters
@@ -669,7 +677,7 @@ extended to allow algorithmic creation of the contained network.
 # link target: <<slot submodules>>
 
 
-****** Internal Slot: =submodules=                                               :slot:
+****** Slot: =submodules=                                                        :slot:
 
 - Value type: =hash-table=
 - Initial value: =(MAKE-HASH-TABLE)=
@@ -685,7 +693,7 @@ extended to allow algorithmic creation of the contained network.
 # link target: <<slot-accessor submodules>>
 
 
-******** Internal Slot Accessor: =submodules=                             :reader:writer:
+******** Slot Accessor: =submodules=                                      :reader:writer:
 
 
 ********* Syntax
@@ -707,7 +715,7 @@ extended to allow algorithmic creation of the contained network.
 # link target: <<slot channels>>
 
 
-****** Internal Slot: =channels=                                                 :slot:
+****** Slot: =channels=                                                          :slot:
 
 - Value type: =list=
 - Initial value: =NIL=
@@ -723,7 +731,7 @@ extended to allow algorithmic creation of the contained network.
 # link target: <<slot-accessor channels>>
 
 
-******** Internal Slot Accessor: =channels=                               :reader:writer:
+******** Slot Accessor: =channels=                                        :reader:writer:
 
 
 ********* Syntax
@@ -749,7 +757,7 @@ extended to allow algorithmic creation of the contained network.
 # link target: <<slot gate-slots>>
 
 
-****** Internal Slot: =gate-slots=                                               :slot:
+****** Slot: =gate-slots=                                                        :slot:
 
 - Value type: =hash-table=
 - Initial value: =(MAKE-HASH-TABLE)=
@@ -768,7 +776,7 @@ Hash table mapping gate names to [[gate-slot]]
 # link target: <<slot initialized-p>>
 
 
-****** External Slot: =initialized-p=                                            :slot:
+****** Inherited Slot: =initialized-p=                                           :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -785,7 +793,7 @@ True if this component has been initialized.
 # link target: <<slot rng-map>>
 
 
-****** External Slot: =rng-map=                                                  :slot:
+****** Inherited Slot: =rng-map=                                                 :slot:
 
 - Value type: =array=
 - Initial value: =NIL=
@@ -802,7 +810,7 @@ RNG map for this component
 # link target: <<slot collect-trace-info>>
 
 
-****** Internal Slot: =collect-trace-info=                                       :slot:
+****** Slot: =collect-trace-info=                                                :slot:
 
 - Value type: =boolean=
 - Initial value: =NIL=
@@ -819,7 +827,7 @@ If true tracelog outputs will be traced for this component.
 # link target: <<slot properties>>
 
 
-****** Internal Slot: =properties=                                               :slot:
+****** Slot: =properties=                                                        :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -836,7 +844,7 @@ Per instance property list
 # link target: <<slot has-ancestor-listeners>>
 
 
-****** Internal Slot: =has-ancestor-listeners=                                   :slot:
+****** Slot: =has-ancestor-listeners=                                            :slot:
 
 - Value type: =simple-bit-vector=
 - Initial value: =NIL=
@@ -854,11 +862,11 @@ A bit map recording which signals have ancestor
 # link target: <<slot has-local-listeners>>
 
 
-****** Internal Slot: =has-local-listeners=                                      :slot:
+****** Slot: =has-local-listeners=                                               :slot:
 
 - Value type: =simple-bit-vector=
-- Initial value: =(MAKE-ARRAY +SIGNAL-CACHE-SIZE+ :ELEMENT-TYPE 'BIT           
-                   :INITIAL-ELEMENT 0)=
+- Initial value: =(MAKE-ARRAY LENS::+SIGNAL-CACHE-SIZE+ :ELEMENT-TYPE 'BIT     
+                         :INITIAL-ELEMENT 0)=
 - Initargs: none
 - Allocation: instance
 
@@ -872,7 +880,7 @@ A bit map recording which signals have local listeners.
 # link target: <<slot signal-table>>
 
 
-****** Internal Slot: =signal-table=                                             :slot:
+****** Slot: =signal-table=                                                      :slot:
 
 - Value type: =hash-table=
 - Initial value: =(MAKE-HASH-TABLE)=
@@ -890,7 +898,7 @@ Hash by signal of lists of registered listeners
 # link target: <<slot owner>>
 
 
-****** External Slot: =owner=                                                    :slot:
+****** Inherited Slot: =owner=                                                   :slot:
 
 - Value type: =named-object=
 - Initial value: =NIL=
@@ -907,7 +915,7 @@ Object which owns this in object heirarchy
 # link target: <<slot index>>
 
 
-****** External Slot: =index=                                                    :slot:
+****** Inherited Slot: =index=                                                   :slot:
 
 - Value type: =fixnum=
 - Initial value: =NIL=
@@ -925,7 +933,7 @@ Position in an object vector (if it is in an
 # link target: <<slot name>>
 
 
-****** External Slot: =name=                                                     :slot:
+****** Inherited Slot: =name=                                                    :slot:
 
 - Value type: =symbol=
 - Initial value: =NIL=
@@ -948,7 +956,7 @@ Name of this object - used when addressing
 # link target: <<class compound-module-class>>
 
 
-**** External Class: =compound-module-class=                                  :class:
+**** Inherited Class: =compound-module-class=                                 :class:
 
 
 ***** Inheritance
@@ -1040,7 +1048,7 @@ with the current object instance as the argument.
 # link target: <<slot ..25..localtypes>>
 
 
-****** Internal Slot: =%localtypes=                                              :slot:
+****** Slot: =%localtypes=                                                       :slot:
 
 - Value type: =list=
 - Initial value: =NIL=
@@ -1057,7 +1065,7 @@ Specified local type mapping.
 # link target: <<slot ..25..submodules>>
 
 
-****** Internal Slot: =%submodules=                                              :slot:
+****** Slot: =%submodules=                                                       :slot:
 
 - Value type: =list=
 - Initial value: =NIL=
@@ -1074,7 +1082,7 @@ Submodule specifications
 # link target: <<slot ..25..connections>>
 
 
-****** Internal Slot: =%connections=                                             :slot:
+****** Slot: =%connections=                                                      :slot:
 
 - Value type: =list=
 - Initial value: =NIL=
@@ -1095,7 +1103,7 @@ Connection specification for this class
 # link target: <<slot ..25..gatespec>>
 
 
-****** Internal Slot: =%gatespec=                                                :slot:
+****** Slot: =%gatespec=                                                         :slot:
 
 - Value type: =list=
 - Initial value: =NIL=
@@ -1112,7 +1120,7 @@ The parsed gate specification used to build gates for this class
 # link target: <<slot properties>>
 
 
-****** Internal Slot: =properties=                                               :slot:
+****** Slot: =properties=                                                        :slot:
 
 - Value type: =list=
 - Initial value: =NIL=
@@ -1129,7 +1137,7 @@ The properties for this class
 # link target: <<slot slots>>
 
 
-****** Internal Slot: =slots=                                                    :slot:
+****** Slot: =slots=                                                             :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -1337,7 +1345,7 @@ The properties for this class
 # link target: <<slot direct-superclasses>>
 
 
-****** Internal Slot: =direct-superclasses=                                      :slot:
+****** Slot: =direct-superclasses=                                               :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -1368,7 +1376,7 @@ The properties for this class
 # link target: <<slot name>>
 
 
-****** External Slot: =name=                                                     :slot:
+****** Inherited Slot: =name=                                                    :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -1437,7 +1445,7 @@ The properties for this class
 # link target: <<class delay-channel>>
 
 
-**** External Class: =delay-channel=                                          :class:
+**** Inherited Class: =delay-channel=                                         :class:
 
 
 ***** Inheritance
@@ -1458,7 +1466,7 @@ The properties for this class
 ***** Parameters
 
 - delay :: a =time-type=. Default: =0.0d0=. The propagation delay in seconds
-- disabled-p :: a =bool=.  NIL
+- disabled-p :: a =lens::bool=.  NIL
 
 ***** Description
 
@@ -1471,7 +1479,7 @@ A [[channel]] with propagation delay.
 # link target: <<slot delay>>
 
 
-****** External Slot: =delay=                                                    :slot:
+****** Inherited Slot: =delay=                                                   :slot:
 
 - Value type: =time-type=
 - Initial value: =0.0d0=
@@ -1494,7 +1502,7 @@ The propagation delay in seconds
 # link target: <<slot-accessor delay>>
 
 
-******** External Slot Accessor: =delay=                                  :reader:writer:
+******** Inherited Slot Accessor: =delay=                                 :reader:writer:
 
 
 ********* Syntax
@@ -1516,7 +1524,7 @@ The propagation delay in seconds
 # link target: <<slot disabled-p>>
 
 
-****** External Slot: =disabled-p=                                               :slot:
+****** Inherited Slot: =disabled-p=                                              :slot:
 
 - Value type: =bool=
 - Initial value: =NIL=
@@ -1534,7 +1542,7 @@ The propagation delay in seconds
 # link target: <<slot-accessor disabled-p>>
 
 
-******** External Slot Accessor: =disabled-p=                             :reader:writer:
+******** Inherited Slot Accessor: =disabled-p=                            :reader:writer:
 
 
 ********* Syntax
@@ -1546,6 +1554,8 @@ The propagation delay in seconds
 
 ********* Methods
 
+- (=disabled-p= (resources [[class resources][=lens.wsn:resources=]]))
+- (=disabled-p= (wsn-module [[class wsn-module][=lens.wsn:wsn-module=]]))
 - (=disabled-p= (delay-channel [[class delay-channel][=delay-channel=]]))
 
 
@@ -1560,7 +1570,7 @@ The propagation delay in seconds
 # link target: <<slot source-gate>>
 
 
-****** Internal Slot: =source-gate=                                              :slot:
+****** Slot: =source-gate=                                                       :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -1577,7 +1587,7 @@ The gate which sends messages over the channel.
 # link target: <<slot initialized-p>>
 
 
-****** External Slot: =initialized-p=                                            :slot:
+****** Inherited Slot: =initialized-p=                                           :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -1594,7 +1604,7 @@ True if this component has been initialized.
 # link target: <<slot rng-map>>
 
 
-****** External Slot: =rng-map=                                                  :slot:
+****** Inherited Slot: =rng-map=                                                 :slot:
 
 - Value type: =array=
 - Initial value: =NIL=
@@ -1611,7 +1621,7 @@ RNG map for this component
 # link target: <<slot collect-trace-info>>
 
 
-****** Internal Slot: =collect-trace-info=                                       :slot:
+****** Slot: =collect-trace-info=                                                :slot:
 
 - Value type: =boolean=
 - Initial value: =NIL=
@@ -1628,7 +1638,7 @@ If true tracelog outputs will be traced for this component.
 # link target: <<slot properties>>
 
 
-****** Internal Slot: =properties=                                               :slot:
+****** Slot: =properties=                                                        :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -1645,7 +1655,7 @@ Per instance property list
 # link target: <<slot has-ancestor-listeners>>
 
 
-****** Internal Slot: =has-ancestor-listeners=                                   :slot:
+****** Slot: =has-ancestor-listeners=                                            :slot:
 
 - Value type: =simple-bit-vector=
 - Initial value: =NIL=
@@ -1663,11 +1673,11 @@ A bit map recording which signals have ancestor
 # link target: <<slot has-local-listeners>>
 
 
-****** Internal Slot: =has-local-listeners=                                      :slot:
+****** Slot: =has-local-listeners=                                               :slot:
 
 - Value type: =simple-bit-vector=
-- Initial value: =(MAKE-ARRAY +SIGNAL-CACHE-SIZE+ :ELEMENT-TYPE 'BIT           
-                   :INITIAL-ELEMENT 0)=
+- Initial value: =(MAKE-ARRAY LENS::+SIGNAL-CACHE-SIZE+ :ELEMENT-TYPE 'BIT     
+                         :INITIAL-ELEMENT 0)=
 - Initargs: none
 - Allocation: instance
 
@@ -1681,7 +1691,7 @@ A bit map recording which signals have local listeners.
 # link target: <<slot signal-table>>
 
 
-****** Internal Slot: =signal-table=                                             :slot:
+****** Slot: =signal-table=                                                      :slot:
 
 - Value type: =hash-table=
 - Initial value: =(MAKE-HASH-TABLE)=
@@ -1699,7 +1709,7 @@ Hash by signal of lists of registered listeners
 # link target: <<slot owner>>
 
 
-****** External Slot: =owner=                                                    :slot:
+****** Inherited Slot: =owner=                                                   :slot:
 
 - Value type: =named-object=
 - Initial value: =NIL=
@@ -1716,7 +1726,7 @@ Object which owns this in object heirarchy
 # link target: <<slot index>>
 
 
-****** External Slot: =index=                                                    :slot:
+****** Inherited Slot: =index=                                                   :slot:
 
 - Value type: =fixnum=
 - Initial value: =NIL=
@@ -1734,7 +1744,7 @@ Position in an object vector (if it is in an
 # link target: <<slot name>>
 
 
-****** External Slot: =name=                                                     :slot:
+****** Inherited Slot: =name=                                                    :slot:
 
 - Value type: =symbol=
 - Initial value: =NIL=
@@ -1757,7 +1767,7 @@ Name of this object - used when addressing
 # link target: <<class entity-with-signals>>
 
 
-**** External Class: =entity-with-signals=                                    :class:
+**** Inherited Class: =entity-with-signals=                                   :class:
 
 
 ***** Inheritance
@@ -1785,7 +1795,7 @@ An entity which can [[subscribe]] to and [[emit]] and
 # link target: <<slot signal-table>>
 
 
-****** Internal Slot: =signal-table=                                             :slot:
+****** Slot: =signal-table=                                                      :slot:
 
 - Value type: =hash-table=
 - Initial value: =(MAKE-HASH-TABLE)=
@@ -1807,7 +1817,7 @@ Hash by signal of lists of registered listeners
 # link target: <<slot-accessor signal-table>>
 
 
-******** Internal Slot Accessor: =signal-table=                           :reader:writer:
+******** Slot Accessor: =signal-table=                                    :reader:writer:
 
 
 ********* Syntax
@@ -1830,11 +1840,11 @@ Hash by signal of lists of registered listeners
 # link target: <<slot has-local-listeners>>
 
 
-****** Internal Slot: =has-local-listeners=                                      :slot:
+****** Slot: =has-local-listeners=                                               :slot:
 
 - Value type: =simple-bit-vector=
-- Initial value: =(MAKE-ARRAY +SIGNAL-CACHE-SIZE+ :ELEMENT-TYPE 'BIT           
-                   :INITIAL-ELEMENT 0)=
+- Initial value: =(MAKE-ARRAY LENS::+SIGNAL-CACHE-SIZE+ :ELEMENT-TYPE 'BIT     
+                         :INITIAL-ELEMENT 0)=
 - Initargs: none
 - Allocation: instance
 
@@ -1848,7 +1858,7 @@ A bit map recording which signals have local listeners.
 # link target: <<slot has-ancestor-listeners>>
 
 
-****** Internal Slot: =has-ancestor-listeners=                                   :slot:
+****** Slot: =has-ancestor-listeners=                                            :slot:
 
 - Value type: =simple-bit-vector=
 - Initial value: =NIL=
@@ -1870,7 +1880,7 @@ A bit map recording which signals have ancestor
 # link target: <<slot owner>>
 
 
-****** External Slot: =owner=                                                    :slot:
+****** Inherited Slot: =owner=                                                   :slot:
 
 - Value type: =named-object=
 - Initial value: =NIL=
@@ -1887,7 +1897,7 @@ Object which owns this in object heirarchy
 # link target: <<slot index>>
 
 
-****** External Slot: =index=                                                    :slot:
+****** Inherited Slot: =index=                                                   :slot:
 
 - Value type: =fixnum=
 - Initial value: =NIL=
@@ -1905,7 +1915,7 @@ Position in an object vector (if it is in an
 # link target: <<slot name>>
 
 
-****** External Slot: =name=                                                     :slot:
+****** Inherited Slot: =name=                                                    :slot:
 
 - Value type: =symbol=
 - Initial value: =NIL=
@@ -1927,7 +1937,7 @@ Name of this object - used when addressing
 # link target: <<class gate>>
 
 
-**** External Class: =gate=                                                   :class:
+**** Inherited Class: =gate=                                                  :class:
 
 
 ***** Inheritance
@@ -1958,7 +1968,7 @@ of gates going in each direction.
 # link target: <<slot previous-gate>>
 
 
-****** Internal Slot: =previous-gate=                                            :slot:
+****** Slot: =previous-gate=                                                     :slot:
 
 - Value type: =link=
 - Initial value: =NIL=
@@ -1979,7 +1989,7 @@ The previous gate in the series of connections (the path)
 # link target: <<slot-accessor previous-gate>>
 
 
-******** Internal Slot Accessor: =previous-gate=                          :reader:writer:
+******** Slot Accessor: =previous-gate=                                   :reader:writer:
 
 
 ********* Syntax
@@ -2001,7 +2011,7 @@ The previous gate in the series of connections (the path)
 # link target: <<slot next-gate>>
 
 
-****** Internal Slot: =next-gate=                                                :slot:
+****** Slot: =next-gate=                                                         :slot:
 
 - Value type: =link=
 - Initial value: =NIL=
@@ -2022,7 +2032,7 @@ The next gate in the series of connections (the path)
 # link target: <<slot-accessor next-gate>>
 
 
-******** Internal Slot Accessor: =next-gate=                              :reader:writer:
+******** Slot Accessor: =next-gate=                                       :reader:writer:
 
 
 ********* Syntax
@@ -2043,7 +2053,7 @@ The next gate in the series of connections (the path)
 # link target: <<slot channel>>
 
 
-****** External Slot: =channel=                                                  :slot:
+****** Inherited Slot: =channel=                                                 :slot:
 
 - Value type: =channel=
 - Initial value: =NIL=
@@ -2063,7 +2073,7 @@ Channel object (if exists) to next link
 # link target: <<slot-accessor channel>>
 
 
-******** External Slot Accessor: =channel=                                :reader:writer:
+******** Inherited Slot Accessor: =channel=                               :reader:writer:
 
 
 ********* Syntax
@@ -2085,7 +2095,7 @@ Channel object (if exists) to next link
 # link target: <<slot deliver-on-reception-start-p>>
 
 
-****** External Slot: =deliver-on-reception-start-p=                             :slot:
+****** Inherited Slot: =deliver-on-reception-start-p=                            :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -2113,7 +2123,7 @@ Messages with nonzero length then have a nonzero
 # link target: <<slot-accessor deliver-on-reception-start-p>>
 
 
-******** External Slot Accessor: =deliver-on-reception-start-p=           :reader:writer:
+******** Inherited Slot Accessor: =deliver-on-reception-start-p=          :reader:writer:
 
 
 ********* Syntax
@@ -2139,7 +2149,7 @@ Messages with nonzero length then have a nonzero
 # link target: <<slot owner>>
 
 
-****** External Slot: =owner=                                                    :slot:
+****** Inherited Slot: =owner=                                                   :slot:
 
 - Value type: =named-object=
 - Initial value: =NIL=
@@ -2156,7 +2166,7 @@ Object which owns this in object heirarchy
 # link target: <<slot index>>
 
 
-****** External Slot: =index=                                                    :slot:
+****** Inherited Slot: =index=                                                   :slot:
 
 - Value type: =fixnum=
 - Initial value: =NIL=
@@ -2174,7 +2184,7 @@ Position in an object vector (if it is in an
 # link target: <<slot name>>
 
 
-****** External Slot: =name=                                                     :slot:
+****** Inherited Slot: =name=                                                    :slot:
 
 - Value type: =symbol=
 - Initial value: =NIL=
@@ -2197,7 +2207,7 @@ Name of this object - used when addressing
 # link target: <<class gate-slot>>
 
 
-**** External Class: =gate-slot=                                              :class:
+**** Inherited Class: =gate-slot=                                             :class:
 
 
 ***** Inheritance
@@ -2227,7 +2237,7 @@ Named storage slot for gate or gates - direction
 # link target: <<slot input>>
 
 
-****** External Slot: =input=                                                    :slot:
+****** Inherited Slot: =input=                                                   :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -2248,7 +2258,7 @@ Slot for input gate or gates
 # link target: <<slot-accessor input>>
 
 
-******** External Slot Accessor: =input=                                  :reader:writer:
+******** Inherited Slot Accessor: =input=                                 :reader:writer:
 
 
 ********* Syntax
@@ -2270,7 +2280,7 @@ Slot for input gate or gates
 # link target: <<slot-accessor input-gate-p>>
 
 
-******** Internal Slot Accessor: =input-gate-p=                           :reader:writer:
+******** Slot Accessor: =input-gate-p=                                    :reader:writer:
 
 
 ********* Syntax
@@ -2292,7 +2302,7 @@ Slot for input gate or gates
 # link target: <<slot output>>
 
 
-****** External Slot: =output=                                                   :slot:
+****** Inherited Slot: =output=                                                  :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -2313,7 +2323,7 @@ Slot for output gate or gates
 # link target: <<slot-accessor output>>
 
 
-******** External Slot Accessor: =output=                                 :reader:writer:
+******** Inherited Slot Accessor: =output=                                :reader:writer:
 
 
 ********* Syntax
@@ -2335,7 +2345,7 @@ Slot for output gate or gates
 # link target: <<slot-accessor output-gate-p>>
 
 
-******** Internal Slot Accessor: =output-gate-p=                          :reader:writer:
+******** Slot Accessor: =output-gate-p=                                   :reader:writer:
 
 
 ********* Syntax
@@ -2361,7 +2371,7 @@ Slot for output gate or gates
 # link target: <<slot owner>>
 
 
-****** External Slot: =owner=                                                    :slot:
+****** Inherited Slot: =owner=                                                   :slot:
 
 - Value type: =named-object=
 - Initial value: =NIL=
@@ -2378,7 +2388,7 @@ Object which owns this in object heirarchy
 # link target: <<slot index>>
 
 
-****** External Slot: =index=                                                    :slot:
+****** Inherited Slot: =index=                                                   :slot:
 
 - Value type: =fixnum=
 - Initial value: =NIL=
@@ -2396,7 +2406,7 @@ Position in an object vector (if it is in an
 # link target: <<slot name>>
 
 
-****** External Slot: =name=                                                     :slot:
+****** Inherited Slot: =name=                                                    :slot:
 
 - Value type: =symbol=
 - Initial value: =NIL=
@@ -2419,7 +2429,7 @@ Name of this object - used when addressing
 # link target: <<class histogram>>
 
 
-**** External Class: =histogram=                                              :class:
+**** Inherited Class: =histogram=                                             :class:
 
 
 ***** Inheritance
@@ -2473,7 +2483,7 @@ or the *overflow* *cell* is incremented.
 # link target: <<slot range-min>>
 
 
-****** Internal Slot: =range-min=                                                :slot:
+****** Slot: =range-min=                                                         :slot:
 
 - Value type: =real=
 - Initial value: =NIL=
@@ -2489,7 +2499,7 @@ or the *overflow* *cell* is incremented.
 # link target: <<slot-accessor range-min>>
 
 
-******** Internal Slot Accessor: =range-min=                              :reader:writer:
+******** Slot Accessor: =range-min=                                       :reader:writer:
 
 
 ********* Syntax
@@ -2511,7 +2521,7 @@ or the *overflow* *cell* is incremented.
 # link target: <<slot range-max>>
 
 
-****** Internal Slot: =range-max=                                                :slot:
+****** Slot: =range-max=                                                         :slot:
 
 - Value type: =real=
 - Initial value: =NIL=
@@ -2527,7 +2537,7 @@ or the *overflow* *cell* is incremented.
 # link target: <<slot-accessor range-max>>
 
 
-******** Internal Slot Accessor: =range-max=                              :reader:writer:
+******** Slot Accessor: =range-max=                                       :reader:writer:
 
 
 ********* Syntax
@@ -2549,7 +2559,7 @@ or the *overflow* *cell* is incremented.
 # link target: <<slot range-ext-factor>>
 
 
-****** Internal Slot: =range-ext-factor=                                         :slot:
+****** Slot: =range-ext-factor=                                                  :slot:
 
 - Value type: =real=
 - Initial value: =1=
@@ -2570,7 +2580,7 @@ Factor to expand range by
 # link target: <<slot-accessor range-ext-factor>>
 
 
-******** Internal Slot Accessor: =range-ext-factor=                       :reader:writer:
+******** Slot Accessor: =range-ext-factor=                                :reader:writer:
 
 
 ********* Syntax
@@ -2592,7 +2602,7 @@ Factor to expand range by
 # link target: <<slot mode>>
 
 
-****** Internal Slot: =mode=                                                     :slot:
+****** Slot: =mode=                                                              :slot:
 
 - Value type: =symbol=
 - Initial value: =NIL=
@@ -2613,7 +2623,7 @@ integer or float mode for collection.
 # link target: <<slot-accessor histogram-mode>>
 
 
-******** Internal Slot Accessor: =histogram-mode=                         :reader:writer:
+******** Slot Accessor: =histogram-mode=                                  :reader:writer:
 
 
 ********* Syntax
@@ -2635,7 +2645,7 @@ integer or float mode for collection.
 # link target: <<slot rng>>
 
 
-****** Internal Slot: =rng=                                                      :slot:
+****** Slot: =rng=                                                               :slot:
 
 - Value type: =fixnum=
 - Initial value: =0=
@@ -2652,7 +2662,7 @@ Index of random number generator to use
 # link target: <<slot num-cells>>
 
 
-****** Internal Slot: =num-cells=                                                :slot:
+****** Slot: =num-cells=                                                         :slot:
 
 - Value type: =fixnum=
 - Initial value: =10=
@@ -2673,7 +2683,7 @@ How many cells to use.
 # link target: <<slot-accessor num-cells>>
 
 
-******** Internal Slot Accessor: =num-cells=                              :reader:writer:
+******** Slot Accessor: =num-cells=                                       :reader:writer:
 
 
 ********* Syntax
@@ -2695,7 +2705,7 @@ How many cells to use.
 # link target: <<slot cell-size>>
 
 
-****** Internal Slot: =cell-size=                                                :slot:
+****** Slot: =cell-size=                                                         :slot:
 
 - Value type: =real=
 - Initial value: =NIL=
@@ -2716,7 +2726,7 @@ Cell size once scale determined.
 # link target: <<slot-accessor cell-size>>
 
 
-******** Internal Slot Accessor: =cell-size=                              :reader:writer:
+******** Slot Accessor: =cell-size=                                       :reader:writer:
 
 
 ********* Syntax
@@ -2738,7 +2748,7 @@ Cell size once scale determined.
 # link target: <<slot-accessor histogram-transformed-p>>
 
 
-******** Internal Slot Accessor: =histogram-transformed-p=                :reader:writer:
+******** Slot Accessor: =histogram-transformed-p=                         :reader:writer:
 
 
 ********* Syntax
@@ -2781,7 +2791,7 @@ Pre-collected observations or cells
 # link target: <<slot-accessor cells>>
 
 
-******** Internal Slot Accessor: =cells=                                  :reader:writer:
+******** Slot Accessor: =cells=                                           :reader:writer:
 
 
 ********* Syntax
@@ -2803,7 +2813,7 @@ Pre-collected observations or cells
 # link target: <<slot units>>
 
 
-****** Internal Slot: =units=                                                    :slot:
+****** Slot: =units=                                                             :slot:
 
 - Value type: =string=
 - Initial value: ="s"=
@@ -2815,7 +2825,7 @@ Pre-collected observations or cells
 # link target: <<slot underflow-cell>>
 
 
-****** Internal Slot: =underflow-cell=                                           :slot:
+****** Slot: =underflow-cell=                                                    :slot:
 
 - Value type: =integer=
 - Initial value: =0=
@@ -2836,7 +2846,7 @@ Number of observations below range-min
 # link target: <<slot-accessor underflow-cell>>
 
 
-******** Internal Slot Accessor: =underflow-cell=                         :reader:writer:
+******** Slot Accessor: =underflow-cell=                                  :reader:writer:
 
 
 ********* Syntax
@@ -2858,7 +2868,7 @@ Number of observations below range-min
 # link target: <<slot overflow-cell>>
 
 
-****** Internal Slot: =overflow-cell=                                            :slot:
+****** Slot: =overflow-cell=                                                     :slot:
 
 - Value type: =integer=
 - Initial value: =0=
@@ -2879,7 +2889,7 @@ Number of observations above range-max
 # link target: <<slot-accessor overflow-cell>>
 
 
-******** Internal Slot Accessor: =overflow-cell=                          :reader:writer:
+******** Slot Accessor: =overflow-cell=                                   :reader:writer:
 
 
 ********* Syntax
@@ -2905,7 +2915,7 @@ Number of observations above range-max
 # link target: <<slot sqrsum>>
 
 
-****** Internal Slot: =sqrsum=                                                   :slot:
+****** Slot: =sqrsum=                                                            :slot:
 
 - Value type: =float=
 - Initial value: =0=
@@ -2917,7 +2927,7 @@ Number of observations above range-max
 # link target: <<slot sum>>
 
 
-****** External Slot: =sum=                                                      :slot:
+****** Inherited Slot: =sum=                                                     :slot:
 
 - Value type: =float=
 - Initial value: =0=
@@ -2965,7 +2975,7 @@ Number of observations above range-max
 # link target: <<slot output-format>>
 
 
-****** Internal Slot: =output-format=                                            :slot:
+****** Slot: =output-format=                                                     :slot:
 
 - Value type: =t=
 - Initial value: ="~3@/dfv:eng/"=
@@ -2982,7 +2992,7 @@ Format to use when outputing recorded units
 # link target: <<slot owner>>
 
 
-****** External Slot: =owner=                                                    :slot:
+****** Inherited Slot: =owner=                                                   :slot:
 
 - Value type: =named-object=
 - Initial value: =NIL=
@@ -2999,7 +3009,7 @@ Object which owns this in object heirarchy
 # link target: <<slot index>>
 
 
-****** External Slot: =index=                                                    :slot:
+****** Inherited Slot: =index=                                                   :slot:
 
 - Value type: =fixnum=
 - Initial value: =NIL=
@@ -3017,7 +3027,7 @@ Position in an object vector (if it is in an
 # link target: <<slot name>>
 
 
-****** External Slot: =name=                                                     :slot:
+****** Inherited Slot: =name=                                                    :slot:
 
 - Value type: =symbol=
 - Initial value: =NIL=
@@ -3040,7 +3050,7 @@ Name of this object - used when addressing
 # link target: <<class history-buffer>>
 
 
-**** External Class: =history-buffer=                                         :class:
+**** Inherited Class: =history-buffer=                                        :class:
 
 
 ***** Inheritance
@@ -3074,7 +3084,7 @@ The [[duplicate-p]] method is called with an object and will return true if the 
 # link target: <<slot queue>>
 
 
-****** External Slot: =queue=                                                    :slot:
+****** Inherited Slot: =queue=                                                   :slot:
 
 - Value type: =vector-wrap-queue=
 - Initial value: =NIL=
@@ -3090,7 +3100,7 @@ The [[duplicate-p]] method is called with an object and will return true if the 
 # link target: <<slot-accessor queue>>
 
 
-******** External Slot Accessor: =queue=                                  :reader:writer:
+******** Inherited Slot Accessor: =queue=                                 :reader:writer:
 
 
 ********* Syntax
@@ -3113,7 +3123,7 @@ The [[duplicate-p]] method is called with an object and will return true if the 
 # link target: <<slot test>>
 
 
-****** Internal Slot: =test=                                                     :slot:
+****** Slot: =test=                                                              :slot:
 
 - Value type: =t=
 - Initial value: =#'EQUALP=
@@ -3134,7 +3144,7 @@ The test function to compare entities
 # link target: <<slot-accessor buffer-test>>
 
 
-******** Internal Slot Accessor: =buffer-test=                            :reader:writer:
+******** Slot Accessor: =buffer-test=                                     :reader:writer:
 
 
 ********* Syntax
@@ -3156,7 +3166,7 @@ The test function to compare entities
 # link target: <<slot key>>
 
 
-****** Internal Slot: =key=                                                      :slot:
+****** Slot: =key=                                                               :slot:
 
 - Value type: =t=
 - Initial value: =#'IDENTITY=
@@ -3177,7 +3187,7 @@ The jey function to use to compare entities.
 # link target: <<slot-accessor buffer-key>>
 
 
-******** Internal Slot Accessor: =buffer-key=                             :reader:writer:
+******** Slot Accessor: =buffer-key=                                      :reader:writer:
 
 
 ********* Syntax
@@ -3204,7 +3214,7 @@ The jey function to use to compare entities.
 # link target: <<class ideal-channel>>
 
 
-**** External Class: =ideal-channel=                                          :class:
+**** Inherited Class: =ideal-channel=                                         :class:
 
 
 ***** Inheritance
@@ -3242,7 +3252,7 @@ Channel with zero propagation delay, zero
 # link target: <<slot source-gate>>
 
 
-****** Internal Slot: =source-gate=                                              :slot:
+****** Slot: =source-gate=                                                       :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -3259,7 +3269,7 @@ The gate which sends messages over the channel.
 # link target: <<slot initialized-p>>
 
 
-****** External Slot: =initialized-p=                                            :slot:
+****** Inherited Slot: =initialized-p=                                           :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -3276,7 +3286,7 @@ True if this component has been initialized.
 # link target: <<slot rng-map>>
 
 
-****** External Slot: =rng-map=                                                  :slot:
+****** Inherited Slot: =rng-map=                                                 :slot:
 
 - Value type: =array=
 - Initial value: =NIL=
@@ -3293,7 +3303,7 @@ RNG map for this component
 # link target: <<slot collect-trace-info>>
 
 
-****** Internal Slot: =collect-trace-info=                                       :slot:
+****** Slot: =collect-trace-info=                                                :slot:
 
 - Value type: =boolean=
 - Initial value: =NIL=
@@ -3310,7 +3320,7 @@ If true tracelog outputs will be traced for this component.
 # link target: <<slot properties>>
 
 
-****** Internal Slot: =properties=                                               :slot:
+****** Slot: =properties=                                                        :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -3327,7 +3337,7 @@ Per instance property list
 # link target: <<slot has-ancestor-listeners>>
 
 
-****** Internal Slot: =has-ancestor-listeners=                                   :slot:
+****** Slot: =has-ancestor-listeners=                                            :slot:
 
 - Value type: =simple-bit-vector=
 - Initial value: =NIL=
@@ -3345,11 +3355,11 @@ A bit map recording which signals have ancestor
 # link target: <<slot has-local-listeners>>
 
 
-****** Internal Slot: =has-local-listeners=                                      :slot:
+****** Slot: =has-local-listeners=                                               :slot:
 
 - Value type: =simple-bit-vector=
-- Initial value: =(MAKE-ARRAY +SIGNAL-CACHE-SIZE+ :ELEMENT-TYPE 'BIT           
-                   :INITIAL-ELEMENT 0)=
+- Initial value: =(MAKE-ARRAY LENS::+SIGNAL-CACHE-SIZE+ :ELEMENT-TYPE 'BIT     
+                         :INITIAL-ELEMENT 0)=
 - Initargs: none
 - Allocation: instance
 
@@ -3363,7 +3373,7 @@ A bit map recording which signals have local listeners.
 # link target: <<slot signal-table>>
 
 
-****** Internal Slot: =signal-table=                                             :slot:
+****** Slot: =signal-table=                                                      :slot:
 
 - Value type: =hash-table=
 - Initial value: =(MAKE-HASH-TABLE)=
@@ -3381,7 +3391,7 @@ Hash by signal of lists of registered listeners
 # link target: <<slot owner>>
 
 
-****** External Slot: =owner=                                                    :slot:
+****** Inherited Slot: =owner=                                                   :slot:
 
 - Value type: =named-object=
 - Initial value: =NIL=
@@ -3398,7 +3408,7 @@ Object which owns this in object heirarchy
 # link target: <<slot index>>
 
 
-****** External Slot: =index=                                                    :slot:
+****** Inherited Slot: =index=                                                   :slot:
 
 - Value type: =fixnum=
 - Initial value: =NIL=
@@ -3416,7 +3426,7 @@ Position in an object vector (if it is in an
 # link target: <<slot name>>
 
 
-****** External Slot: =name=                                                     :slot:
+****** Inherited Slot: =name=                                                    :slot:
 
 - Value type: =symbol=
 - Initial value: =NIL=
@@ -3439,7 +3449,7 @@ Name of this object - used when addressing
 # link target: <<class indexed-count-recorder>>
 
 
-**** External Class: =indexed-count-recorder=                                 :class:
+**** Inherited Class: =indexed-count-recorder=                                :class:
 
 
 ***** Inheritance
@@ -3491,7 +3501,7 @@ Indexed count records the number of times a
 # link target: <<slot-accessor recorded-value>>
 
 
-******** Internal Slot Accessor: =recorded-value=                         :reader:writer:
+******** Slot Accessor: =recorded-value=                                  :reader:writer:
 
 
 ********* Syntax
@@ -3509,15 +3519,15 @@ Return the value to record for a scalar recorder
 ********* Methods
 
 - (=recorded-value= (r                    [[class accumulated-time
-  recorder][=accumulated-time-recorder=]]))
+  recorder][=lens::accumulated-time-recorder=]]))
 - (=recorded-value= (indexed-count-recorder                    [[class indexed
   count-recorder][=indexed-count-recorder=]]))
 - (=recorded-value= (r [[class timeavg][=timeavg=]]))
 - (=recorded-value= (last-value [[class last-value][=last-value=]]))
 - (=recorded-value= (recorder [[class mean][=mean=]]))
 - (=recorded-value= (sum [[class sum][=sum=]]))
-- (=recorded-value= (count-recorder [[class count-recorder][=count
-  recorder=]]))
+- (=recorded-value= (count-recorder                    [[class count
+  recorder][=lens::count-recorder=]]))
 
 
 
@@ -3531,7 +3541,7 @@ Return the value to record for a scalar recorder
 # link target: <<slot output-format>>
 
 
-****** Internal Slot: =output-format=                                            :slot:
+****** Slot: =output-format=                                                     :slot:
 
 - Value type: =t=
 - Initial value: ="~A"=
@@ -3548,7 +3558,7 @@ Format to use when outputing recorded units
 # link target: <<slot owner>>
 
 
-****** External Slot: =owner=                                                    :slot:
+****** Inherited Slot: =owner=                                                   :slot:
 
 - Value type: =named-object=
 - Initial value: =NIL=
@@ -3565,7 +3575,7 @@ Object which owns this in object heirarchy
 # link target: <<slot index>>
 
 
-****** External Slot: =index=                                                    :slot:
+****** Inherited Slot: =index=                                                   :slot:
 
 - Value type: =fixnum=
 - Initial value: =NIL=
@@ -3583,7 +3593,7 @@ Position in an object vector (if it is in an
 # link target: <<slot name>>
 
 
-****** External Slot: =name=                                                     :slot:
+****** Inherited Slot: =name=                                                    :slot:
 
 - Value type: =symbol=
 - Initial value: =NIL=
@@ -3606,7 +3616,7 @@ Name of this object - used when addressing
 # link target: <<class last-value>>
 
 
-**** External Class: =last-value=                                             :class:
+**** Inherited Class: =last-value=                                            :class:
 
 
 ***** Inheritance
@@ -3634,7 +3644,7 @@ Record the last value received.
 # link target: <<slot value>>
 
 
-****** Internal Slot: =value=                                                    :slot:
+****** Slot: =value=                                                             :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -3650,7 +3660,7 @@ Record the last value received.
 # link target: <<slot-accessor recorded-value>>
 
 
-******** Internal Slot Accessor: =recorded-value=                         :reader:writer:
+******** Slot Accessor: =recorded-value=                                  :reader:writer:
 
 
 ********* Syntax
@@ -3668,15 +3678,15 @@ Return the value to record for a scalar recorder
 ********* Methods
 
 - (=recorded-value= (r                    [[class accumulated-time
-  recorder][=accumulated-time-recorder=]]))
+  recorder][=lens::accumulated-time-recorder=]]))
 - (=recorded-value= (indexed-count-recorder                    [[class indexed
   count-recorder][=indexed-count-recorder=]]))
 - (=recorded-value= (r [[class timeavg][=timeavg=]]))
 - (=recorded-value= (last-value [[class last-value][=last-value=]]))
 - (=recorded-value= (recorder [[class mean][=mean=]]))
 - (=recorded-value= (sum [[class sum][=sum=]]))
-- (=recorded-value= (count-recorder [[class count-recorder][=count
-  recorder=]]))
+- (=recorded-value= (count-recorder                    [[class count
+  recorder][=lens::count-recorder=]]))
 
 
 
@@ -3690,7 +3700,7 @@ Return the value to record for a scalar recorder
 # link target: <<slot output-format>>
 
 
-****** Internal Slot: =output-format=                                            :slot:
+****** Slot: =output-format=                                                     :slot:
 
 - Value type: =t=
 - Initial value: ="~A"=
@@ -3707,7 +3717,7 @@ Format to use when outputing recorded units
 # link target: <<slot owner>>
 
 
-****** External Slot: =owner=                                                    :slot:
+****** Inherited Slot: =owner=                                                   :slot:
 
 - Value type: =named-object=
 - Initial value: =NIL=
@@ -3724,7 +3734,7 @@ Object which owns this in object heirarchy
 # link target: <<slot index>>
 
 
-****** External Slot: =index=                                                    :slot:
+****** Inherited Slot: =index=                                                   :slot:
 
 - Value type: =fixnum=
 - Initial value: =NIL=
@@ -3742,7 +3752,7 @@ Position in an object vector (if it is in an
 # link target: <<slot name>>
 
 
-****** External Slot: =name=                                                     :slot:
+****** Inherited Slot: =name=                                                    :slot:
 
 - Value type: =symbol=
 - Initial value: =NIL=
@@ -3765,7 +3775,7 @@ Name of this object - used when addressing
 # link target: <<class mean>>
 
 
-**** External Class: =mean=                                                   :class:
+**** Inherited Class: =mean=                                                  :class:
 
 
 ***** Inheritance
@@ -3793,7 +3803,7 @@ Record the mean of the numeric values received.
 # link target: <<slot sum>>
 
 
-****** External Slot: =sum=                                                      :slot:
+****** Inherited Slot: =sum=                                                     :slot:
 
 - Value type: =t=
 - Initial value: =0=
@@ -3821,7 +3831,7 @@ Record the mean of the numeric values received.
 # link target: <<slot output-format>>
 
 
-****** Internal Slot: =output-format=                                            :slot:
+****** Slot: =output-format=                                                     :slot:
 
 - Value type: =t=
 - Initial value: ="~A"=
@@ -3838,7 +3848,7 @@ Format to use when outputing recorded units
 # link target: <<slot owner>>
 
 
-****** External Slot: =owner=                                                    :slot:
+****** Inherited Slot: =owner=                                                   :slot:
 
 - Value type: =named-object=
 - Initial value: =NIL=
@@ -3855,7 +3865,7 @@ Object which owns this in object heirarchy
 # link target: <<slot index>>
 
 
-****** External Slot: =index=                                                    :slot:
+****** Inherited Slot: =index=                                                   :slot:
 
 - Value type: =fixnum=
 - Initial value: =NIL=
@@ -3873,7 +3883,7 @@ Position in an object vector (if it is in an
 # link target: <<slot name>>
 
 
-****** External Slot: =name=                                                     :slot:
+****** Inherited Slot: =name=                                                    :slot:
 
 - Value type: =symbol=
 - Initial value: =NIL=
@@ -3895,7 +3905,7 @@ Name of this object - used when addressing
 # link target: <<class message>>
 
 
-**** External Class: =message=                                                :class:
+**** Inherited Class: =message=                                               :class:
 
 
 ***** Inheritance
@@ -3908,7 +3918,11 @@ Name of this object - used when addressing
     object]], [[class standard-object][standard-object]], [[class slot-object][slot
     object]], [[class t][t]]
 - Direct subclasses:
-    [[class timer-message][timer-message]], [[class packet][packet]]
+    [[class tictocmsg][tictocmsg]], [[class wireless-signal-start][wireless-signal
+    start]], [[class communications-control-command][communications-control
+    command]], [[class communications-control-message][communications-control
+    message]], [[class sensor-message][sensor-message]], [[class ram-store][ram
+    store]], [[class timer-message][timer-message]], [[class packet][packet]]
 
 
 ***** Description
@@ -3924,7 +3938,7 @@ model domain.
 # link target: <<slot creation-time>>
 
 
-****** External Slot: =creation-time=                                            :slot:
+****** Inherited Slot: =creation-time=                                           :slot:
 
 - Value type: =time-type=
 - Initial value: =(SIMULATION-TIME)=
@@ -3950,7 +3964,7 @@ retransmissions and/or segmentation/reassembly.
 # link target: <<slot-accessor creation-time>>
 
 
-******** External Slot Accessor: =creation-time=                          :reader:writer:
+******** Inherited Slot Accessor: =creation-time=                         :reader:writer:
 
 
 ********* Syntax
@@ -3972,7 +3986,7 @@ retransmissions and/or segmentation/reassembly.
 # link target: <<slot from>>
 
 
-****** Internal Slot: =from=                                                     :slot:
+****** Slot: =from=                                                              :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -3993,7 +4007,7 @@ Module or gate from which message was originally sent.
 # link target: <<slot-accessor from>>
 
 
-******** Internal Slot Accessor: =from=                                   :reader:writer:
+******** Slot Accessor: =from=                                            :reader:writer:
 
 
 ********* Syntax
@@ -4015,7 +4029,7 @@ Module or gate from which message was originally sent.
 # link target: <<slot to>>
 
 
-****** Internal Slot: =to=                                                       :slot:
+****** Slot: =to=                                                                :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -4036,7 +4050,7 @@ Module or Gate which finally receices message (after a delay if appropriate)
 # link target: <<slot-accessor to>>
 
 
-******** Internal Slot Accessor: =to=                                     :reader:writer:
+******** Slot Accessor: =to=                                              :reader:writer:
 
 
 ********* Syntax
@@ -4058,7 +4072,7 @@ Module or Gate which finally receices message (after a delay if appropriate)
 # link target: <<slot sent-time>>
 
 
-****** External Slot: =sent-time=                                                :slot:
+****** Inherited Slot: =sent-time=                                               :slot:
 
 - Value type: =time-type=
 - Initial value: =NIL=
@@ -4079,7 +4093,7 @@ The simulation time the message was sent.
 # link target: <<slot-accessor sent-time>>
 
 
-******** External Slot Accessor: =sent-time=                              :reader:writer:
+******** Inherited Slot Accessor: =sent-time=                             :reader:writer:
 
 
 ********* Syntax
@@ -4092,7 +4106,7 @@ The simulation time the message was sent.
 ********* Methods
 
 - (=sent-time= (message [[class message][=message=]]))
-- (=sent-time= (event [[class event][=event=]]))
+- (=sent-time= (event [[class event][=lens::event=]]))
 
 
 
@@ -4102,7 +4116,7 @@ The simulation time the message was sent.
 # link target: <<slot timestamp>>
 
 
-****** External Slot: =timestamp=                                                :slot:
+****** Inherited Slot: =timestamp=                                               :slot:
 
 - Value type: =time-type=
 - Initial value: =0.0d0=
@@ -4123,7 +4137,7 @@ Utility time stamp field for user
 # link target: <<slot-accessor timestamp>>
 
 
-******** External Slot Accessor: =timestamp=                              :reader:writer:
+******** Inherited Slot Accessor: =timestamp=                             :reader:writer:
 
 
 ********* Syntax
@@ -4149,7 +4163,7 @@ Utility time stamp field for user
 # link target: <<slot root-event>>
 
 
-****** External Slot: =root-event=                                               :slot:
+****** Inherited Slot: =root-event=                                              :slot:
 
 - Value type: =event=
 - Initial value: =NIL=
@@ -4166,7 +4180,7 @@ Top level root for cloned messages
 # link target: <<slot schedule-id>>
 
 
-****** Internal Slot: =schedule-id=                                              :slot:
+****** Slot: =schedule-id=                                                       :slot:
 
 - Value type: =integer=
 - Initial value: =-1=
@@ -4184,7 +4198,7 @@ Used to ensure events with same time and
 # link target: <<slot priority>>
 
 
-****** Internal Slot: =priority=                                                 :slot:
+****** Slot: =priority=                                                          :slot:
 
 - Value type: =fixnum=
 - Initial value: =0=
@@ -4201,7 +4215,7 @@ Determines delivery of messages with same arrival time
 # link target: <<slot arrival-time>>
 
 
-****** External Slot: =arrival-time=                                             :slot:
+****** Inherited Slot: =arrival-time=                                            :slot:
 
 - Value type: =time-type=
 - Initial value: =-1.0d0=
@@ -4218,7 +4232,7 @@ simulation time at which event is to be handled
 # link target: <<slot rank>>
 
 
-****** Internal Slot: =rank=                                                     :slot:
+****** Slot: =rank=                                                              :slot:
 
 - Value type: =fixnum=
 - Initial value: =-1=
@@ -4236,7 +4250,7 @@ Rank in priority queue - used internally for
 # link target: <<slot owner>>
 
 
-****** External Slot: =owner=                                                    :slot:
+****** Inherited Slot: =owner=                                                   :slot:
 
 - Value type: =named-object=
 - Initial value: =NIL=
@@ -4253,7 +4267,7 @@ Object which owns this in object heirarchy
 # link target: <<slot index>>
 
 
-****** External Slot: =index=                                                    :slot:
+****** Inherited Slot: =index=                                                   :slot:
 
 - Value type: =fixnum=
 - Initial value: =NIL=
@@ -4271,7 +4285,7 @@ Position in an object vector (if it is in an
 # link target: <<slot name>>
 
 
-****** External Slot: =name=                                                     :slot:
+****** Inherited Slot: =name=                                                    :slot:
 
 - Value type: =symbol=
 - Initial value: =NIL=
@@ -4293,7 +4307,7 @@ Name of this object - used when addressing
 # link target: <<class module>>
 
 
-**** External Class: =module=                                                 :class:
+**** Inherited Class: =module=                                                :class:
 
 
 ***** Inheritance
@@ -4307,7 +4321,13 @@ Name of this object - used when addressing
     [[class lens-object][lens-object]], [[class standard-object][standard-object]],
     [[class slot-object][slot-object]], [[class t][t]]
 - Direct subclasses:
-    [[class compound-module][compound-module]]
+    [[class tic13][tic13]], [[class tic12][tic12]], [[class tic10][tic10]], [[class
+    toc9][toc9]], [[class tic9][tic9]], [[class toc8][toc8]], [[class tic8][tic8]],
+    [[class txc6][txc6]], [[class txc2][txc2]], [[class txc1][txc1]], [[class log
+    distance][log-distance]], [[class temporal-model][temporal-model]], [[class no
+    temporal-model][no-temporal-model]], [[class physical-process][physical
+    process]], [[class wsn-module][wsn-module]], [[class compound-module][compound
+    module]]
 
 
 ***** Parameters
@@ -4336,7 +4356,7 @@ following methods.
 # link target: <<slot gate-slots>>
 
 
-****** Internal Slot: =gate-slots=                                               :slot:
+****** Slot: =gate-slots=                                                        :slot:
 
 - Value type: =hash-table=
 - Initial value: =(MAKE-HASH-TABLE)=
@@ -4359,7 +4379,7 @@ Hash table mapping gate names to [[gate-slot]]
 # link target: <<slot-accessor gate-slots>>
 
 
-******** Internal Slot Accessor: =gate-slots=                             :reader:writer:
+******** Slot Accessor: =gate-slots=                                      :reader:writer:
 
 
 ********* Syntax
@@ -4385,7 +4405,7 @@ Hash table mapping gate names to [[gate-slot]]
 # link target: <<slot initialized-p>>
 
 
-****** External Slot: =initialized-p=                                            :slot:
+****** Inherited Slot: =initialized-p=                                           :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -4402,7 +4422,7 @@ True if this component has been initialized.
 # link target: <<slot rng-map>>
 
 
-****** External Slot: =rng-map=                                                  :slot:
+****** Inherited Slot: =rng-map=                                                 :slot:
 
 - Value type: =array=
 - Initial value: =NIL=
@@ -4419,7 +4439,7 @@ RNG map for this component
 # link target: <<slot collect-trace-info>>
 
 
-****** Internal Slot: =collect-trace-info=                                       :slot:
+****** Slot: =collect-trace-info=                                                :slot:
 
 - Value type: =boolean=
 - Initial value: =NIL=
@@ -4436,7 +4456,7 @@ If true tracelog outputs will be traced for this component.
 # link target: <<slot properties>>
 
 
-****** Internal Slot: =properties=                                               :slot:
+****** Slot: =properties=                                                        :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -4453,7 +4473,7 @@ Per instance property list
 # link target: <<slot has-ancestor-listeners>>
 
 
-****** Internal Slot: =has-ancestor-listeners=                                   :slot:
+****** Slot: =has-ancestor-listeners=                                            :slot:
 
 - Value type: =simple-bit-vector=
 - Initial value: =NIL=
@@ -4471,11 +4491,11 @@ A bit map recording which signals have ancestor
 # link target: <<slot has-local-listeners>>
 
 
-****** Internal Slot: =has-local-listeners=                                      :slot:
+****** Slot: =has-local-listeners=                                               :slot:
 
 - Value type: =simple-bit-vector=
-- Initial value: =(MAKE-ARRAY +SIGNAL-CACHE-SIZE+ :ELEMENT-TYPE 'BIT           
-                   :INITIAL-ELEMENT 0)=
+- Initial value: =(MAKE-ARRAY LENS::+SIGNAL-CACHE-SIZE+ :ELEMENT-TYPE 'BIT     
+                         :INITIAL-ELEMENT 0)=
 - Initargs: none
 - Allocation: instance
 
@@ -4489,7 +4509,7 @@ A bit map recording which signals have local listeners.
 # link target: <<slot signal-table>>
 
 
-****** Internal Slot: =signal-table=                                             :slot:
+****** Slot: =signal-table=                                                      :slot:
 
 - Value type: =hash-table=
 - Initial value: =(MAKE-HASH-TABLE)=
@@ -4507,7 +4527,7 @@ Hash by signal of lists of registered listeners
 # link target: <<slot owner>>
 
 
-****** External Slot: =owner=                                                    :slot:
+****** Inherited Slot: =owner=                                                   :slot:
 
 - Value type: =named-object=
 - Initial value: =NIL=
@@ -4524,7 +4544,7 @@ Object which owns this in object heirarchy
 # link target: <<slot index>>
 
 
-****** External Slot: =index=                                                    :slot:
+****** Inherited Slot: =index=                                                   :slot:
 
 - Value type: =fixnum=
 - Initial value: =NIL=
@@ -4542,7 +4562,7 @@ Position in an object vector (if it is in an
 # link target: <<slot name>>
 
 
-****** External Slot: =name=                                                     :slot:
+****** Inherited Slot: =name=                                                    :slot:
 
 - Value type: =symbol=
 - Initial value: =NIL=
@@ -4565,7 +4585,7 @@ Name of this object - used when addressing
 # link target: <<class module-class>>
 
 
-**** External Class: =module-class=                                           :class:
+**** Inherited Class: =module-class=                                          :class:
 
 
 ***** Inheritance
@@ -4616,7 +4636,7 @@ connections the module.
 # link target: <<slot ..25..gatespec>>
 
 
-****** Internal Slot: =%gatespec=                                                :slot:
+****** Slot: =%gatespec=                                                         :slot:
 
 - Value type: =list=
 - Initial value: =NIL=
@@ -4637,7 +4657,7 @@ The parsed gate specification used to build gates for this class
 # link target: <<slot properties>>
 
 
-****** Internal Slot: =properties=                                               :slot:
+****** Slot: =properties=                                                        :slot:
 
 - Value type: =list=
 - Initial value: =NIL=
@@ -4654,7 +4674,7 @@ The properties for this class
 # link target: <<slot slots>>
 
 
-****** Internal Slot: =slots=                                                    :slot:
+****** Slot: =slots=                                                             :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -4862,7 +4882,7 @@ The properties for this class
 # link target: <<slot direct-superclasses>>
 
 
-****** Internal Slot: =direct-superclasses=                                      :slot:
+****** Slot: =direct-superclasses=                                               :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -4893,7 +4913,7 @@ The properties for this class
 # link target: <<slot name>>
 
 
-****** External Slot: =name=                                                     :slot:
+****** Inherited Slot: =name=                                                    :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -4962,7 +4982,7 @@ The properties for this class
 # link target: <<class mt-random-state>>
 
 
-**** External Class: =mt-random-state=                                        :class:
+**** Inherited Class: =mt-random-state=                                       :class:
 
 
 ***** Inheritance
@@ -4998,10 +5018,10 @@ Modeling and Computer Simulation, Vol. 8, No. 1, January 1998, pp 3-30.
 # link target: <<slot arr>>
 
 
-****** Internal Slot: =arr=                                                      :slot:
+****** Slot: =arr=                                                               :slot:
 
 - Value type: =array=
-- Initial value: =(MAKE-ARRAY +MT-N+ :ELEMENT-TYPE '(UINT 32))=
+- Initial value: =(MAKE-ARRAY LENS::+MT-N+ :ELEMENT-TYPE '(UINT 32))=
 - Initargs: none
 - Allocation: instance
 
@@ -5010,10 +5030,10 @@ Modeling and Computer Simulation, Vol. 8, No. 1, January 1998, pp 3-30.
 # link target: <<slot mti>>
 
 
-****** Internal Slot: =mti=                                                      :slot:
+****** Slot: =mti=                                                               :slot:
 
 - Value type: =fixnum=
-- Initial value: =+MT-N+=
+- Initial value: =LENS::+MT-N+=
 - Initargs: none
 - Allocation: instance
 
@@ -5022,7 +5042,7 @@ Modeling and Computer Simulation, Vol. 8, No. 1, January 1998, pp 3-30.
 # link target: <<slot seed>>
 
 
-****** External Slot: =seed=                                                     :slot:
+****** Inherited Slot: =seed=                                                    :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -5061,7 +5081,7 @@ The number of random values extracted.
 # link target: <<class named-object>>
 
 
-**** External Class: =named-object=                                           :class:
+**** Inherited Class: =named-object=                                          :class:
 
 
 ***** Inheritance
@@ -5087,7 +5107,7 @@ Not documented.
 # link target: <<slot name>>
 
 
-****** External Slot: =name=                                                     :slot:
+****** Inherited Slot: =name=                                                    :slot:
 
 - Value type: =symbol=
 - Initial value: =NIL=
@@ -5109,7 +5129,7 @@ Name of this object - used when addressing
 # link target: <<slot-accessor name>>
 
 
-******** External Slot Accessor: =name=                                   :reader:writer:
+******** Inherited Slot Accessor: =name=                                  :reader:writer:
 
 
 ********* Syntax
@@ -5132,7 +5152,7 @@ Name of this object - used when addressing
 # link target: <<slot index>>
 
 
-****** External Slot: =index=                                                    :slot:
+****** Inherited Slot: =index=                                                   :slot:
 
 - Value type: =fixnum=
 - Initial value: =NIL=
@@ -5154,7 +5174,7 @@ Position in an object vector (if it is in an
 # link target: <<slot-accessor index>>
 
 
-******** External Slot Accessor: =index=                                  :reader:writer:
+******** Inherited Slot Accessor: =index=                                 :reader:writer:
 
 
 ********* Syntax
@@ -5180,7 +5200,7 @@ Position in an object vector (if it is in an
 # link target: <<class network>>
 
 
-**** External Class: =network=                                                :class:
+**** Inherited Class: =network=                                               :class:
 
 
 ***** Inheritance
@@ -5195,7 +5215,9 @@ Position in an object vector (if it is in an
     [[class lens-object][lens-object]], [[class standard-object][standard-object]],
     [[class slot-object][slot-object]], [[class t][t]]
 - Direct subclasses:
-    None.
+    [[class tictoc12][tictoc12]], [[class tictoc10][tictoc10]], [[class
+    tictoc8][tictoc8]], [[class tictoc4][tictoc4]], [[class tictoc2][tictoc2]],
+    [[class tictoc1][tictoc1]], [[class wsn][wsn]]
 
 
 ***** Parameters
@@ -5216,7 +5238,7 @@ Base class for networks. This is the required type
 # link target: <<slot gate-slots>>
 
 
-****** Internal Slot: =gate-slots=                                               :slot:
+****** Slot: =gate-slots=                                                        :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -5232,7 +5254,7 @@ Base class for networks. This is the required type
 # link target: <<slot channels>>
 
 
-****** Internal Slot: =channels=                                                 :slot:
+****** Slot: =channels=                                                          :slot:
 
 - Value type: =list=
 - Initial value: =NIL=
@@ -5244,7 +5266,7 @@ Base class for networks. This is the required type
 # link target: <<slot submodules>>
 
 
-****** Internal Slot: =submodules=                                               :slot:
+****** Slot: =submodules=                                                        :slot:
 
 - Value type: =hash-table=
 - Initial value: =(MAKE-HASH-TABLE)=
@@ -5256,7 +5278,7 @@ Base class for networks. This is the required type
 # link target: <<slot initialized-p>>
 
 
-****** External Slot: =initialized-p=                                            :slot:
+****** Inherited Slot: =initialized-p=                                           :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -5273,7 +5295,7 @@ True if this component has been initialized.
 # link target: <<slot rng-map>>
 
 
-****** External Slot: =rng-map=                                                  :slot:
+****** Inherited Slot: =rng-map=                                                 :slot:
 
 - Value type: =array=
 - Initial value: =NIL=
@@ -5290,7 +5312,7 @@ RNG map for this component
 # link target: <<slot collect-trace-info>>
 
 
-****** Internal Slot: =collect-trace-info=                                       :slot:
+****** Slot: =collect-trace-info=                                                :slot:
 
 - Value type: =boolean=
 - Initial value: =NIL=
@@ -5307,7 +5329,7 @@ If true tracelog outputs will be traced for this component.
 # link target: <<slot properties>>
 
 
-****** Internal Slot: =properties=                                               :slot:
+****** Slot: =properties=                                                        :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -5324,7 +5346,7 @@ Per instance property list
 # link target: <<slot has-ancestor-listeners>>
 
 
-****** Internal Slot: =has-ancestor-listeners=                                   :slot:
+****** Slot: =has-ancestor-listeners=                                            :slot:
 
 - Value type: =simple-bit-vector=
 - Initial value: =NIL=
@@ -5342,11 +5364,11 @@ A bit map recording which signals have ancestor
 # link target: <<slot has-local-listeners>>
 
 
-****** Internal Slot: =has-local-listeners=                                      :slot:
+****** Slot: =has-local-listeners=                                               :slot:
 
 - Value type: =simple-bit-vector=
-- Initial value: =(MAKE-ARRAY +SIGNAL-CACHE-SIZE+ :ELEMENT-TYPE 'BIT           
-                   :INITIAL-ELEMENT 0)=
+- Initial value: =(MAKE-ARRAY LENS::+SIGNAL-CACHE-SIZE+ :ELEMENT-TYPE 'BIT     
+                         :INITIAL-ELEMENT 0)=
 - Initargs: none
 - Allocation: instance
 
@@ -5360,7 +5382,7 @@ A bit map recording which signals have local listeners.
 # link target: <<slot signal-table>>
 
 
-****** Internal Slot: =signal-table=                                             :slot:
+****** Slot: =signal-table=                                                      :slot:
 
 - Value type: =hash-table=
 - Initial value: =(MAKE-HASH-TABLE)=
@@ -5378,7 +5400,7 @@ Hash by signal of lists of registered listeners
 # link target: <<slot owner>>
 
 
-****** External Slot: =owner=                                                    :slot:
+****** Inherited Slot: =owner=                                                   :slot:
 
 - Value type: =named-object=
 - Initial value: =NIL=
@@ -5395,7 +5417,7 @@ Object which owns this in object heirarchy
 # link target: <<slot index>>
 
 
-****** External Slot: =index=                                                    :slot:
+****** Inherited Slot: =index=                                                   :slot:
 
 - Value type: =fixnum=
 - Initial value: =NIL=
@@ -5413,7 +5435,7 @@ Position in an object vector (if it is in an
 # link target: <<slot name>>
 
 
-****** External Slot: =name=                                                     :slot:
+****** Inherited Slot: =name=                                                    :slot:
 
 - Value type: =symbol=
 - Initial value: =NIL=
@@ -5436,7 +5458,7 @@ Name of this object - used when addressing
 # link target: <<class owned-object>>
 
 
-**** External Class: =owned-object=                                           :class:
+**** Inherited Class: =owned-object=                                          :class:
 
 
 ***** Inheritance
@@ -5464,7 +5486,7 @@ Not documented.
 # link target: <<slot owner>>
 
 
-****** External Slot: =owner=                                                    :slot:
+****** Inherited Slot: =owner=                                                   :slot:
 
 - Value type: =named-object=
 - Initial value: =NIL=
@@ -5485,7 +5507,7 @@ Object which owns this in object heirarchy
 # link target: <<slot-accessor owner>>
 
 
-******** External Slot Accessor: =owner=                                  :reader:writer:
+******** Inherited Slot Accessor: =owner=                                 :reader:writer:
 
 
 ********* Syntax
@@ -5511,7 +5533,7 @@ Object which owns this in object heirarchy
 # link target: <<slot index>>
 
 
-****** External Slot: =index=                                                    :slot:
+****** Inherited Slot: =index=                                                   :slot:
 
 - Value type: =fixnum=
 - Initial value: =NIL=
@@ -5529,7 +5551,7 @@ Position in an object vector (if it is in an
 # link target: <<slot name>>
 
 
-****** External Slot: =name=                                                     :slot:
+****** Inherited Slot: =name=                                                    :slot:
 
 - Value type: =symbol=
 - Initial value: =NIL=
@@ -5552,7 +5574,7 @@ Name of this object - used when addressing
 # link target: <<class packet>>
 
 
-**** External Class: =packet=                                                 :class:
+**** Inherited Class: =packet=                                                :class:
 
 
 ***** Inheritance
@@ -5565,7 +5587,8 @@ Name of this object - used when addressing
     [[class lens-object][lens-object]], [[class standard-object][standard-object]],
     [[class slot-object][slot-object]], [[class t][t]]
 - Direct subclasses:
-    None.
+    [[class wsn-packet][wsn-packet]], [[class application-packet][application
+    packet]], [[class wireless-signal-end][wireless-signal-end]]
 
 
 ***** Description
@@ -5588,7 +5611,7 @@ create multiple copies as required.
 # link target: <<slot encapsulated-packet>>
 
 
-****** Internal Slot: =encapsulated-packet=                                      :slot:
+****** Slot: =encapsulated-packet=                                               :slot:
 
 - Value type: =packet=
 - Initial value: =NIL=
@@ -5605,7 +5628,7 @@ Higher level encapsulated protocol packet.
 # link target: <<slot duration>>
 
 
-****** External Slot: =duration=                                                 :slot:
+****** Internal Slot: =duration=                                                 :slot:
 
 - Value type: =time-type=
 - Initial value: =0.0d0=
@@ -5626,7 +5649,7 @@ Duration of last transmission
 # link target: <<slot-accessor duration>>
 
 
-******** External Slot Accessor: =duration=                               :reader:writer:
+******** Internal Slot Accessor: =duration=                               :reader:writer:
 
 
 ********* Syntax
@@ -5648,7 +5671,7 @@ Duration of last transmission
 # link target: <<slot control-info>>
 
 
-****** External Slot: =control-info=                                             :slot:
+****** Inherited Slot: =control-info=                                            :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -5670,7 +5693,7 @@ Additional data to be passed with packet between
 # link target: <<slot-accessor control-info>>
 
 
-******** External Slot Accessor: =control-info=                           :reader:writer:
+******** Inherited Slot Accessor: =control-info=                          :reader:writer:
 
 
 ********* Syntax
@@ -5692,7 +5715,7 @@ Additional data to be passed with packet between
 # link target: <<slot reception-start-p>>
 
 
-****** Internal Slot: =reception-start-p=                                        :slot:
+****** Slot: =reception-start-p=                                                 :slot:
 
 - Value type: =boolean=
 - Initial value: =NIL=
@@ -5716,7 +5739,7 @@ deliver-on-reception-start flag of the receiving gate.
 # link target: <<slot-accessor reception-start-p>>
 
 
-******** Internal Slot Accessor: =reception-start-p=                      :reader:writer:
+******** Slot Accessor: =reception-start-p=                               :reader:writer:
 
 
 ********* Syntax
@@ -5738,7 +5761,7 @@ deliver-on-reception-start flag of the receiving gate.
 # link target: <<slot bit-error-p>>
 
 
-****** External Slot: =bit-error-p=                                              :slot:
+****** Inherited Slot: =bit-error-p=                                             :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -5762,7 +5785,7 @@ after having received the packet, and to act upon it.
 # link target: <<slot-accessor bit-error-p>>
 
 
-******** External Slot Accessor: =bit-error-p=                            :reader:writer:
+******** Inherited Slot Accessor: =bit-error-p=                           :reader:writer:
 
 
 ********* Syntax
@@ -5788,7 +5811,7 @@ after having received the packet, and to act upon it.
 # link target: <<slot timestamp>>
 
 
-****** External Slot: =timestamp=                                                :slot:
+****** Inherited Slot: =timestamp=                                               :slot:
 
 - Value type: =time-type=
 - Initial value: =0.0d0=
@@ -5805,7 +5828,7 @@ Utility time stamp field for user
 # link target: <<slot to>>
 
 
-****** Internal Slot: =to=                                                       :slot:
+****** Slot: =to=                                                                :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -5822,7 +5845,7 @@ Module or Gate which finally receices message (after a delay if appropriate)
 # link target: <<slot from>>
 
 
-****** Internal Slot: =from=                                                     :slot:
+****** Slot: =from=                                                              :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -5839,7 +5862,7 @@ Module or gate from which message was originally sent.
 # link target: <<slot creation-time>>
 
 
-****** External Slot: =creation-time=                                            :slot:
+****** Inherited Slot: =creation-time=                                           :slot:
 
 - Value type: =time-type=
 - Initial value: =(SIMULATION-TIME)=
@@ -5861,7 +5884,7 @@ retransmissions and/or segmentation/reassembly.
 # link target: <<slot root-event>>
 
 
-****** External Slot: =root-event=                                               :slot:
+****** Inherited Slot: =root-event=                                              :slot:
 
 - Value type: =event=
 - Initial value: =NIL=
@@ -5878,7 +5901,7 @@ Top level root for cloned messages
 # link target: <<slot schedule-id>>
 
 
-****** Internal Slot: =schedule-id=                                              :slot:
+****** Slot: =schedule-id=                                                       :slot:
 
 - Value type: =integer=
 - Initial value: =-1=
@@ -5896,7 +5919,7 @@ Used to ensure events with same time and
 # link target: <<slot priority>>
 
 
-****** Internal Slot: =priority=                                                 :slot:
+****** Slot: =priority=                                                          :slot:
 
 - Value type: =fixnum=
 - Initial value: =0=
@@ -5913,7 +5936,7 @@ Determines delivery of messages with same arrival time
 # link target: <<slot arrival-time>>
 
 
-****** External Slot: =arrival-time=                                             :slot:
+****** Inherited Slot: =arrival-time=                                            :slot:
 
 - Value type: =time-type=
 - Initial value: =-1.0d0=
@@ -5930,7 +5953,7 @@ simulation time at which event is to be handled
 # link target: <<slot sent-time>>
 
 
-****** External Slot: =sent-time=                                                :slot:
+****** Inherited Slot: =sent-time=                                               :slot:
 
 - Value type: =double-float=
 - Initial value: =NIL=
@@ -5947,7 +5970,7 @@ The simulation time the message was sent.
 # link target: <<slot rank>>
 
 
-****** Internal Slot: =rank=                                                     :slot:
+****** Slot: =rank=                                                              :slot:
 
 - Value type: =fixnum=
 - Initial value: =-1=
@@ -5965,7 +5988,7 @@ Rank in priority queue - used internally for
 # link target: <<slot owner>>
 
 
-****** External Slot: =owner=                                                    :slot:
+****** Inherited Slot: =owner=                                                   :slot:
 
 - Value type: =named-object=
 - Initial value: =NIL=
@@ -5982,7 +6005,7 @@ Object which owns this in object heirarchy
 # link target: <<slot index>>
 
 
-****** External Slot: =index=                                                    :slot:
+****** Inherited Slot: =index=                                                   :slot:
 
 - Value type: =fixnum=
 - Initial value: =NIL=
@@ -6000,7 +6023,7 @@ Position in an object vector (if it is in an
 # link target: <<slot name>>
 
 
-****** External Slot: =name=                                                     :slot:
+****** Inherited Slot: =name=                                                    :slot:
 
 - Value type: =symbol=
 - Initial value: =NIL=
@@ -6023,7 +6046,7 @@ Name of this object - used when addressing
 # link target: <<class packet-buffer>>
 
 
-**** External Class: =packet-buffer=                                          :class:
+**** Inherited Class: =packet-buffer=                                         :class:
 
 
 ***** Inheritance
@@ -6071,7 +6094,7 @@ duration the packet was in the buffer respectively.
 # link target: <<slot queue>>
 
 
-****** External Slot: =queue=                                                    :slot:
+****** Inherited Slot: =queue=                                                   :slot:
 
 - Value type: =timestamped-queue=
 - Initial value: =NIL=
@@ -6087,7 +6110,7 @@ duration the packet was in the buffer respectively.
 # link target: <<slot-accessor queue>>
 
 
-******** External Slot Accessor: =queue=                                  :reader:writer:
+******** Inherited Slot Accessor: =queue=                                 :reader:writer:
 
 
 ********* Syntax
@@ -6110,7 +6133,7 @@ duration the packet was in the buffer respectively.
 # link target: <<slot buffer-size>>
 
 
-****** External Slot: =buffer-size=                                              :slot:
+****** Inherited Slot: =buffer-size=                                             :slot:
 
 - Value type: =fixnum=
 - Initial value: =32=
@@ -6133,7 +6156,7 @@ max buffer size in messages
 # link target: <<slot-accessor buffer-size>>
 
 
-******** External Slot Accessor: =buffer-size=                            :reader:writer:
+******** Inherited Slot Accessor: =buffer-size=                           :reader:writer:
 
 
 ********* Syntax
@@ -6155,7 +6178,7 @@ max buffer size in messages
 # link target: <<slot buffer-size-bytes>>
 
 
-****** External Slot: =buffer-size-bytes=                                        :slot:
+****** Inherited Slot: =buffer-size-bytes=                                       :slot:
 
 - Value type: =fixnum=
 - Initial value: =NIL=
@@ -6178,7 +6201,7 @@ max size in bytes
 # link target: <<slot-accessor buffer-size-bytes>>
 
 
-******** External Slot Accessor: =buffer-size-bytes=                      :reader:writer:
+******** Inherited Slot Accessor: =buffer-size-bytes=                     :reader:writer:
 
 
 ********* Syntax
@@ -6201,7 +6224,7 @@ max size in bytes
 # link target: <<slot byte-length>>
 
 
-****** External Slot: =byte-length=                                              :slot:
+****** Inherited Slot: =byte-length=                                             :slot:
 
 - Value type: =fixnum=
 - Initial value: =0=
@@ -6217,7 +6240,7 @@ max size in bytes
 # link target: <<slot-accessor byte-length>>
 
 
-******** External Slot Accessor: =byte-length=                            :reader:writer:
+******** Inherited Slot Accessor: =byte-length=                           :reader:writer:
 
 
 ********* Syntax
@@ -6238,6 +6261,30 @@ Return the length in whole octets (8 bit bytes) of
 
 - (=byte-length= (packet-buffer [[class packet-buffer][=packet-buffer=]]))
 - (=byte-length= (v [[class bit-vector][=bit-vector=]]))
+- (=byte-length= (pkt (eql lens.wsn.mac.802.15.4::mac802.15.4-gts-request
+  packet)))
+- (=byte-length= (pkt (eql lens.wsn.mac.802.15.4::mac802.15.4-ack-packet)))
+- (=byte-length= (pkt (eql lens.wsn.mac.802.15.4::mac802.15.4-associate
+  packet)))
+- (=byte-length= (pkt                 [[class mac802.15.4-protocol
+  packet][=lens.wsn.mac.802.15.4::mac802.15.4-protocol-packet=]]))
+- (=byte-length= (pkt                 [[class mac802.15.4-beacon
+  packet][=lens.wsn.mac.802.15.4::mac802.15.4-beacon-packet=]]))
+- (=byte-length= (mac802.15.4-gts-request-packet                 [[class
+  mac802.15.4-gts-request-packet][=lens.wsn.mac.802.15.4::mac802.15.4-gts
+  request-packet=]]))
+- (=byte-length= (mac802.15.4-ack-packet                 [[class mac802.15.4
+  ack-packet][=lens.wsn.mac.802.15.4::mac802.15.4-ack-packet=]]))
+- (=byte-length= (mac802.15.4-associate-packet                 [[class
+  mac802.15.4-associate-packet][=lens.wsn.mac.802.15.4::mac802.15.4-associate
+  packet=]]))
+- (=byte-length= (pkt                 [[class aggregate-application
+  packet][=lens.wsn.routing.leach::aggregate-application-packet=]]))
+- (=byte-length= (packet [[class wsn-packet][=lens.wsn:wsn-packet=]]))
+- (=byte-length= (application-packet                 [[class application
+  packet][=lens.wsn:application-packet=]]))
+- (=byte-length= (pkt                 [[class wireless-signal
+  end][=lens.wsn::wireless-signal-end=]]))
 
 
 
@@ -6251,7 +6298,7 @@ Return the length in whole octets (8 bit bytes) of
 # link target: <<slot has-ancestor-listeners>>
 
 
-****** Internal Slot: =has-ancestor-listeners=                                   :slot:
+****** Slot: =has-ancestor-listeners=                                            :slot:
 
 - Value type: =simple-bit-vector=
 - Initial value: =NIL=
@@ -6269,11 +6316,11 @@ A bit map recording which signals have ancestor
 # link target: <<slot has-local-listeners>>
 
 
-****** Internal Slot: =has-local-listeners=                                      :slot:
+****** Slot: =has-local-listeners=                                               :slot:
 
 - Value type: =simple-bit-vector=
-- Initial value: =(MAKE-ARRAY +SIGNAL-CACHE-SIZE+ :ELEMENT-TYPE 'BIT           
-                   :INITIAL-ELEMENT 0)=
+- Initial value: =(MAKE-ARRAY LENS::+SIGNAL-CACHE-SIZE+ :ELEMENT-TYPE 'BIT     
+                         :INITIAL-ELEMENT 0)=
 - Initargs: none
 - Allocation: instance
 
@@ -6287,7 +6334,7 @@ A bit map recording which signals have local listeners.
 # link target: <<slot signal-table>>
 
 
-****** Internal Slot: =signal-table=                                             :slot:
+****** Slot: =signal-table=                                                      :slot:
 
 - Value type: =hash-table=
 - Initial value: =(MAKE-HASH-TABLE)=
@@ -6305,7 +6352,7 @@ Hash by signal of lists of registered listeners
 # link target: <<slot owner>>
 
 
-****** External Slot: =owner=                                                    :slot:
+****** Inherited Slot: =owner=                                                   :slot:
 
 - Value type: =named-object=
 - Initial value: =NIL=
@@ -6322,7 +6369,7 @@ Object which owns this in object heirarchy
 # link target: <<slot index>>
 
 
-****** External Slot: =index=                                                    :slot:
+****** Inherited Slot: =index=                                                   :slot:
 
 - Value type: =fixnum=
 - Initial value: =NIL=
@@ -6340,7 +6387,7 @@ Position in an object vector (if it is in an
 # link target: <<slot name>>
 
 
-****** External Slot: =name=                                                     :slot:
+****** Inherited Slot: =name=                                                    :slot:
 
 - Value type: =symbol=
 - Initial value: =NIL=
@@ -6358,7 +6405,7 @@ Name of this object - used when addressing
 # link target: <<slot properties>>
 
 
-****** Internal Slot: =properties=                                               :slot:
+****** Slot: =properties=                                                        :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -6380,7 +6427,7 @@ Per instance property list
 # link target: <<class parameter-class>>
 
 
-**** External Class: =parameter-class=                                        :class:
+**** Inherited Class: =parameter-class=                                       :class:
 
 
 ***** Inheritance
@@ -6441,7 +6488,7 @@ the following properties are currently understood.
 # link target: <<slot properties>>
 
 
-****** Internal Slot: =properties=                                               :slot:
+****** Slot: =properties=                                                        :slot:
 
 - Value type: =list=
 - Initial value: =NIL=
@@ -6462,7 +6509,7 @@ The properties for this class
 # link target: <<slot-accessor properties>>
 
 
-******** Internal Slot Accessor: =properties=                             :reader:writer:
+******** Slot Accessor: =properties=                                      :reader:writer:
 
 
 ********* Syntax
@@ -6499,7 +6546,7 @@ Return an a-list of properties associated with an
 # link target: <<slot slots>>
 
 
-****** Internal Slot: =slots=                                                    :slot:
+****** Slot: =slots=                                                             :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -6707,7 +6754,7 @@ Return an a-list of properties associated with an
 # link target: <<slot direct-superclasses>>
 
 
-****** Internal Slot: =direct-superclasses=                                      :slot:
+****** Slot: =direct-superclasses=                                               :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -6738,7 +6785,7 @@ Return an a-list of properties associated with an
 # link target: <<slot name>>
 
 
-****** External Slot: =name=                                                     :slot:
+****** Inherited Slot: =name=                                                    :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -6807,7 +6854,7 @@ Return an a-list of properties associated with an
 # link target: <<class parameter-object>>
 
 
-**** External Class: =parameter-object=                                       :class:
+**** Inherited Class: =parameter-object=                                      :class:
 
 
 ***** Inheritance
@@ -6841,7 +6888,7 @@ may be used to specify instance specific properties (see
 # link target: <<slot properties>>
 
 
-****** Internal Slot: =properties=                                               :slot:
+****** Slot: =properties=                                                        :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -6863,7 +6910,7 @@ Per instance property list
 # link target: <<class simulation>>
 
 
-**** External Class: =simulation=                                             :class:
+**** Inherited Class: =simulation=                                            :class:
 
 
 ***** Inheritance
@@ -6902,7 +6949,7 @@ The main discrete time event simulation class reads
 # link target: <<slot clock>>
 
 
-****** Internal Slot: =clock=                                                    :slot:
+****** Slot: =clock=                                                             :slot:
 
 - Value type: =time-type=
 - Initial value: =0.0d0=
@@ -6923,7 +6970,7 @@ Simulation virtual time
 # link target: <<slot-accessor clock>>
 
 
-******** Internal Slot Accessor: =clock=                                  :reader:writer:
+******** Slot Accessor: =clock=                                           :reader:writer:
 
 
 ********* Syntax
@@ -6945,7 +6992,7 @@ Simulation virtual time
 # link target: <<slot halted>>
 
 
-****** Internal Slot: =halted=                                                   :slot:
+****** Slot: =halted=                                                            :slot:
 
 - Value type: =boolean=
 - Initial value: =T=
@@ -6961,7 +7008,7 @@ Simulation virtual time
 # link target: <<slot-accessor halted>>
 
 
-******** Internal Slot Accessor: =halted=                                 :reader:writer:
+******** Slot Accessor: =halted=                                          :reader:writer:
 
 
 ********* Syntax
@@ -6983,7 +7030,7 @@ Simulation virtual time
 # link target: <<slot thread>>
 
 
-****** Internal Slot: =thread=                                                   :slot:
+****** Slot: =thread=                                                            :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -7004,7 +7051,7 @@ Thread running simulation
 # link target: <<slot-accessor simulation-thread>>
 
 
-******** Internal Slot Accessor: =simulation-thread=                      :reader:writer:
+******** Slot Accessor: =simulation-thread=                               :reader:writer:
 
 
 ********* Syntax
@@ -7026,7 +7073,7 @@ Thread running simulation
 # link target: <<slot last-schedule-id>>
 
 
-****** Internal Slot: =last-schedule-id=                                         :slot:
+****** Slot: =last-schedule-id=                                                  :slot:
 
 - Value type: =integer=
 - Initial value: =0=
@@ -7038,12 +7085,12 @@ Thread running simulation
 # link target: <<slot event-queue>>
 
 
-****** Internal Slot: =event-queue=                                              :slot:
+****** Slot: =event-queue=                                                       :slot:
 
 - Value type: =t=
-- Initial value: =(MAKE-BINARY-HEAP :INITIAL-SIZE 1024 :EXTEND-SIZE 1.4        
-                            :ELEMENT-TYPE 'EVENT :COMP-FN #'EVENT< :INDEX      
-                              #'EVENT-RANK)=
+- Initial value: =(CLRS:MAKE-BINARY-HEAP :INITIAL-SIZE 1024 :EXTEND-SIZE 1.4   
+                                      :ELEMENT-TYPE 'LENS::EVENT :COMP-FN      
+                                   #'LENS::EVENT< :INDEX #'LENS::EVENT-RANK)=
 - Initargs: none
 - Allocation: instance
 
@@ -7056,7 +7103,7 @@ Thread running simulation
 # link target: <<slot-accessor event-queue>>
 
 
-******** Internal Slot Accessor: =event-queue=                            :reader:writer:
+******** Slot Accessor: =event-queue=                                     :reader:writer:
 
 
 ********* Syntax
@@ -7078,7 +7125,7 @@ Thread running simulation
 # link target: <<slot configuration>>
 
 
-****** External Slot: =configuration=                                            :slot:
+****** Inherited Slot: =configuration=                                           :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -7099,7 +7146,7 @@ Configuration data used for simulation
 # link target: <<slot-accessor configuration>>
 
 
-******** External Slot Accessor: =configuration=                          :reader:writer:
+******** Inherited Slot Accessor: =configuration=                         :reader:writer:
 
 
 ********* Syntax
@@ -7130,7 +7177,7 @@ Return the configuration trie with an instance. By
 # link target: <<slot rng-map>>
 
 
-****** External Slot: =rng-map=                                                  :slot:
+****** Inherited Slot: =rng-map=                                                 :slot:
 
 - Value type: =array=
 - Initial value: =NIL=
@@ -7151,7 +7198,7 @@ Top level array of rngs
 # link target: <<slot-accessor rng-map>>
 
 
-******** External Slot Accessor: =rng-map=                                :reader:writer:
+******** Inherited Slot Accessor: =rng-map=                               :reader:writer:
 
 
 ********* Syntax
@@ -7175,7 +7222,7 @@ Top level array of rngs
 # link target: <<slot seed-set>>
 
 
-****** Internal Slot: =seed-set=                                                 :slot:
+****** Slot: =seed-set=                                                          :slot:
 
 - Value type: =integer=
 - Initial value: =NIL=
@@ -7196,7 +7243,7 @@ Seed set used in this simulation
 # link target: <<slot-accessor seed-set>>
 
 
-******** Internal Slot Accessor: =seed-set=                               :reader:writer:
+******** Slot Accessor: =seed-set=                                        :reader:writer:
 
 
 ********* Syntax
@@ -7218,7 +7265,7 @@ Seed set used in this simulation
 # link target: <<slot num-rngs>>
 
 
-****** Internal Slot: =num-rngs=                                                 :slot:
+****** Slot: =num-rngs=                                                          :slot:
 
 - Value type: =fixnum=
 - Initial value: =1=
@@ -7241,7 +7288,7 @@ Total number of rngs for this simulation
 # link target: <<slot-accessor num-rngs>>
 
 
-******** Internal Slot Accessor: =num-rngs=                               :reader:writer:
+******** Slot Accessor: =num-rngs=                                        :reader:writer:
 
 
 ********* Syntax
@@ -7263,7 +7310,7 @@ Total number of rngs for this simulation
 # link target: <<slot rng-class>>
 
 
-****** Internal Slot: =rng-class=                                                :slot:
+****** Slot: =rng-class=                                                         :slot:
 
 - Value type: =symbol=
 - Initial value: ='MT-RANDOM-STATE=
@@ -7282,7 +7329,7 @@ Class for rng's
 # link target: <<slot warmup-period>>
 
 
-****** Internal Slot: =warmup-period=                                            :slot:
+****** Slot: =warmup-period=                                                     :slot:
 
 - Value type: =time-type=
 - Initial value: =0=
@@ -7305,7 +7352,7 @@ Warmup period for statistics collection
 # link target: <<slot-accessor warmup-period>>
 
 
-******** Internal Slot Accessor: =warmup-period=                          :reader:writer:
+******** Slot Accessor: =warmup-period=                                   :reader:writer:
 
 
 ********* Syntax
@@ -7327,7 +7374,7 @@ Warmup period for statistics collection
 # link target: <<slot cpu-time-limit>>
 
 
-****** External Slot: =cpu-time-limit=                                           :slot:
+****** Inherited Slot: =cpu-time-limit=                                          :slot:
 
 - Value type: =time-type=
 - Initial value: =300=
@@ -7350,7 +7397,7 @@ Max cpu time for run.
 # link target: <<slot-accessor cpu-time-limit>>
 
 
-******** External Slot Accessor: =cpu-time-limit=                         :reader:writer:
+******** Inherited Slot Accessor: =cpu-time-limit=                        :reader:writer:
 
 
 ********* Syntax
@@ -7372,7 +7419,7 @@ Max cpu time for run.
 # link target: <<slot sim-time-limit>>
 
 
-****** External Slot: =sim-time-limit=                                           :slot:
+****** Inherited Slot: =sim-time-limit=                                          :slot:
 
 - Value type: =time-type=
 - Initial value: =(* 100 60 60 60)=
@@ -7395,7 +7442,7 @@ Maximum simulation run time
 # link target: <<slot-accessor sim-time-limit>>
 
 
-******** External Slot Accessor: =sim-time-limit=                         :reader:writer:
+******** Inherited Slot Accessor: =sim-time-limit=                        :reader:writer:
 
 
 ********* Syntax
@@ -7416,7 +7463,7 @@ Maximum simulation run time
 # link target: <<slot network>>
 
 
-****** External Slot: =network=                                                  :slot:
+****** Inherited Slot: =network=                                                 :slot:
 
 - Value type: =symbol=
 - Initial value: =NIL=
@@ -7435,7 +7482,7 @@ Specified Network type parameter
 # link target: <<slot initialized-p>>
 
 
-****** External Slot: =initialized-p=                                            :slot:
+****** Inherited Slot: =initialized-p=                                           :slot:
 
 - Value type: =boolean=
 - Initial value: =NIL=
@@ -7447,7 +7494,7 @@ Specified Network type parameter
 # link target: <<slot network-instance>>
 
 
-****** Internal Slot: =network-instance=                                         :slot:
+****** Slot: =network-instance=                                                  :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -7467,7 +7514,7 @@ Actual network instance in this simulation
 # link target: <<slot-accessor network>>
 
 
-******** External Slot Accessor: =network=                                :reader:writer:
+******** Inherited Slot Accessor: =network=                               :reader:writer:
 
 
 ********* Syntax
@@ -7479,6 +7526,7 @@ Actual network instance in this simulation
 
 ********* Methods
 
+- (=network= (node [[class node][=lens.wsn:node=]]))
 - (=network= (instance [[class t][=t=]]))
 - (=network= (simulation [[class simulation][=simulation=]]))
 
@@ -7490,7 +7538,7 @@ Actual network instance in this simulation
 # link target: <<slot vector-stream>>
 
 
-****** Internal Slot: =vector-stream=                                            :slot:
+****** Slot: =vector-stream=                                                     :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -7511,7 +7559,7 @@ Destination stream for vector results
 # link target: <<slot-accessor vector-stream>>
 
 
-******** Internal Slot Accessor: =vector-stream=                          :reader:writer:
+******** Slot Accessor: =vector-stream=                                   :reader:writer:
 
 
 ********* Syntax
@@ -7533,7 +7581,7 @@ Destination stream for vector results
 # link target: <<slot scalar-stream>>
 
 
-****** Internal Slot: =scalar-stream=                                            :slot:
+****** Slot: =scalar-stream=                                                     :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -7554,7 +7602,7 @@ Destination stream for scalar results
 # link target: <<slot-accessor scalar-stream>>
 
 
-******** Internal Slot Accessor: =scalar-stream=                          :reader:writer:
+******** Slot Accessor: =scalar-stream=                                   :reader:writer:
 
 
 ********* Syntax
@@ -7580,7 +7628,7 @@ Destination stream for scalar results
 # link target: <<slot index>>
 
 
-****** External Slot: =index=                                                    :slot:
+****** Inherited Slot: =index=                                                   :slot:
 
 - Value type: =fixnum=
 - Initial value: =NIL=
@@ -7598,7 +7646,7 @@ Position in an object vector (if it is in an
 # link target: <<slot name>>
 
 
-****** External Slot: =name=                                                     :slot:
+****** Inherited Slot: =name=                                                    :slot:
 
 - Value type: =symbol=
 - Initial value: =NIL=
@@ -7616,7 +7664,7 @@ Name of this object - used when addressing
 # link target: <<slot properties>>
 
 
-****** Internal Slot: =properties=                                               :slot:
+****** Slot: =properties=                                                        :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -7638,7 +7686,7 @@ Per instance property list
 # link target: <<class simulation-condition>>
 
 
-**** External Class: =simulation-condition=                                   :class:
+**** Inherited Class: =simulation-condition=                                  :class:
 
 
 ***** Inheritance
@@ -7668,7 +7716,7 @@ Not documented.
 # link target: <<class stddev>>
 
 
-**** External Class: =stddev=                                                 :class:
+**** Inherited Class: =stddev=                                                :class:
 
 
 ***** Inheritance
@@ -7697,7 +7745,7 @@ Output basic statistics (cound,min,max,mean and
 # link target: <<slot output-format>>
 
 
-****** Internal Slot: =output-format=                                            :slot:
+****** Slot: =output-format=                                                     :slot:
 
 - Value type: =t=
 - Initial value: ="~3@/dfv:eng/"=
@@ -7725,7 +7773,7 @@ Output basic statistics (cound,min,max,mean and
 # link target: <<slot-accessor result-count>>
 
 
-******** Internal Slot Accessor: =result-count=                           :reader:writer:
+******** Slot Accessor: =result-count=                                    :reader:writer:
 
 
 ********* Syntax
@@ -7763,7 +7811,7 @@ Output basic statistics (cound,min,max,mean and
 # link target: <<slot-accessor result-min>>
 
 
-******** Internal Slot Accessor: =result-min=                             :reader:writer:
+******** Slot Accessor: =result-min=                                      :reader:writer:
 
 
 ********* Syntax
@@ -7801,7 +7849,7 @@ Output basic statistics (cound,min,max,mean and
 # link target: <<slot-accessor result-max>>
 
 
-******** Internal Slot Accessor: =result-max=                             :reader:writer:
+******** Slot Accessor: =result-max=                                      :reader:writer:
 
 
 ********* Syntax
@@ -7823,7 +7871,7 @@ Output basic statistics (cound,min,max,mean and
 # link target: <<slot sum>>
 
 
-****** External Slot: =sum=                                                      :slot:
+****** Inherited Slot: =sum=                                                     :slot:
 
 - Value type: =float=
 - Initial value: =0=
@@ -7839,7 +7887,7 @@ Output basic statistics (cound,min,max,mean and
 # link target: <<slot-accessor result-sum>>
 
 
-******** Internal Slot Accessor: =result-sum=                             :reader:writer:
+******** Slot Accessor: =result-sum=                                      :reader:writer:
 
 
 ********* Syntax
@@ -7861,7 +7909,7 @@ Output basic statistics (cound,min,max,mean and
 # link target: <<slot sqrsum>>
 
 
-****** Internal Slot: =sqrsum=                                                   :slot:
+****** Slot: =sqrsum=                                                            :slot:
 
 - Value type: =float=
 - Initial value: =0=
@@ -7877,7 +7925,7 @@ Output basic statistics (cound,min,max,mean and
 # link target: <<slot-accessor result-sqrsum>>
 
 
-******** Internal Slot Accessor: =result-sqrsum=                          :reader:writer:
+******** Slot Accessor: =result-sqrsum=                                   :reader:writer:
 
 
 ********* Syntax
@@ -7903,7 +7951,7 @@ Output basic statistics (cound,min,max,mean and
 # link target: <<slot owner>>
 
 
-****** External Slot: =owner=                                                    :slot:
+****** Inherited Slot: =owner=                                                   :slot:
 
 - Value type: =named-object=
 - Initial value: =NIL=
@@ -7920,7 +7968,7 @@ Object which owns this in object heirarchy
 # link target: <<slot index>>
 
 
-****** External Slot: =index=                                                    :slot:
+****** Inherited Slot: =index=                                                   :slot:
 
 - Value type: =fixnum=
 - Initial value: =NIL=
@@ -7938,7 +7986,7 @@ Position in an object vector (if it is in an
 # link target: <<slot name>>
 
 
-****** External Slot: =name=                                                     :slot:
+****** Inherited Slot: =name=                                                    :slot:
 
 - Value type: =symbol=
 - Initial value: =NIL=
@@ -7961,7 +8009,7 @@ Name of this object - used when addressing
 # link target: <<class sum>>
 
 
-**** External Class: =sum=                                                    :class:
+**** Inherited Class: =sum=                                                   :class:
 
 
 ***** Inheritance
@@ -7989,7 +8037,7 @@ Record the sum of the numeric values received.
 # link target: <<slot sum>>
 
 
-****** External Slot: =sum=                                                      :slot:
+****** Inherited Slot: =sum=                                                     :slot:
 
 - Value type: =t=
 - Initial value: =0=
@@ -8005,7 +8053,7 @@ Record the sum of the numeric values received.
 # link target: <<slot-accessor recorded-value>>
 
 
-******** Internal Slot Accessor: =recorded-value=                         :reader:writer:
+******** Slot Accessor: =recorded-value=                                  :reader:writer:
 
 
 ********* Syntax
@@ -8023,15 +8071,15 @@ Return the value to record for a scalar recorder
 ********* Methods
 
 - (=recorded-value= (r                    [[class accumulated-time
-  recorder][=accumulated-time-recorder=]]))
+  recorder][=lens::accumulated-time-recorder=]]))
 - (=recorded-value= (indexed-count-recorder                    [[class indexed
   count-recorder][=indexed-count-recorder=]]))
 - (=recorded-value= (r [[class timeavg][=timeavg=]]))
 - (=recorded-value= (last-value [[class last-value][=last-value=]]))
 - (=recorded-value= (recorder [[class mean][=mean=]]))
 - (=recorded-value= (sum [[class sum][=sum=]]))
-- (=recorded-value= (count-recorder [[class count-recorder][=count
-  recorder=]]))
+- (=recorded-value= (count-recorder                    [[class count
+  recorder][=lens::count-recorder=]]))
 
 
 
@@ -8045,7 +8093,7 @@ Return the value to record for a scalar recorder
 # link target: <<slot output-format>>
 
 
-****** Internal Slot: =output-format=                                            :slot:
+****** Slot: =output-format=                                                     :slot:
 
 - Value type: =t=
 - Initial value: ="~A"=
@@ -8062,7 +8110,7 @@ Format to use when outputing recorded units
 # link target: <<slot owner>>
 
 
-****** External Slot: =owner=                                                    :slot:
+****** Inherited Slot: =owner=                                                   :slot:
 
 - Value type: =named-object=
 - Initial value: =NIL=
@@ -8079,7 +8127,7 @@ Object which owns this in object heirarchy
 # link target: <<slot index>>
 
 
-****** External Slot: =index=                                                    :slot:
+****** Inherited Slot: =index=                                                   :slot:
 
 - Value type: =fixnum=
 - Initial value: =NIL=
@@ -8097,7 +8145,7 @@ Position in an object vector (if it is in an
 # link target: <<slot name>>
 
 
-****** External Slot: =name=                                                     :slot:
+****** Inherited Slot: =name=                                                    :slot:
 
 - Value type: =symbol=
 - Initial value: =NIL=
@@ -8120,7 +8168,7 @@ Name of this object - used when addressing
 # link target: <<class timeavg>>
 
 
-**** External Class: =timeavg=                                                :class:
+**** Inherited Class: =timeavg=                                               :class:
 
 
 ***** Inheritance
@@ -8148,7 +8196,7 @@ Record the time averaged value received.
 # link target: <<slot start-time>>
 
 
-****** Internal Slot: =start-time=                                               :slot:
+****** Slot: =start-time=                                                        :slot:
 
 - Value type: =timetype=
 - Initial value: =-1=
@@ -8160,7 +8208,7 @@ Record the time averaged value received.
 # link target: <<slot last-time>>
 
 
-****** Internal Slot: =last-time=                                                :slot:
+****** Slot: =last-time=                                                         :slot:
 
 - Value type: =timetype=
 - Initial value: =NIL=
@@ -8172,7 +8220,7 @@ Record the time averaged value received.
 # link target: <<slot weighted-sum>>
 
 
-****** Internal Slot: =weighted-sum=                                             :slot:
+****** Slot: =weighted-sum=                                                      :slot:
 
 - Value type: =real=
 - Initial value: =0=
@@ -8184,7 +8232,7 @@ Record the time averaged value received.
 # link target: <<slot last-value>>
 
 
-****** External Slot: =last-value=                                               :slot:
+****** Inherited Slot: =last-value=                                              :slot:
 
 - Value type: =real=
 - Initial value: =0=
@@ -8200,7 +8248,7 @@ Record the time averaged value received.
 # link target: <<slot output-format>>
 
 
-****** Internal Slot: =output-format=                                            :slot:
+****** Slot: =output-format=                                                     :slot:
 
 - Value type: =t=
 - Initial value: ="~A"=
@@ -8217,7 +8265,7 @@ Format to use when outputing recorded units
 # link target: <<slot owner>>
 
 
-****** External Slot: =owner=                                                    :slot:
+****** Inherited Slot: =owner=                                                   :slot:
 
 - Value type: =named-object=
 - Initial value: =NIL=
@@ -8234,7 +8282,7 @@ Object which owns this in object heirarchy
 # link target: <<slot index>>
 
 
-****** External Slot: =index=                                                    :slot:
+****** Inherited Slot: =index=                                                   :slot:
 
 - Value type: =fixnum=
 - Initial value: =NIL=
@@ -8252,7 +8300,7 @@ Position in an object vector (if it is in an
 # link target: <<slot name>>
 
 
-****** External Slot: =name=                                                     :slot:
+****** Inherited Slot: =name=                                                    :slot:
 
 - Value type: =symbol=
 - Initial value: =NIL=
@@ -8275,7 +8323,7 @@ Name of this object - used when addressing
 # link target: <<class timer-message>>
 
 
-**** External Class: =timer-message=                                          :class:
+**** Inherited Class: =timer-message=                                         :class:
 
 
 ***** Inheritance
@@ -8307,7 +8355,7 @@ Class for timer messages. Components which subclass
 # link target: <<slot timestamp>>
 
 
-****** External Slot: =timestamp=                                                :slot:
+****** Inherited Slot: =timestamp=                                               :slot:
 
 - Value type: =time-type=
 - Initial value: =0.0d0=
@@ -8324,7 +8372,7 @@ Utility time stamp field for user
 # link target: <<slot to>>
 
 
-****** Internal Slot: =to=                                                       :slot:
+****** Slot: =to=                                                                :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -8341,7 +8389,7 @@ Module or Gate which finally receices message (after a delay if appropriate)
 # link target: <<slot from>>
 
 
-****** Internal Slot: =from=                                                     :slot:
+****** Slot: =from=                                                              :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -8358,7 +8406,7 @@ Module or gate from which message was originally sent.
 # link target: <<slot creation-time>>
 
 
-****** External Slot: =creation-time=                                            :slot:
+****** Inherited Slot: =creation-time=                                           :slot:
 
 - Value type: =time-type=
 - Initial value: =(SIMULATION-TIME)=
@@ -8380,7 +8428,7 @@ retransmissions and/or segmentation/reassembly.
 # link target: <<slot root-event>>
 
 
-****** External Slot: =root-event=                                               :slot:
+****** Inherited Slot: =root-event=                                              :slot:
 
 - Value type: =event=
 - Initial value: =NIL=
@@ -8397,7 +8445,7 @@ Top level root for cloned messages
 # link target: <<slot schedule-id>>
 
 
-****** Internal Slot: =schedule-id=                                              :slot:
+****** Slot: =schedule-id=                                                       :slot:
 
 - Value type: =integer=
 - Initial value: =-1=
@@ -8415,7 +8463,7 @@ Used to ensure events with same time and
 # link target: <<slot priority>>
 
 
-****** Internal Slot: =priority=                                                 :slot:
+****** Slot: =priority=                                                          :slot:
 
 - Value type: =fixnum=
 - Initial value: =0=
@@ -8432,7 +8480,7 @@ Determines delivery of messages with same arrival time
 # link target: <<slot arrival-time>>
 
 
-****** External Slot: =arrival-time=                                             :slot:
+****** Inherited Slot: =arrival-time=                                            :slot:
 
 - Value type: =time-type=
 - Initial value: =-1.0d0=
@@ -8449,7 +8497,7 @@ simulation time at which event is to be handled
 # link target: <<slot sent-time>>
 
 
-****** External Slot: =sent-time=                                                :slot:
+****** Inherited Slot: =sent-time=                                               :slot:
 
 - Value type: =double-float=
 - Initial value: =NIL=
@@ -8466,7 +8514,7 @@ The simulation time the message was sent.
 # link target: <<slot rank>>
 
 
-****** Internal Slot: =rank=                                                     :slot:
+****** Slot: =rank=                                                              :slot:
 
 - Value type: =fixnum=
 - Initial value: =-1=
@@ -8484,7 +8532,7 @@ Rank in priority queue - used internally for
 # link target: <<slot owner>>
 
 
-****** External Slot: =owner=                                                    :slot:
+****** Inherited Slot: =owner=                                                   :slot:
 
 - Value type: =named-object=
 - Initial value: =NIL=
@@ -8501,7 +8549,7 @@ Object which owns this in object heirarchy
 # link target: <<slot index>>
 
 
-****** External Slot: =index=                                                    :slot:
+****** Inherited Slot: =index=                                                   :slot:
 
 - Value type: =fixnum=
 - Initial value: =NIL=
@@ -8519,7 +8567,7 @@ Position in an object vector (if it is in an
 # link target: <<slot name>>
 
 
-****** External Slot: =name=                                                     :slot:
+****** Inherited Slot: =name=                                                    :slot:
 
 - Value type: =symbol=
 - Initial value: =NIL=
@@ -8541,7 +8589,7 @@ Name of this object - used when addressing
 # link target: <<class transmission-channel>>
 
 
-**** External Class: =transmission-channel=                                   :class:
+**** Inherited Class: =transmission-channel=                                  :class:
 
 
 ***** Inheritance
@@ -8578,7 +8626,7 @@ Base classe for all transmission channels
 # link target: <<slot source-gate>>
 
 
-****** Internal Slot: =source-gate=                                              :slot:
+****** Slot: =source-gate=                                                       :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -8595,7 +8643,7 @@ The gate which sends messages over the channel.
 # link target: <<slot initialized-p>>
 
 
-****** External Slot: =initialized-p=                                            :slot:
+****** Inherited Slot: =initialized-p=                                           :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -8612,7 +8660,7 @@ True if this component has been initialized.
 # link target: <<slot rng-map>>
 
 
-****** External Slot: =rng-map=                                                  :slot:
+****** Inherited Slot: =rng-map=                                                 :slot:
 
 - Value type: =array=
 - Initial value: =NIL=
@@ -8629,7 +8677,7 @@ RNG map for this component
 # link target: <<slot collect-trace-info>>
 
 
-****** Internal Slot: =collect-trace-info=                                       :slot:
+****** Slot: =collect-trace-info=                                                :slot:
 
 - Value type: =boolean=
 - Initial value: =NIL=
@@ -8646,7 +8694,7 @@ If true tracelog outputs will be traced for this component.
 # link target: <<slot properties>>
 
 
-****** Internal Slot: =properties=                                               :slot:
+****** Slot: =properties=                                                        :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -8663,7 +8711,7 @@ Per instance property list
 # link target: <<slot has-ancestor-listeners>>
 
 
-****** Internal Slot: =has-ancestor-listeners=                                   :slot:
+****** Slot: =has-ancestor-listeners=                                            :slot:
 
 - Value type: =simple-bit-vector=
 - Initial value: =NIL=
@@ -8681,11 +8729,11 @@ A bit map recording which signals have ancestor
 # link target: <<slot has-local-listeners>>
 
 
-****** Internal Slot: =has-local-listeners=                                      :slot:
+****** Slot: =has-local-listeners=                                               :slot:
 
 - Value type: =simple-bit-vector=
-- Initial value: =(MAKE-ARRAY +SIGNAL-CACHE-SIZE+ :ELEMENT-TYPE 'BIT           
-                   :INITIAL-ELEMENT 0)=
+- Initial value: =(MAKE-ARRAY LENS::+SIGNAL-CACHE-SIZE+ :ELEMENT-TYPE 'BIT     
+                         :INITIAL-ELEMENT 0)=
 - Initargs: none
 - Allocation: instance
 
@@ -8699,7 +8747,7 @@ A bit map recording which signals have local listeners.
 # link target: <<slot signal-table>>
 
 
-****** Internal Slot: =signal-table=                                             :slot:
+****** Slot: =signal-table=                                                      :slot:
 
 - Value type: =hash-table=
 - Initial value: =(MAKE-HASH-TABLE)=
@@ -8717,7 +8765,7 @@ Hash by signal of lists of registered listeners
 # link target: <<slot owner>>
 
 
-****** External Slot: =owner=                                                    :slot:
+****** Inherited Slot: =owner=                                                   :slot:
 
 - Value type: =named-object=
 - Initial value: =NIL=
@@ -8734,7 +8782,7 @@ Object which owns this in object heirarchy
 # link target: <<slot index>>
 
 
-****** External Slot: =index=                                                    :slot:
+****** Inherited Slot: =index=                                                   :slot:
 
 - Value type: =fixnum=
 - Initial value: =NIL=
@@ -8752,7 +8800,7 @@ Position in an object vector (if it is in an
 # link target: <<slot name>>
 
 
-****** External Slot: =name=                                                     :slot:
+****** Inherited Slot: =name=                                                    :slot:
 
 - Value type: =symbol=
 - Initial value: =NIL=
@@ -8775,7 +8823,7 @@ Name of this object - used when addressing
 # link target: <<class unknown-message>>
 
 
-**** External Class: =unknown-message=                                        :class:
+**** Inherited Class: =unknown-message=                                       :class:
 
 
 ***** Inheritance
@@ -8799,7 +8847,7 @@ Not documented.
 # link target: <<slot module>>
 
 
-****** External Slot: =module=                                                   :slot:
+****** Inherited Slot: =module=                                                  :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -8814,7 +8862,7 @@ Not documented.
 # link target: <<slot-accessor module>>
 
 
-******** External Slot Accessor: =module=                                 :reader:writer:
+******** Inherited Slot Accessor: =module=                                :reader:writer:
 
 
 ********* Syntax
@@ -8827,6 +8875,7 @@ Not documented.
 ********* Methods
 
 - (=module= (condition [[class unknown-message][=unknown-message=]]))
+- (=module= (condition [[class invalid-command][=lens.wsn::invalid-command=]]))
 
 
 
@@ -8835,7 +8884,7 @@ Not documented.
 # link target: <<slot message>>
 
 
-****** External Slot: =message=                                                  :slot:
+****** Inherited Slot: =message=                                                 :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -8850,7 +8899,7 @@ Not documented.
 # link target: <<slot-accessor message>>
 
 
-******** External Slot Accessor: =message=                                :reader:writer:
+******** Inherited Slot Accessor: =message=                               :reader:writer:
 
 
 ********* Syntax
@@ -8877,7 +8926,7 @@ Not documented.
 # link target: <<class with-timers>>
 
 
-**** External Class: =with-timers=                                            :class:
+**** Inherited Class: =with-timers=                                           :class:
 
 
 ***** Inheritance
@@ -8888,7 +8937,7 @@ Not documented.
     [[class with-timers][with-timers]], [[class standard-object][standard-object]],
     [[class slot-object][slot-object]], [[class t][t]]
 - Direct subclasses:
-    None.
+    [[class wsn-module][wsn-module]]
 
 
 ***** Description
@@ -8904,7 +8953,7 @@ Mixin class with dynamic timer handling. See
 # link target: <<slot timers>>
 
 
-****** Internal Slot: =timers=                                                   :slot:
+****** Slot: =timers=                                                            :slot:
 
 - Value type: =list=
 - Initial value: =NIL=
@@ -8930,7 +8979,7 @@ Active Timers which aren't cached in slots
 # link target: <<structure channel-result>>
 
 
-**** External Structure: =channel-result=                                 :structure:
+**** Inherited Structure: =channel-result=                                :structure:
 
 ***** Slots
 
@@ -8948,7 +8997,7 @@ Structure containg result of process-message from a channel
 # link target: <<slot delay>>
 
 
-****** External Slot: =delay=                                                    :slot:
+****** Inherited Slot: =delay=                                                   :slot:
 
 - Value type: =time-type=
 - Initial value: =0.0d0=
@@ -8960,7 +9009,7 @@ Structure containg result of process-message from a channel
 # link target: <<slot duration>>
 
 
-****** External Slot: =duration=                                                 :slot:
+****** Internal Slot: =duration=                                                 :slot:
 
 - Value type: =time-type=
 - Initial value: =0.0d0=
@@ -8972,7 +9021,7 @@ Structure containg result of process-message from a channel
 # link target: <<slot discard>>
 
 
-****** Internal Slot: =discard=                                                  :slot:
+****** Slot: =discard=                                                           :slot:
 
 - Value type: =boolean=
 - Initial value: =NIL=
@@ -8989,7 +9038,7 @@ Structure containg result of process-message from a channel
 # link target: <<structure coord>>
 
 
-**** External Structure: =coord=                                          :structure:
+**** Inherited Structure: =coord=                                         :structure:
 
 
 ***** Description
@@ -9003,7 +9052,7 @@ A spatial coordinate
 # link target: <<slot x>>
 
 
-****** Internal Slot: =x=                                                        :slot:
+****** Slot: =x=                                                                 :slot:
 
 - Value type: =float=
 - Initial value: =0.0=
@@ -9015,7 +9064,7 @@ A spatial coordinate
 # link target: <<slot y>>
 
 
-****** Internal Slot: =y=                                                        :slot:
+****** Slot: =y=                                                                 :slot:
 
 - Value type: =float=
 - Initial value: =0.0=
@@ -9027,7 +9076,7 @@ A spatial coordinate
 # link target: <<slot z>>
 
 
-****** Internal Slot: =z=                                                        :slot:
+****** Slot: =z=                                                                 :slot:
 
 - Value type: =float=
 - Initial value: =0.0=
@@ -9044,7 +9093,7 @@ A spatial coordinate
 # link target: <<structure message-sent-signal-value>>
 
 
-**** External Structure: =message-sent-signal-value=                      :structure:
+**** Inherited Structure: =message-sent-signal-value=                     :structure:
 
 ***** Slots
 
@@ -9064,7 +9113,7 @@ conataining the time it was sent, the message and the channel result.
 # link target: <<slot timestamp>>
 
 
-****** External Slot: =timestamp=                                                :slot:
+****** Inherited Slot: =timestamp=                                               :slot:
 
 - Value type: =time-type=
 - Initial value: =(SIMULATION-TIME)=
@@ -9075,7 +9124,7 @@ conataining the time it was sent, the message and the channel result.
 # link target: <<slot message>>
 
 
-****** External Slot: =message=                                                  :slot:
+****** Inherited Slot: =message=                                                 :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -9087,10 +9136,10 @@ conataining the time it was sent, the message and the channel result.
 # link target: <<slot result>>
 
 
-****** Internal Slot: =result=                                                   :slot:
+****** Slot: =result=                                                            :slot:
 
 - Value type: =channel-result=
-- Initial value: =(MAKE-CHANNEL-RESULT)=
+- Initial value: =(LENS::MAKE-CHANNEL-RESULT)=
 - Initargs: none
 - Allocation: instance
 
@@ -9104,7 +9153,7 @@ conataining the time it was sent, the message and the channel result.
 # link target: <<structure timestamped>>
 
 
-**** External Structure: =timestamped=                                    :structure:
+**** Inherited Structure: =timestamped=                                   :structure:
 
 ***** Slots
 
@@ -9135,7 +9184,7 @@ Structure associating a time with a value.
 # link target: <<slot value>>
 
 
-****** Internal Slot: =value=                                                    :slot:
+****** Slot: =value=                                                             :slot:
 
 - Value type: =t=
 - Initial value: =NIL=
@@ -9152,7 +9201,7 @@ Structure associating a time with a value.
 # link target: <<structure timestamped-queue>>
 
 
-**** External Structure: =timestamped-queue=                              :structure:
+**** Inherited Structure: =timestamped-queue=                             :structure:
 
 
 ***** Description
@@ -9170,7 +9219,7 @@ track of the average queue duration which can be obtained using
 # link target: <<slot average-timestamp>>
 
 
-****** Internal Slot: =average-timestamp=                                        :slot:
+****** Slot: =average-timestamp=                                                 :slot:
 
 - Value type: =time-type=
 - Initial value: =0.0d0=
@@ -9190,7 +9239,7 @@ track of the average queue duration which can be obtained using
 # link target: <<type gate-direction>>
 
 
-**** External Type: =gate-direction=                                           :type:
+**** Inherited Type: =gate-direction=                                          :type:
 
 Not documented.
 
@@ -9201,7 +9250,7 @@ Not documented.
 # link target: <<type time-type>>
 
 
-**** External Type: =time-type=                                                :type:
+**** Inherited Type: =time-type=                                               :type:
 
 Not documented.
 
@@ -9216,7 +9265,7 @@ Not documented.
 # link target: <<constant ..2b..c..2b..>>
 
 
-**** External Constant: =+c+=                                              :constant:
+**** Inherited Constant: =+c+=                                             :constant:
 
 
 ***** Value
@@ -9242,7 +9291,7 @@ Speed of Light in m/sec
 # link target: <<variable *context*>>
 
 
-**** External Variable: =*context*=                                        :variable:
+**** Inherited Variable: =*context*=                                       :variable:
 
 
 ***** Value
@@ -9268,14 +9317,14 @@ Current global component context in which evaluation is taking
 # link target: <<variable *simulation*>>
 
 
-**** External Variable: =*simulation*=                                     :variable:
+**** Inherited Variable: =*simulation*=                                    :variable:
 
 
 ***** Value
 
-: NIL
+: #<SIMULATION t=300.09999999999974 HALTED 1 pending events {C928491}>
 
-Type: =null=
+Type: =simulation=
 
 
 ***** Description
@@ -9290,12 +9339,12 @@ The global [[simulation]] instance
 # link target: <<variable *simulation-init-hooks*>>
 
 
-**** External Variable: =*simulation-init-hooks*=                          :variable:
+**** Inherited Variable: =*simulation-init-hooks*=                         :variable:
 
 
 ***** Value
 
-: (ADD-STATISTICS)
+: (LENS::ADD-STATISTICS)
 
 Type: =cons=
 
@@ -9315,12 +9364,12 @@ A list of functions which take the simulation as an argument which
 # link target: <<variable *simulation-trace-stream*>>
 
 
-**** External Variable: =*simulation-trace-stream*=                        :variable:
+**** Inherited Variable: =*simulation-trace-stream*=                       :variable:
 
 
 ***** Value
 
-: #<SWANK-BACKEND::SLIME-OUTPUT-STREAM {BC4F6C1}>
+: #<SWANK-BACKEND::SLIME-OUTPUT-STREAM {BC3C449}>
 
 Type: =slime-output-stream=
 
@@ -9337,7 +9386,7 @@ The stream on which tracing information (using [[tracelog]]) is to be written.
 # link target: <<variable *time-format*>>
 
 
-**** External Variable: =*time-format*=                                    :variable:
+**** Inherited Variable: =*time-format*=                                   :variable:
 
 
 ***** Value
@@ -9359,7 +9408,7 @@ when tracing.
 # link target: <<variable network>>
 
 
-**** External Variable: =network=                                          :variable:
+**** Inherited Variable: =network=                                         :variable:
 
 
 ***** Value
@@ -9385,7 +9434,7 @@ Network name for current run
 # link target: <<macro define-statistic-filter>>
 
 
-**** External Macro: =define-statistic-filter=                                :macro:
+**** Inherited Macro: =define-statistic-filter=                               :macro:
 
 
 ***** Syntax
@@ -9431,7 +9480,7 @@ filtering.
 # link target: <<macro filter>>
 
 
-**** External Macro: =filter=                                                 :macro:
+**** Inherited Macro: =filter=                                                :macro:
 
 
 ***** Syntax
@@ -9464,7 +9513,7 @@ is true.
 # link target: <<macro for>>
 
 
-**** External Macro: =for=                                                    :macro:
+**** Inherited Macro: =for=                                                   :macro:
 
 
 ***** Syntax
@@ -9496,7 +9545,7 @@ evaluating the +body+
 # link target: <<macro tracelog>>
 
 
-**** External Macro: =tracelog=                                               :macro:
+**** Inherited Macro: =tracelog=                                              :macro:
 
 
 ***** Syntax
@@ -9526,7 +9575,7 @@ tracing of simulation execution.
 # link target: <<macro until>>
 
 
-**** External Macro: =until=                                                  :macro:
+**** Inherited Macro: =until=                                                 :macro:
 
 
 ***** Syntax
@@ -9550,7 +9599,7 @@ Repeat body until test returns true
 # link target: <<macro while>>
 
 
-**** External Macro: =while=                                                  :macro:
+**** Inherited Macro: =while=                                                 :macro:
 
 
 ***** Syntax
@@ -9578,7 +9627,7 @@ A while loop - repeat body while test is true
 # link target: <<function ..3c....3d..>>
 
 
-**** External Function: =<==                                               :function:
+**** Inherited Function: =<==                                              :function:
 
 
 ***** Syntax
@@ -9600,7 +9649,7 @@ Return T if arguments are in strictly non-decreasing order, NIL otherwise.
 # link target: <<function ..3c....3d..>>
 
 
-**** External Function: =<==                                               :function:
+**** Inherited Function: =<==                                              :function:
 
 
 ***** Syntax
@@ -9622,7 +9671,7 @@ Return T if arguments are in strictly non-decreasing order, NIL otherwise.
 # link target: <<function arrival-time>>
 
 
-**** External Function: =arrival-time=                                     :function:
+**** Inherited Function: =arrival-time=                                    :function:
 
 
 ***** Syntax
@@ -9644,7 +9693,7 @@ Return the simulation time at which an event is to be handled
 # link target: <<function arrived>>
 
 
-**** External Function: =arrived=                                          :function:
+**** Inherited Function: =arrived=                                         :function:
 
 
 ***** Syntax
@@ -9676,7 +9725,7 @@ The default implementation will fill in the arrival gate details in the /message
 # link target: <<function average-queue-time>>
 
 
-**** External Function: =average-queue-time=                               :function:
+**** Inherited Function: =average-queue-time=                              :function:
 
 
 ***** Syntax
@@ -9702,7 +9751,7 @@ Returns the average simulation time items have been on /queue/.
 # link target: <<function bernoulli>>
 
 
-**** External Function: =bernoulli=                                        :function:
+**** Inherited Function: =bernoulli=                                       :function:
 
 
 ***** Syntax
@@ -9734,7 +9783,7 @@ Returns the result of a Bernoulli trial with probability /p/,
 # link target: <<function beta>>
 
 
-**** External Function: =beta=                                             :function:
+**** Inherited Function: =beta=                                            :function:
 
 
 ***** Syntax
@@ -9773,7 +9822,7 @@ Y1/(Y1+Y2)/ has beta distribution with parameters /alpha1/ and /alpha2/.
 # link target: <<function binomial>>
 
 
-**** External Function: =binomial=                                         :function:
+**** Inherited Function: =binomial=                                        :function:
 
 
 ***** Syntax
@@ -9811,7 +9860,7 @@ distribution (runtime is proportional to /n/).
 # link target: <<function bit-error-p>>
 
 
-**** External Function: =bit-error-p=                                      :function:
+**** Inherited Function: =bit-error-p=                                     :function:
 
 
 ***** Syntax
@@ -9833,7 +9882,7 @@ Not documented.
 # link target: <<function bit-length>>
 
 
-**** External Function: =bit-length=                                       :function:
+**** Inherited Function: =bit-length=                                      :function:
 
 
 ***** Syntax
@@ -9857,7 +9906,7 @@ Return the length in bits of an =entity=. This is
 # link target: <<function buffer-size>>
 
 
-**** External Function: =buffer-size=                                      :function:
+**** Inherited Function: =buffer-size=                                     :function:
 
 
 ***** Syntax
@@ -9879,7 +9928,7 @@ Not documented.
 # link target: <<function buffer-size-bytes>>
 
 
-**** External Function: =buffer-size-bytes=                                :function:
+**** Inherited Function: =buffer-size-bytes=                               :function:
 
 
 ***** Syntax
@@ -9901,7 +9950,7 @@ Not documented.
 # link target: <<function build-connections>>
 
 
-**** External Function: =build-connections=                                :function:
+**** Inherited Function: =build-connections=                               :function:
 
 
 ***** Syntax
@@ -9929,7 +9978,7 @@ network connections algorithmically.
 # link target: <<function build-gates>>
 
 
-**** External Function: =build-gates=                                      :function:
+**** Inherited Function: =build-gates=                                     :function:
 
 
 ***** Syntax
@@ -9958,7 +10007,7 @@ This method is called during a [[module]] instance initialisation.
 # link target: <<function build-inside>>
 
 
-**** External Function: =build-inside=                                     :function:
+**** Inherited Function: =build-inside=                                    :function:
 
 
 ***** Syntax
@@ -9989,7 +10038,7 @@ This method is recursively called upon [[network]] creation.
 # link target: <<function build-submodules>>
 
 
-**** External Function: =build-submodules=                                 :function:
+**** Inherited Function: =build-submodules=                                :function:
 
 
 ***** Syntax
@@ -10017,7 +10066,7 @@ usefully to add in additional submodule creation algoritmically.
 # link target: <<function busy-p>>
 
 
-**** External Function: =busy-p=                                           :function:
+**** Inherited Function: =busy-p=                                          :function:
 
 
 ***** Syntax
@@ -10048,7 +10097,7 @@ is greater than the current simulation time.
 # link target: <<function byte-length>>
 
 
-**** External Function: =byte-length=                                      :function:
+**** Inherited Function: =byte-length=                                     :function:
 
 
 ***** Syntax
@@ -10072,7 +10121,7 @@ Return the length in whole octets (8 bit bytes) of
 # link target: <<function calculate-duration>>
 
 
-**** External Function: =calculate-duration=                               :function:
+**** Inherited Function: =calculate-duration=                              :function:
 
 
 ***** Syntax
@@ -10119,7 +10168,7 @@ redefine *both* [[process-message]] and [[calculate-duration]].
 # link target: <<function cancel>>
 
 
-**** External Function: =cancel=                                           :function:
+**** Inherited Function: =cancel=                                          :function:
 
 
 ***** Syntax
@@ -10145,7 +10194,7 @@ Cancel event /event/ if it was scheduled.
 # link target: <<function cancel-timer>>
 
 
-**** External Function: =cancel-timer=                                     :function:
+**** Inherited Function: =cancel-timer=                                    :function:
 
 
 ***** Syntax
@@ -10174,7 +10223,7 @@ scheduled [[set-timer]] it will be deleted at this point.
 # link target: <<function cauchy>>
 
 
-**** External Function: =cauchy=                                           :function:
+**** Inherited Function: =cauchy=                                          :function:
 
 
 ***** Syntax
@@ -10213,7 +10262,7 @@ Generation uses the inverse transform.
 # link target: <<function channel>>
 
 
-**** External Function: =channel=                                          :function:
+**** Inherited Function: =channel=                                         :function:
 
 
 ***** Syntax
@@ -10235,7 +10284,7 @@ Not documented.
 # link target: <<function chi-square>>
 
 
-**** External Function: =chi-square=                                       :function:
+**** Inherited Function: =chi-square=                                      :function:
 
 
 ***** Syntax
@@ -10275,7 +10324,7 @@ Generation is using relationship to gamma distribution (see [[gamma-d]]).
 # link target: <<function configuration>>
 
 
-**** External Function: =configuration=                                    :function:
+**** Inherited Function: =configuration=                                   :function:
 
 
 ***** Syntax
@@ -10299,7 +10348,7 @@ Return the configuration trie with an instance. By
 # link target: <<function configure>>
 
 
-**** External Function: =configure=                                        :function:
+**** Inherited Function: =configure=                                       :function:
 
 
 ***** Syntax
@@ -10323,7 +10372,7 @@ Configure an instances unbound parameter slots from
 # link target: <<function connect>>
 
 
-**** External Function: =connect=                                          :function:
+**** Inherited Function: =connect=                                         :function:
 
 
 ***** Syntax
@@ -10372,7 +10421,7 @@ the following model change notifications.
 # link target: <<function connected-outside-p>>
 
 
-**** External Function: =connected-outside-p=                              :function:
+**** Inherited Function: =connected-outside-p=                             :function:
 
 
 ***** Syntax
@@ -10394,7 +10443,7 @@ Return true if a gate is connected to the outside of its module.
 # link target: <<function connected-p>>
 
 
-**** External Function: =connected-p=                                      :function:
+**** Inherited Function: =connected-p=                                     :function:
 
 
 ***** Syntax
@@ -10416,7 +10465,7 @@ Not documented.
 # link target: <<function control-info>>
 
 
-**** External Function: =control-info=                                     :function:
+**** Inherited Function: =control-info=                                    :function:
 
 
 ***** Syntax
@@ -10438,7 +10487,7 @@ Not documented.
 # link target: <<function coord*>>
 
 
-**** External Function: =coord*=                                           :function:
+**** Inherited Function: =coord*=                                          :function:
 
 
 ***** Syntax
@@ -10460,7 +10509,7 @@ Return element wise (scalar) multiplation of [[coord]]s a and b.
 # link target: <<function coord..2b..>>
 
 
-**** External Function: =coord+=                                           :function:
+**** Inherited Function: =coord+=                                          :function:
 
 
 ***** Syntax
@@ -10482,7 +10531,7 @@ Add two [[coord]]s together returning result [[coord]]
 # link target: <<function coord->>
 
 
-**** External Function: =coord-=                                           :function:
+**** Inherited Function: =coord-=                                          :function:
 
 
 ***** Syntax
@@ -10504,7 +10553,7 @@ Return a-b for [[coord]]s
 # link target: <<function coord-op>>
 
 
-**** External Function: =coord-op=                                         :function:
+**** Inherited Function: =coord-op=                                        :function:
 
 
 ***** Syntax
@@ -10527,7 +10576,7 @@ ordinates
 # link target: <<function coord-x>>
 
 
-**** External Function: =coord-x=                                          :function:
+**** Inherited Function: =coord-x=                                         :function:
 
 
 ***** Syntax
@@ -10549,7 +10598,7 @@ Return whether debug-block represents elsewhere code.
 # link target: <<function coord-y>>
 
 
-**** External Function: =coord-y=                                          :function:
+**** Inherited Function: =coord-y=                                         :function:
 
 
 ***** Syntax
@@ -10571,7 +10620,7 @@ Return whether debug-block represents elsewhere code.
 # link target: <<function coord-z>>
 
 
-**** External Function: =coord-z=                                          :function:
+**** Inherited Function: =coord-z=                                         :function:
 
 
 ***** Syntax
@@ -10593,7 +10642,7 @@ Return whether debug-block represents elsewhere code.
 # link target: <<function copy-slots>>
 
 
-**** External Function: =copy-slots=                                       :function:
+**** Inherited Function: =copy-slots=                                      :function:
 
 
 ***** Syntax
@@ -10624,7 +10673,7 @@ returning the modifed destination object.
 # link target: <<function cpu-time-limit>>
 
 
-**** External Function: =cpu-time-limit=                                   :function:
+**** Inherited Function: =cpu-time-limit=                                  :function:
 
 
 ***** Syntax
@@ -10646,7 +10695,7 @@ Not documented.
 # link target: <<function creation-time>>
 
 
-**** External Function: =creation-time=                                    :function:
+**** Inherited Function: =creation-time=                                   :function:
 
 
 ***** Syntax
@@ -10668,7 +10717,7 @@ Not documented.
 # link target: <<function cumulative-density-function>>
 
 
-**** External Function: =cumulative-density-function=                      :function:
+**** Inherited Function: =cumulative-density-function=                     :function:
 
 
 ***** Syntax
@@ -10691,7 +10740,7 @@ Returns the estimated value of the Cumulated
 # link target: <<function decapsulate>>
 
 
-**** External Function: =decapsulate=                                      :function:
+**** Inherited Function: =decapsulate=                                     :function:
 
 
 ***** Syntax
@@ -10714,7 +10763,7 @@ Protocols *must* use this to get the encapsulated packet. It returns a duplicate
 # link target: <<function define-result-recorder>>
 
 
-**** External Function: =define-result-recorder=                           :function:
+**** Inherited Function: =define-result-recorder=                          :function:
 
 
 ***** Syntax
@@ -10743,7 +10792,7 @@ propery definitons of simulation components.
 # link target: <<function delay>>
 
 
-**** External Function: =delay=                                            :function:
+**** Inherited Function: =delay=                                           :function:
 
 
 ***** Syntax
@@ -10765,7 +10814,7 @@ Not documented.
 # link target: <<function deliver>>
 
 
-**** External Function: =deliver=                                          :function:
+**** Inherited Function: =deliver=                                         :function:
 
 
 ***** Syntax
@@ -10789,7 +10838,7 @@ This function is called internally by the [[send]]
 # link target: <<function deliver-on-reception-start-p>>
 
 
-**** External Function: =deliver-on-reception-start-p=                     :function:
+**** Inherited Function: =deliver-on-reception-start-p=                    :function:
 
 
 ***** Syntax
@@ -10811,7 +10860,7 @@ Not documented.
 # link target: <<function dequeue>>
 
 
-**** External Function: =dequeue=                                          :function:
+**** Inherited Function: =dequeue=                                         :function:
 
 
 ***** Syntax
@@ -10833,7 +10882,7 @@ Return next element x from queue q
 # link target: <<function detailed-info>>
 
 
-**** External Function: =detailed-info=                                    :function:
+**** Inherited Function: =detailed-info=                                   :function:
 
 
 ***** Syntax
@@ -10858,7 +10907,7 @@ wherever it is feasible to display a multi-line string.
 # link target: <<function disabled-p>>
 
 
-**** External Function: =disabled-p=                                       :function:
+**** Inherited Function: =disabled-p=                                      :function:
 
 
 ***** Syntax
@@ -10880,7 +10929,7 @@ Not documented.
 # link target: <<function disconnect>>
 
 
-**** External Function: =disconnect=                                       :function:
+**** Inherited Function: =disconnect=                                      :function:
 
 
 ***** Syntax
@@ -10919,7 +10968,7 @@ the following model change notifications.
 # link target: <<function distance>>
 
 
-**** External Function: =distance=                                         :function:
+**** Inherited Function: =distance=                                        :function:
 
 
 ***** Syntax
@@ -10942,7 +10991,7 @@ Return the Euclidean distance between two entities
 # link target: <<function do-histogram>>
 
 
-**** External Function: =do-histogram=                                     :function:
+**** Inherited Function: =do-histogram=                                    :function:
 
 
 ***** Syntax
@@ -10964,7 +11013,7 @@ Not documented.
 # link target: <<function duplicate>>
 
 
-**** External Function: =duplicate=                                        :function:
+**** Inherited Function: =duplicate=                                       :function:
 
 
 ***** Syntax
@@ -10994,7 +11043,7 @@ not recurse into the encapsulated packets.
 # link target: <<function duplicate-p>>
 
 
-**** External Function: =duplicate-p=                                      :function:
+**** Inherited Function: =duplicate-p=                                     :function:
 
 
 ***** Syntax
@@ -11027,7 +11076,7 @@ is true then /entity will be recorded in the buffer.
 # link target: <<function emit>>
 
 
-**** External Function: =emit=                                             :function:
+**** Inherited Function: =emit=                                            :function:
 
 
 ***** Syntax
@@ -11061,7 +11110,7 @@ their appropriate [[receive-signal]] methods get called.
 # link target: <<function empty-p>>
 
 
-**** External Function: =empty-p=                                          :function:
+**** Inherited Function: =empty-p=                                         :function:
 
 
 ***** Syntax
@@ -11083,7 +11132,7 @@ Return true if a data structure is empty
 # link target: <<function encapsulate>>
 
 
-**** External Function: =encapsulate=                                      :function:
+**** Inherited Function: =encapsulate=                                     :function:
 
 
 ***** Syntax
@@ -11105,7 +11154,7 @@ Called to encapsulate one packet within another.
 # link target: <<function end-module>>
 
 
-**** External Function: =end-module=                                       :function:
+**** Inherited Function: =end-module=                                      :function:
 
 
 ***** Syntax
@@ -11127,7 +11176,7 @@ Not documented.
 # link target: <<function enqueue>>
 
 
-**** External Function: =enqueue=                                          :function:
+**** Inherited Function: =enqueue=                                         :function:
 
 
 ***** Syntax
@@ -11149,7 +11198,7 @@ Add element x to end of queue q
 # link target: <<function erlang-k>>
 
 
-**** External Function: =erlang-k=                                         :function:
+**** Inherited Function: =erlang-k=                                        :function:
 
 
 ***** Syntax
@@ -11190,7 +11239,7 @@ sum up to Erlang.
 # link target: <<function exponential>>
 
 
-**** External Function: =exponential=                                      :function:
+**** Inherited Function: =exponential=                                     :function:
 
 
 ***** Syntax
@@ -11224,7 +11273,7 @@ context.
 # link target: <<function find-object>>
 
 
-**** External Function: =find-object=                                      :function:
+**** Inherited Function: =find-object=                                     :function:
 
 
 ***** Syntax
@@ -11252,7 +11301,7 @@ Finds the object with the given name. This function
 # link target: <<function finish>>
 
 
-**** External Function: =finish=                                           :function:
+**** Inherited Function: =finish=                                          :function:
 
 
 ***** Syntax
@@ -11278,7 +11327,7 @@ Called depth first for every /component/ at end of simulation. May bee used to f
 # link target: <<function for-each-channel>>
 
 
-**** External Function: =for-each-channel=                                 :function:
+**** Inherited Function: =for-each-channel=                                :function:
 
 
 ***** Syntax
@@ -11300,7 +11349,7 @@ Not documented.
 # link target: <<function for-each-child>>
 
 
-**** External Function: =for-each-child=                                   :function:
+**** Inherited Function: =for-each-child=                                  :function:
 
 
 ***** Syntax
@@ -11327,7 +11376,7 @@ Enables traversing the object tree, performing some
 # link target: <<function for-each-gate>>
 
 
-**** External Function: =for-each-gate=                                    :function:
+**** Inherited Function: =for-each-gate=                                   :function:
 
 
 ***** Syntax
@@ -11349,7 +11398,7 @@ Not documented.
 # link target: <<function for-each-submodule>>
 
 
-**** External Function: =for-each-submodule=                               :function:
+**** Inherited Function: =for-each-submodule=                              :function:
 
 
 ***** Syntax
@@ -11382,7 +11431,7 @@ to specialise this function to include them..
 # link target: <<function format-from-type>>
 
 
-**** External Function: =format-from-type=                                 :function:
+**** Inherited Function: =format-from-type=                                :function:
 
 
 ***** Syntax
@@ -11404,7 +11453,7 @@ Given a type declaration return a format declaration suitable for use in [[parse
 # link target: <<function from-gate>>
 
 
-**** External Function: =from-gate=                                        :function:
+**** Inherited Function: =from-gate=                                       :function:
 
 
 ***** Syntax
@@ -11426,7 +11475,7 @@ Not documented.
 # link target: <<function from-module>>
 
 
-**** External Function: =from-module=                                      :function:
+**** Inherited Function: =from-module=                                     :function:
 
 
 ***** Syntax
@@ -11448,7 +11497,7 @@ Not documented.
 # link target: <<function full-name>>
 
 
-**** External Function: =full-name=                                        :function:
+**** Inherited Function: =full-name=                                       :function:
 
 
 ***** Syntax
@@ -11473,7 +11522,7 @@ brackets;
 # link target: <<function full-path>>
 
 
-**** External Function: =full-path=                                        :function:
+**** Inherited Function: =full-path=                                       :function:
 
 
 ***** Syntax
@@ -11501,7 +11550,7 @@ returns full-name.
 # link target: <<function gamma-d>>
 
 
-**** External Function: =gamma-d=                                          :function:
+**** Inherited Function: =gamma-d=                                         :function:
 
 
 ***** Syntax
@@ -11558,7 +11607,7 @@ above paper.
 # link target: <<function gate>>
 
 
-**** External Function: =gate=                                             :function:
+**** Inherited Function: =gate=                                            :function:
 
 
 ***** Syntax
@@ -11581,7 +11630,7 @@ Look up a gate object on entity by address. For a
 # link target: <<function gate-direction>>
 
 
-**** External Function: =gate-direction=                                   :function:
+**** Inherited Function: =gate-direction=                                  :function:
 
 
 ***** Syntax
@@ -11603,7 +11652,7 @@ Return the direction of a gate object (either :input or :output).
 # link target: <<function gate-extend>>
 
 
-**** External Function: =gate-extend=                                      :function:
+**** Inherited Function: =gate-extend=                                     :function:
 
 
 ***** Syntax
@@ -11626,7 +11675,7 @@ inout gate-slot)
 # link target: <<function gate-size>>
 
 
-**** External Function: =gate-size=                                        :function:
+**** Inherited Function: =gate-size=                                       :function:
 
 
 ***** Syntax
@@ -11648,7 +11697,7 @@ Not documented.
 # link target: <<function gate-type>>
 
 
-**** External Function: =gate-type=                                        :function:
+**** Inherited Function: =gate-type=                                       :function:
 
 
 ***** Syntax
@@ -11670,7 +11719,7 @@ Return gate type for a gate slot - :input, :output or :inout
 # link target: <<function geometric>>
 
 
-**** External Function: =geometric=                                        :function:
+**** Inherited Function: =geometric=                                       :function:
 
 
 ***** Syntax
@@ -11708,7 +11757,7 @@ Generation uses inverse transform.
 # link target: <<function handle-message>>
 
 
-**** External Function: =handle-message=                                   :function:
+**** Inherited Function: =handle-message=                                  :function:
 
 
 ***** Syntax
@@ -11740,7 +11789,7 @@ normally expected.
 # link target: <<function handle-timer>>
 
 
-**** External Function: =handle-timer=                                     :function:
+**** Inherited Function: =handle-timer=                                    :function:
 
 
 ***** Syntax
@@ -11770,7 +11819,7 @@ specializer form for timer-name.
 # link target: <<function has-listeners>>
 
 
-**** External Function: =has-listeners=                                    :function:
+**** Inherited Function: =has-listeners=                                   :function:
 
 
 ***** Syntax
@@ -11802,7 +11851,7 @@ be more appropriate in most cases.
 # link target: <<function index>>
 
 
-**** External Function: =index=                                            :function:
+**** Inherited Function: =index=                                           :function:
 
 
 ***** Syntax
@@ -11824,7 +11873,7 @@ Not documented.
 # link target: <<function info>>
 
 
-**** External Function: =info=                                             :function:
+**** Inherited Function: =info=                                            :function:
 
 
 ***** Syntax
@@ -11850,7 +11899,7 @@ newline.
 # link target: <<function initialize>>
 
 
-**** External Function: =initialize=                                       :function:
+**** Inherited Function: =initialize=                                      :function:
 
 
 ***** Syntax
@@ -11896,7 +11945,7 @@ method to return true.
 # link target: <<function initialized-p>>
 
 
-**** External Function: =initialized-p=                                    :function:
+**** Inherited Function: =initialized-p=                                   :function:
 
 
 ***** Syntax
@@ -11923,7 +11972,7 @@ Returns true if an entity has finished its initialization using the
 # link target: <<function input>>
 
 
-**** External Function: =input=                                            :function:
+**** Inherited Function: =input=                                           :function:
 
 
 ***** Syntax
@@ -11945,7 +11994,7 @@ Not documented.
 # link target: <<function intuniform>>
 
 
-**** External Function: =intuniform=                                       :function:
+**** Inherited Function: =intuniform=                                      :function:
 
 
 ***** Syntax
@@ -11979,7 +12028,7 @@ context.
 # link target: <<function latency>>
 
 
-**** External Function: =latency=                                          :function:
+**** Inherited Function: =latency=                                         :function:
 
 
 ***** Syntax
@@ -12007,7 +12056,7 @@ difference between current [[simulation-time]] and the time the
 # link target: <<function listeners>>
 
 
-**** External Function: =listeners=                                        :function:
+**** Inherited Function: =listeners=                                       :function:
 
 
 ***** Syntax
@@ -12035,7 +12084,7 @@ If /signal/ is t return all listeners in /entity/.
 # link target: <<function lognormal>>
 
 
-**** External Function: =lognormal=                                        :function:
+**** Inherited Function: =lognormal=                                       :function:
 
 
 ***** Syntax
@@ -12071,7 +12120,7 @@ deviation.)
 # link target: <<function make-coord>>
 
 
-**** External Function: =make-coord=                                       :function:
+**** Inherited Function: =make-coord=                                      :function:
 
 
 ***** Syntax
@@ -12093,7 +12142,7 @@ Not documented.
 # link target: <<function may-have-listeners>>
 
 
-**** External Function: =may-have-listeners=                               :function:
+**** Inherited Function: =may-have-listeners=                              :function:
 
 
 ***** Syntax
@@ -12125,7 +12174,7 @@ eliminate uneccessary calculations of values and calls to [[emit]].
 # link target: <<function message>>
 
 
-**** External Function: =message=                                          :function:
+**** Inherited Function: =message=                                         :function:
 
 
 ***** Syntax
@@ -12147,7 +12196,7 @@ Not documented.
 # link target: <<function message-sent-signal-value-message>>
 
 
-**** External Function: =message-sent-signal-value-message=                :function:
+**** Inherited Function: =message-sent-signal-value-message=               :function:
 
 
 ***** Syntax
@@ -12169,7 +12218,7 @@ Return whether debug-block represents elsewhere code.
 # link target: <<function message-sent-signal-value-result>>
 
 
-**** External Function: =message-sent-signal-value-result=                 :function:
+**** Inherited Function: =message-sent-signal-value-result=                :function:
 
 
 ***** Syntax
@@ -12191,7 +12240,7 @@ Return whether debug-block represents elsewhere code.
 # link target: <<function message-sent-signal-value-timestamp>>
 
 
-**** External Function: =message-sent-signal-value-timestamp=              :function:
+**** Inherited Function: =message-sent-signal-value-timestamp=             :function:
 
 
 ***** Syntax
@@ -12212,7 +12261,7 @@ Not documented.
 # link target: <<function module>>
 
 
-**** External Function: =module=                                           :function:
+**** Inherited Function: =module=                                          :function:
 
 
 ***** Syntax
@@ -12234,7 +12283,7 @@ Not documented.
 # link target: <<function name>>
 
 
-**** External Function: =name=                                             :function:
+**** Inherited Function: =name=                                            :function:
 
 
 ***** Syntax
@@ -12256,7 +12305,7 @@ Not documented.
 # link target: <<function negbinomial>>
 
 
-**** External Function: =negbinomial=                                      :function:
+**** Inherited Function: =negbinomial=                                     :function:
 
 
 ***** Syntax
@@ -12293,7 +12342,7 @@ proportional to /n/).
 # link target: <<function network>>
 
 
-**** External Function: =network=                                          :function:
+**** Inherited Function: =network=                                         :function:
 
 
 ***** Syntax
@@ -12315,7 +12364,7 @@ Not documented.
 # link target: <<function nominal-datarate>>
 
 
-**** External Function: =nominal-datarate=                                 :function:
+**** Inherited Function: =nominal-datarate=                                :function:
 
 
 ***** Syntax
@@ -12349,7 +12398,7 @@ length of a lead-in signal to the duration.
 # link target: <<function normal>>
 
 
-**** External Function: =normal=                                           :function:
+**** Inherited Function: =normal=                                          :function:
 
 
 ***** Syntax
@@ -12379,7 +12428,7 @@ Returns a random variate from the normal distribution with the given
 # link target: <<function output>>
 
 
-**** External Function: =output=                                           :function:
+**** Inherited Function: =output=                                          :function:
 
 
 ***** Syntax
@@ -12401,7 +12450,7 @@ Not documented.
 # link target: <<function owner>>
 
 
-**** External Function: =owner=                                            :function:
+**** Inherited Function: =owner=                                           :function:
 
 
 ***** Syntax
@@ -12423,7 +12472,7 @@ Not documented.
 # link target: <<function parent-module>>
 
 
-**** External Function: =parent-module=                                    :function:
+**** Inherited Function: =parent-module=                                   :function:
 
 
 ***** Syntax
@@ -12445,7 +12494,7 @@ Return the parent module of this object - not always owner
 # link target: <<function pareto-shifted>>
 
 
-**** External Function: =pareto-shifted=                                   :function:
+**** Inherited Function: =pareto-shifted=                                  :function:
 
 
 ***** Syntax
@@ -12480,7 +12529,7 @@ Returns a random variate from the shifted generalized Pareto distribution.
 # link target: <<function path-end-gate>>
 
 
-**** External Function: =path-end-gate=                                    :function:
+**** Inherited Function: =path-end-gate=                                   :function:
 
 
 ***** Syntax
@@ -12502,7 +12551,7 @@ Return the last gate in the sequence of gates connected to a gate
 # link target: <<function path-start-gate>>
 
 
-**** External Function: =path-start-gate=                                  :function:
+**** Inherited Function: =path-start-gate=                                 :function:
 
 
 ***** Syntax
@@ -12524,7 +12573,7 @@ Return the first gate in the sequence of gates connected to a gate
 # link target: <<function peek>>
 
 
-**** External Function: =peek=                                             :function:
+**** Inherited Function: =peek=                                            :function:
 
 
 ***** Syntax
@@ -12547,7 +12596,7 @@ Return value of next element on set s without
 # link target: <<function poisson>>
 
 
-**** External Function: =poisson=                                          :function:
+**** Inherited Function: =poisson=                                         :function:
 
 
 ***** Syntax
@@ -12588,7 +12637,7 @@ Generation method depends on value of /lambda/:
 # link target: <<function probability-density-function>>
 
 
-**** External Function: =probability-density-function=                     :function:
+**** Inherited Function: =probability-density-function=                    :function:
 
 
 ***** Syntax
@@ -12611,7 +12660,7 @@ Returns the estimated value of the Probability
 # link target: <<function process-message>>
 
 
-**** External Function: =process-message=                                  :function:
+**** Inherited Function: =process-message=                                 :function:
 
 
 ***** Syntax
@@ -12676,7 +12725,7 @@ done before [[process-message]] is called.
 # link target: <<function property-union>>
 
 
-**** External Function: =property-union=                                   :function:
+**** Inherited Function: =property-union=                                  :function:
 
 
 ***** Syntax
@@ -12711,7 +12760,7 @@ appended onto end of list1 value.
 # link target: <<function queue>>
 
 
-**** External Function: =queue=                                            :function:
+**** Inherited Function: =queue=                                           :function:
 
 
 ***** Syntax
@@ -12733,7 +12782,7 @@ Not documented.
 # link target: <<function rand>>
 
 
-**** External Function: =rand=                                             :function:
+**** Inherited Function: =rand=                                            :function:
 
 
 ***** Syntax
@@ -12766,7 +12815,7 @@ number sequence stream in the range 0<= /x/ <= /limit/ . See also
 # link target: <<function range-getf>>
 
 
-**** External Function: =range-getf=                                       :function:
+**** Inherited Function: =range-getf=                                      :function:
 
 
 ***** Syntax
@@ -12815,7 +12864,7 @@ Property ranges are typically used to specify parameters that vary depending on 
 # link target: <<function range-list-p>>
 
 
-**** External Function: =range-list-p=                                     :function:
+**** Inherited Function: =range-list-p=                                    :function:
 
 
 ***** Syntax
@@ -12841,7 +12890,7 @@ Return true if =spec= is a valid range property list.
 # link target: <<function read-configuration>>
 
 
-**** External Function: =read-configuration=                               :function:
+**** Inherited Function: =read-configuration=                              :function:
 
 
 ***** Syntax
@@ -12918,7 +12967,7 @@ See ini files included with source code.
 # link target: <<function read-parameter>>
 
 
-**** External Function: =read-parameter=                                   :function:
+**** Inherited Function: =read-parameter=                                  :function:
 
 
 ***** Syntax
@@ -12944,7 +12993,7 @@ Loopup a fully named parameter from a configuration
 # link target: <<function receive-signal>>
 
 
-**** External Function: =receive-signal=                                   :function:
+**** Inherited Function: =receive-signal=                                  :function:
 
 
 ***** Syntax
@@ -12979,7 +13028,7 @@ All objects which wish to receive signals must specialise this method.
 # link target: <<function record>>
 
 
-**** External Function: =record=                                           :function:
+**** Inherited Function: =record=                                          :function:
 
 
 ***** Syntax
@@ -13010,7 +13059,7 @@ boolean for simple counting recorders.
 # link target: <<function register-signal>>
 
 
-**** External Function: =register-signal=                                  :function:
+**** Inherited Function: =register-signal=                                 :function:
 
 
 ***** Syntax
@@ -13060,7 +13109,7 @@ simulation code.
 # link target: <<function reinitialise-slots>>
 
 
-**** External Function: =reinitialise-slots=                               :function:
+**** Inherited Function: =reinitialise-slots=                              :function:
 
 
 ***** Syntax
@@ -13087,7 +13136,7 @@ in the slot definitions for the instance class
 # link target: <<function repair-signal-flags>>
 
 
-**** External Function: =repair-signal-flags=                              :function:
+**** Inherited Function: =repair-signal-flags=                             :function:
 
 
 ***** Syntax
@@ -13114,7 +13163,7 @@ must be called when the component's ownership changes.
 # link target: <<function report>>
 
 
-**** External Function: =report=                                           :function:
+**** Inherited Function: =report=                                          :function:
 
 
 ***** Syntax
@@ -13152,7 +13201,7 @@ termination time beforer any calls to [[report]]
 # link target: <<function rng-map>>
 
 
-**** External Function: =rng-map=                                          :function:
+**** Inherited Function: =rng-map=                                         :function:
 
 
 ***** Syntax
@@ -13174,7 +13223,7 @@ Not documented.
 # link target: <<function root-event>>
 
 
-**** External Function: =root-event=                                       :function:
+**** Inherited Function: =root-event=                                      :function:
 
 
 ***** Syntax
@@ -13196,7 +13245,7 @@ Not documented.
 # link target: <<function run-simulations>>
 
 
-**** External Function: =run-simulations=                                  :function:
+**** Inherited Function: =run-simulations=                                 :function:
 
 
 ***** Syntax
@@ -13239,7 +13288,7 @@ for each run are printed out.
 # link target: <<function schedule>>
 
 
-**** External Function: =schedule=                                         :function:
+**** Inherited Function: =schedule=                                        :function:
 
 
 ***** Syntax
@@ -13275,7 +13324,7 @@ future.
 # link target: <<function schedule-at>>
 
 
-**** External Function: =schedule-at=                                      :function:
+**** Inherited Function: =schedule-at=                                     :function:
 
 
 ***** Syntax
@@ -13331,7 +13380,7 @@ The preferred way of implementing timers is now provided using
 # link target: <<function scheduled-p>>
 
 
-**** External Function: =scheduled-p=                                      :function:
+**** Inherited Function: =scheduled-p=                                     :function:
 
 
 ***** Syntax
@@ -13353,7 +13402,7 @@ Not documented.
 # link target: <<function sec>>
 
 
-**** External Function: =sec=                                              :function:
+**** Inherited Function: =sec=                                             :function:
 
 
 ***** Syntax
@@ -13396,7 +13445,7 @@ in engineering format.
 # link target: <<function seed>>
 
 
-**** External Function: =seed=                                             :function:
+**** Inherited Function: =seed=                                            :function:
 
 
 ***** Syntax
@@ -13421,7 +13470,7 @@ random source to seed
 # link target: <<function self-message-p>>
 
 
-**** External Function: =self-message-p=                                   :function:
+**** Inherited Function: =self-message-p=                                  :function:
 
 
 ***** Syntax
@@ -13443,7 +13492,7 @@ Not documented.
 # link target: <<function send>>
 
 
-**** External Function: =send=                                             :function:
+**** Inherited Function: =send=                                            :function:
 
 
 ***** Syntax
@@ -13476,7 +13525,7 @@ the /message/.
 # link target: <<function send-direct>>
 
 
-**** External Function: =send-direct=                                      :function:
+**** Inherited Function: =send-direct=                                     :function:
 
 
 ***** Syntax
@@ -13545,7 +13594,7 @@ For messages that are not packets the /duration/ must be zero.
 # link target: <<function sent-time>>
 
 
-**** External Function: =sent-time=                                        :function:
+**** Inherited Function: =sent-time=                                       :function:
 
 
 ***** Syntax
@@ -13567,7 +13616,7 @@ Not documented.
 # link target: <<function serialise>>
 
 
-**** External Function: =serialise=                                        :function:
+**** Inherited Function: =serialise=                                       :function:
 
 
 ***** Syntax
@@ -13589,7 +13638,7 @@ Serialise an object into a stream. Fur future use.
 # link target: <<function set-slots>>
 
 
-**** External Function: =set-slots=                                        :function:
+**** Inherited Function: =set-slots=                                       :function:
 
 
 ***** Syntax
@@ -13617,7 +13666,7 @@ slot name and the second element is the value to set the slot to.
 # link target: <<function set-timer>>
 
 
-**** External Function: =set-timer=                                        :function:
+**** Inherited Function: =set-timer=                                       :function:
 
 
 ***** Syntax
@@ -13661,7 +13710,7 @@ this case the slot definition should definine (make-instance
 # link target: <<function signal-id>>
 
 
-**** External Function: =signal-id=                                        :function:
+**** Inherited Function: =signal-id=                                       :function:
 
 
 ***** Syntax
@@ -13683,7 +13732,7 @@ Return the integer id of the named signal.
 # link target: <<function sim-time-limit>>
 
 
-**** External Function: =sim-time-limit=                                   :function:
+**** Inherited Function: =sim-time-limit=                                  :function:
 
 
 ***** Syntax
@@ -13705,7 +13754,7 @@ Not documented.
 # link target: <<function simulation-time>>
 
 
-**** External Function: =simulation-time=                                  :function:
+**** Inherited Function: =simulation-time=                                 :function:
 
 
 ***** Syntax
@@ -13727,7 +13776,7 @@ Return the simulation time of the current running simulation.
 # link target: <<function size>>
 
 
-**** External Function: =size=                                             :function:
+**** Inherited Function: =size=                                            :function:
 
 
 ***** Syntax
@@ -13749,7 +13798,7 @@ Return the number of elements stored in a data structure
 # link target: <<function stop>>
 
 
-**** External Function: =stop=                                             :function:
+**** Inherited Function: =stop=                                            :function:
 
 
 ***** Syntax
@@ -13780,7 +13829,7 @@ Stop the /simulation/. If /abort/ is teu this will stop immediately by killing t
 # link target: <<function student-t>>
 
 
-**** External Function: =student-t=                                        :function:
+**** Inherited Function: =student-t=                                       :function:
 
 
 ***** Syntax
@@ -13816,7 +13865,7 @@ Generation is using relationship to gamma and [[chi-square]].
 # link target: <<function submodule>>
 
 
-**** External Function: =submodule=                                        :function:
+**** Inherited Function: =submodule=                                       :function:
 
 
 ***** Syntax
@@ -13854,7 +13903,7 @@ error if there is no such named submodule.
 # link target: <<function subscribe>>
 
 
-**** External Function: =subscribe=                                        :function:
+**** Inherited Function: =subscribe=                                       :function:
 
 
 ***** Syntax
@@ -13886,7 +13935,7 @@ undefined.
 # link target: <<function subscribed-p>>
 
 
-**** External Function: =subscribed-p=                                     :function:
+**** Inherited Function: =subscribed-p=                                    :function:
 
 
 ***** Syntax
@@ -13920,7 +13969,7 @@ at listeners subscribed at ancestor components).
 # link target: <<function timer>>
 
 
-**** External Function: =timer=                                            :function:
+**** Inherited Function: =timer=                                           :function:
 
 
 ***** Syntax
@@ -13950,7 +13999,7 @@ component will be search for the named timer.
 # link target: <<function timestamp>>
 
 
-**** External Function: =timestamp=                                        :function:
+**** Inherited Function: =timestamp=                                       :function:
 
 
 ***** Syntax
@@ -13972,7 +14021,7 @@ Not documented.
 # link target: <<function timestamped-time>>
 
 
-**** External Function: =timestamped-time=                                 :function:
+**** Inherited Function: =timestamped-time=                                :function:
 
 
 ***** Syntax
@@ -13994,7 +14043,7 @@ Not documented.
 # link target: <<function timestamped-value>>
 
 
-**** External Function: =timestamped-value=                                :function:
+**** Inherited Function: =timestamped-value=                               :function:
 
 
 ***** Syntax
@@ -14016,7 +14065,7 @@ Return whether debug-block represents elsewhere code.
 # link target: <<function title>>
 
 
-**** External Function: =title=                                            :function:
+**** Inherited Function: =title=                                           :function:
 
 
 ***** Syntax
@@ -14042,7 +14091,7 @@ Return the publishable title for a result from a [[statistic-listener]]. Declare
 # link target: <<function to-gate>>
 
 
-**** External Function: =to-gate=                                          :function:
+**** Inherited Function: =to-gate=                                         :function:
 
 
 ***** Syntax
@@ -14064,7 +14113,7 @@ Not documented.
 # link target: <<function to-module>>
 
 
-**** External Function: =to-module=                                        :function:
+**** Inherited Function: =to-module=                                       :function:
 
 
 ***** Syntax
@@ -14085,7 +14134,7 @@ Not documented.
 # link target: <<function transmission-channel>>
 
 
-**** External Function: =transmission-channel=                             :function:
+**** Inherited Function: =transmission-channel=                            :function:
 
 
 ***** Syntax
@@ -14112,7 +14161,7 @@ Typically invoked on an output gate, this method
 # link target: <<function transmission-finish-time>>
 
 
-**** External Function: =transmission-finish-time=                         :function:
+**** Inherited Function: =transmission-finish-time=                        :function:
 
 
 ***** Syntax
@@ -14144,7 +14193,7 @@ simulation time.
 # link target: <<function triang>>
 
 
-**** External Function: =triang=                                           :function:
+**** Inherited Function: =triang=                                          :function:
 
 
 ***** Syntax
@@ -14180,7 +14229,7 @@ Generation uses inverse transform.
 # link target: <<function truncnormal>>
 
 
-**** External Function: =truncnormal=                                      :function:
+**** Inherited Function: =truncnormal=                                     :function:
 
 
 ***** Syntax
@@ -14219,7 +14268,7 @@ returned will have a different mean and standard deviation.
 # link target: <<function uniform>>
 
 
-**** External Function: =uniform=                                          :function:
+**** Inherited Function: =uniform=                                         :function:
 
 
 ***** Syntax
@@ -14251,7 +14300,7 @@ Returns a random variate /x/ =double float= with uniform distribution in the ran
 # link target: <<function unsubscribe>>
 
 
-**** External Function: =unsubscribe=                                      :function:
+**** Inherited Function: =unsubscribe=                                     :function:
 
 
 ***** Syntax
@@ -14281,7 +14330,7 @@ given listener was not subscribed using [[subscribe]].
 # link target: <<function urandom>>
 
 
-**** External Function: =urandom=                                          :function:
+**** Inherited Function: =urandom=                                         :function:
 
 
 ***** Syntax
@@ -14308,7 +14357,7 @@ Return an integer /size/ octets long read from the system random stream
 # link target: <<function weibull>>
 
 
-**** External Function: =weibull=                                          :function:
+**** Inherited Function: =weibull=                                         :function:
 
 
 ***** Syntax
