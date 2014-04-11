@@ -105,8 +105,10 @@ is true."
                  (list it)))
     ,lst))
 
+
+
 (defmacro for ((var start stop) &body body)
-  "* Arguments
+ "* Arguments
 - var ::  a variable name (not evaluated)
 - start :: an integer (evaluated)
 - stop :: an integer (evaluated)
@@ -117,12 +119,12 @@ is true."
 Iterate from the value supplied by =start= upto but not including the
 value supplied by =end= setting =var= to each value in turn before
 evaluating the +body+"
-(loop
   (let ((gstop (gensym)))
     `(do ((,var ,start (1+ ,var))
           (,gstop ,stop))
       ((>= ,var ,gstop))
-      ,@body))))
+      ,@body)))
+
 
 (defun set-slots(instance defs)
 "* Arguments
