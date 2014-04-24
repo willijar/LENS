@@ -40,7 +40,9 @@
    (send-packet
     :type timer-message :initform (make-instance 'timer-message)))
   (:metaclass module-class)
-  (:documentation "Application that will generate packets at specified rate"))
+  (:documentation "Application module that will generate
+  [[packets-per-node]] packets at intervals of [[packets-per-spacing]]
+  - useful to determine connectivity statistics of a network."))
 
 (defmethod startup((application connectivity-map))
   (call-next-method)

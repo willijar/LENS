@@ -2,7 +2,8 @@
 
 (defclass wsn-packet(packet)
   ((header-overhead
-    :initform 0 :accessor header-overhead :initarg :header-overhead :initarg :byte-length
+    :initform 0 :accessor header-overhead :initarg :header-overhead
+    :initarg :byte-length
     :documentation "In bytes")
    (source :initarg :source :accessor source
            :documentation "the  source address of the received packet")
@@ -12,7 +13,10 @@
    (sequence-number :initarg :seqnum :initarg :sequence-number
                     :reader sequence-number
                     :documentation "a field to distinguish between packets"))
-  (:documentation "Base class for network and link layer packets"))
+  (:documentation "Base class for network and link layer packets. Have
+  a [[source]] and [[destination]] address relevant to the protocol
+  layer and a [[header-overhead]]. Also provides [[sequence-number]]
+  for identifying packets."))
 
 (defmethod print-object((instance wsn-packet) stream)
   (print-unreadable-object(instance stream :type t :identity nil)
@@ -54,8 +58,15 @@
    (header-overhead
     :type integer :parameter t :initform 10 :reader header-overhead
     :properties (:units "B")
-    :documentation "in bytes"))
-  (:metaclass module-class))
+    :documentation "The overhead added to encapsulated packets in
+    bytes"))
+  (:metaclass module-class)
+  (:documentation "Base class for all WSN [[communications]]
+  submodules. This provides a =header-overhead= parameter specifying
+  the default overhead for packets, a [[packet-buffer]] transmission
+  buffer for packets of maximum size specified by the =buffer-size=
+  parameter and a [[history-buffer]] for implementing the
+  [[duplicate-p]] to determine if we are receiving a duplicate packet."))
 
 (defmethod handle-message :around ((module comms-module) (message message))
   (unless (disabled-p module) (call-next-method)))
@@ -78,13 +89,28 @@
     (emit buffer 'buffer-length buffer)))
 
 (defgeneric state(instance)
-  (:documentation "Return current state of instance"))
+  (:documentation "* Arguments
 
-(defgeneric set-state(state-machine state &optional description)
-  (:documentation "Set new state of a protocol
-  implementation. Description may be used to add comments for
-  tracing. print-state-transitions parameter slot switches on tracing of this.
-state is stored in slate slot.")
+- instance :: an object with state handling.
+
+* Description
+
+Return current state identifier of /instance/"))
+
+(defgeneric set-state(instance state &optional description)
+  (:documentation "* Arguments
+
+- instance :: an module with state handling.
+- state :: a new state identifier
+- description :: a /string/ description of reason for state change.
+
+* Description
+
+For modules with the [print-state-transitions] parameter and the
+[[state]] slot update the /state/ slot to new value and if
+[[print-state-transitions]] is true print the change using
+[[tracelog]].  /description/ may be used to add comments for
+tracing.")
   (:method((instance wsn-module) new-state &optional description)
     (with-slots(state print-state-transitions) instance
       (unless (eql state new-state)

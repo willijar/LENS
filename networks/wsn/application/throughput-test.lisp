@@ -23,9 +23,6 @@
 
 ;;; Commentary:
 
-;; This transmits packets of given size and at given rate after specified
-;; startupo-delay. next-recipient may be used to set up static routing
-
 ;;; Code:
 (in-package :lens.wsn)
 
@@ -56,7 +53,10 @@
                :title "packets received per sender node"
                :default (indexed-count))
   (:metaclass module-class)
-  (:documentation "Application that will generate packets at specified rate"))
+  (:documentation "This transmits packets of [[payload-overhead]] and
+[[header-overhead]] size and at given [[packet-rate]] after specified
+[[startup-delay]]. [[next-recipient]] may be used to set up static
+routing"))
 
 (defmethod startup((application throughput-test))
   (call-next-method)

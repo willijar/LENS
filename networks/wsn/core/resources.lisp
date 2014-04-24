@@ -28,18 +28,13 @@
 ;;; Code:
 (in-package :lens.wsn)
 
-(defclass ram-store(message)
-  ((num-bytes :initarg :num-bytes :reader num-bytes
-              :documentation "Use -ve value to free ram"))
-  (:documentation "Message to change ram used"))
-
 (register-signal
  'power-change
- "Sent by a module to indicate a new power consumption level (in W)")
+ "Emitted by a [[wsn-module]] to indicate a new power consumption level (in W) for this module.")
 
 (register-signal
  'energy-consumed
- "Sent every time an energy consumption is calculated")
+ "Emitted every time an energy consumption is calculated.")
 
 (defclass resources(wsn-module)
   ((ram-size
@@ -82,11 +77,20 @@
     :type message :reader periodic-update-message
     :initform (make-instance 'message :name 'resource-periodic-update))
    (clock-drift :reader clock-drift
-                :documentation "Actual clock drift for this module")
-   (disabled-p :type boolean :initform t :accessor disabled-p))
+                :documentation "Actual clock drift for this module initialised from [[clock-drift-sigma]] parameter."))
   (:properties
      :statistic (energy-consumed :title "Consumed Energy" :default (sum)))
-  (:metaclass module-class))
+  (:metaclass module-class)
+  (:dcumentation "Module representing resource constraints on a
+  [[node]] including power consumption, clock-drift and ram-usage (not
+  currently used). This module subscribes to the [[power-change]] and
+  [[energy-consumed]] signal events. Node modules which consume power
+  should emit [[power-change]] when they change power level (and on
+  initalization stage 1 to set initial power) so that this module can
+  track over power consumption and may emit [[energy-consumed]] to
+  signal a discrete use of energy. This module also hadnls clock-drift
+  for the module by providing implementation of
+  [[get-simulation-time]] and [[get-clock]] for the module."))
 
 (defmethod initialize-instance :after
     ((module resources) &key &allow-other-keys)
@@ -142,6 +146,7 @@
      (call-next-method))))
 
 (defun ram-store(instance num-bytes)
+  "Record the change in use of ram"
    (with-slots(total-ram-data ram-size) instance
      (cond
        ((> (+ total-ram-data num-bytes) ram-size)

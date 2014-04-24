@@ -31,11 +31,16 @@
 (in-package :lens.wsn)
 
 (defstruct cell
+  "An area of radio coverage with the list
+of nodes wthin it and a list of [[path-loss]] records to other
+cells."
   (coord (make-coord) :type coord)
   (occupation nil :type list)
   (path-loss nil :type list))
 
 (defstruct path-loss
+  "Record of path-loss to another [[cell]]. Includes observation time
+information for temporal modelling as well as static /avg-path-loss/."
   (destination nil :type (or cell nil))
   (avg-path-loss 0.0 :type real)
   (last-observed-difference-from-avg 0.0 :type float)
@@ -43,16 +48,33 @@
 
 (register-signal
  'fade-depth
- "Signaled to record changes in signal power")
+ "Signaled to record temporal changes in signal power")
 
 (defgeneric run-temporal-model(model time signal-variation)
-  (:documentation "Given a time period and signal-variation return new
-signal variation and the time processed"))
+  (:documentation "* Arguments
+
+- model :: a [[temporal-model]] module
+- time :: a [[time-type]]
+- signal-variation :: a [[real]]
+
+* Description
+
+Given a time interval /time/ since the last estimate and the previous
+/signal-variation/ from /model/ return the new /signal-variation/ and
+the amount of time processed (i.e. the amount to be take off
+/time/)"))
 
 (defgeneric path-loss-signal-variation(model path-loss)
-  (:documentation "Given a temporal model and path loss structure run
-  the temporal model, updating the path-loss structure and returning
-  the new signal variation.")
+  (:documentation "* Arguments
+
+- model :: a [[temporal-model]] module
+- path-loss :: a [[path-loss]] structure
+
+* Description
+
+Given a temporal /model/ and /path-loss/ structure run the temporal
+model using [[run-temporal-model]], updating the path-loss structure
+and returning the new signal variation.")
   (:method :around (model path-loss)
        (let ((*context* model)) (call-next-method)))
   (:method(model (path-loss path-loss))
@@ -216,17 +238,21 @@ channel module"
                       no-cells)))
        t))))
 
-;; we encapsulate transmitted data in wireless-end message
-
 (defclass wireless-signal-start(message)
   ((src :initarg :src :reader src
        :documentation "Source ID for this signal")
-   (power-dBm :type real :initarg :power-dBm :accessor power-dBm)
+   (power-dBm :type real :initarg :power-dBm :accessor power-dBm
+              :documentation "Power level of the signal at recever.")
    (carrier-frequency :type real :initarg :carrier-frequency
                       :reader carrier-frequency)
    (bandwidth :type real :initarg :bandwidth :reader bandwidth)
-   (modulation :initarg :modulation :reader modulation)
-   (encoding :initarg :encoding :reader encoding)))
+   (modulation :initarg :modulation :reader modulation
+               :documentation "Modulation format of signal")
+   (encoding :initarg :encoding :reader encoding
+             :documentation "Encoding of signal"))
+  (:documentation "Message used to record the start of reception of a
+  radio signal at one [[cell]] from another. Data is encapsulated in
+  [[wireless-end]] packet"))
 
 (defmethod print-object((msg wireless-signal-start) os)
   (print-unreadable-object(msg os :type t :identity nil)
@@ -243,7 +269,11 @@ channel module"
   ((src :initarg :src :reader src
         :documentation "Source ID must match signal start source id")
    (header-overhead :type integer :initform 0 :reader header-overhead
-                    :initarg :header-overhead)))
+                    :initarg :header-overhead))
+  (:documentation "Packet message used to record end of the
+  transmission of a signal from one [[cell]] to another. Encapsulates
+  the transmitted data packet. [[header-overhead]] is the physical
+  layer overhead in byte-lengths e.g. for framing etc."))
 
 (defmethod byte-length((pkt wireless-signal-end))
   (+ (header-overhead pkt)

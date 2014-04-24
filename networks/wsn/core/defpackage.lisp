@@ -32,7 +32,11 @@
 (in-package :cl-user)
 
 (defpackage :lens.wsn
-  (:documentation "LENS Wireless Sensor Networks")
+  (:documentation "A simulation package for Wireless Sensor Networks
+  with interfaces and implementations for representing from physical
+  processes, sensors, applications, communications (network, MAC and
+  radio) and a wireless channel model including interference,
+  asymetric bidirectional loss and temporal fading.")
   (:use :cl :cl-user :lens)
   (:shadowing-import-from :lens #:duration)
   (:export
@@ -81,6 +85,7 @@
    #:carrier-sense-interrupt
    ;; mobility
    #:mobility #:location #:cell #:theta #:phi
+   #:line-mobility #:no-mobility
    ;; top level network
    #:wsn #:field #:num-nodes #:deployment #:physical-processes
    #:nodes #:wireless-channel
@@ -88,6 +93,7 @@
    #:num-sensors #:network-address #:sensors
    ;; physical process
    #:physical-process #:description #:measure
+   #:direct-node-physical-process #:scenario-physical-process
    ;; resources
    #:resources #:draw-power #:ram-store #:ram-size #:flash-size #:clock-drift
    #:get-simulation-time #:get-clock
@@ -101,6 +107,10 @@
    #:bypass-routing
    #:multipath-rings-routing
    #:leach-routing
+   ;; application implementations
+   #:connectivity-map #:simple-aggregation #:throughput-test
+   #:value-propagation #:value-reporting
+
 ))
 
 (pushnew :castelia-compatability *features*)

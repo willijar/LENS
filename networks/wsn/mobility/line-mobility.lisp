@@ -29,10 +29,12 @@
 (in-package :lens.wsn)
 
 (defclass line-mobility(mobility)
-  ((start-location :type coord :reader start-location)
+  ((start-location :type coord :reader start-location
+                   :documentation "Starting location coordinate")
    (destination
     :parameter t :type coord :initform (make-coord 1.0 1.0)
-    :initarg :destination-location)
+    :initarg :destination-location
+    :documentation "End location coordinate.")
    (delta :type coord :documentation "Vector delta from start to end")
    (distance :type real
              :documentation "Distance from start to end")
@@ -40,9 +42,12 @@
           :documentation "Speed of motion")
    (update-interval
     :parameter t :type time-type :reader update-interval :initform 1d0
-    :documentation "Interval for position updates along trajectory")
+    :documentation "Time tnterval for position updates along trajectory")
    (update :type timer-message :initform (make-instance 'timer-message)))
   (:metaclass module-class)
+  (:documentation "[[mobility]] module for movement backwards and
+  forwards along a straight line between [[start-location]] and
+  [[destination-location]].")
   (:default-initargs :static-p nil))
 
 (defmethod initialize-instance :after ((instance line-mobility)

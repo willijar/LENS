@@ -30,6 +30,8 @@
 (in-package :lens.wsn)
 
 (defstruct orientation
+  "Structure representing orientation of a node - may useful if
+directional antennas are to be modelled."
   (phi 0.0 :type float :read-only t)
   (theta 0.0 :type float :read-only t))
 
@@ -44,28 +46,66 @@
 
 (defclass mobility(wsn-module)
   ((location :type coord :parameter t :initarg :location :reader location
-             :documentation "current location initalized from parameter file")
+             :documentation "Initial location [[coord]] for node.")
    (orientation
     :type orientation :parameter t :initarg :orientation :reader orientation
     :initform (make-orientation)
-    :documentation "current orientation initialized from parameter gile")
-   (static-p :initform t :initarg :static-p :reader static-p))
-  (:metaclass module-class))
+    :documentation "Initial [[orientation]] for [[node]]")
+   (static-p :initform t :initarg :static-p :reader static-p
+             :documentation "If true (default) this the node is
+             static. Subclasses should specialise this
+             appropriately."))
+  (:metaclass module-class)
+  (:documentation "* Description
+
+Superclass for [[mobility]] submodules of a [[node]] handling node
+mobility. Base class of this initialises the location from the
+[[deployment]] pand [[field]] arameters of the network to initialise
+all node positions for static nodes. Deployment takes the current
+forms.
+
+* Network Parameters
+
+- field :: a /list/ of the /x/, /y/ and optionally /z/ sizes of the network in m
+- deployment :: a symbol /deployment-type/ for the whole network
+       or a [[range-list]] mapping node ids to the /deployment-type/
+       to nodes.
+
+* Deployment Types
+
+Specify how nodes are located over the network [[field]].
+
+- uniform :: random uniform deployment over entire field.
+- center :: located in the center of the field
+- (grid dx dy dz) :: nodes are located on a grid with cell dimensions (dz dy dz)
+- (randomized dx dy dz) :: nodes are randomly located withing
+   the cells of dimensions (dx dy dz)
+"))
 
 (defmethod initialize-instance :after ((instance mobility)
                                        &key &allow-other-keys)
   (unless (slot-boundp instance 'location)
     (parse-deployment instance)))
 
-(defgeneric (setf location)(location instance)
-  (:documentation "Change location in mobility manager")
+(defgeneric (setf location)(location module)
+  (:documentation "* Arguments
+
+- location :: a [[coord]]
+- module :: a [[mobility]] module
+
+* Description
+
+Updates the position of the node of the mboility module. Emits the
++node-move+ signal with the new locations for modules which need to
+now about changes in location (such as [[wireless-channel]] or
+[[sensor]]) to [[subscribe]] to.")
   (:method((location coord) (instance mobility))
     (assert (not (static-p instance))
             ()
             "Attempt to change location of static node ~A" (node instance))
     (tracelog "changed location to ~A" location)
     (setf (slot-value instance 'location) location)
-    (emit instance 'node-move)
+    (emit instance 'node-move location)
     location))
 
 (defmethod initialize list ((instance mobility) &optional (stage 0))

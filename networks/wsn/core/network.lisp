@@ -32,21 +32,32 @@
   ((field :parameter t
           :type coord :reader field
           :initform (make-coord 30.0d0 30.0d0)
-          :documentation "Size of deployment field")
+          :documentation "Size of network deployment field")
    (num-nodes :parameter t :type fixnum :reader num-nodes
-              :initform 30 :documentation "Number of nodes")
+              :initform 30 :documentation "Number of nodes in network")
    (num-physical-processes :parameter t :type fixnum
                            :reader num-physical-processes :initform 1
                            :documentation "Number of physical processes")
    (deployment :parameter t :type list :reader deployment :initform 'uniform
                :properties (:format read)
-               :documentation "Node deployment spec"))
+               :documentation "Node deployment specification. See [[mobility]] module on valid values for this and it's semantics."))
   (:metaclass compound-module-class)
   (:submodules
    ;; order matters here as nodes config depends on physical processes
    (wireless-channel wireless-channel)
    (physical-processes num-physical-processes physical-process)
-   (node num-nodes node)))
+   (node num-nodes node))
+  (:documentation "Network for all Wirelesss sensor networks bringing
+  together a [[wireless-channel]], a set of sensing [[nodes]]
+  representing motes and a number of [[physical-process]]s being
+  sensed.."))
 
 (defgeneric nodes(network)
+  (::documentation "* Arguments
+
+- network :: a network
+
+* Description
+
+Returns a vector of all nodes in the wireless sensor network.")
   (:method((network WSN)) (submodule network 'node)))

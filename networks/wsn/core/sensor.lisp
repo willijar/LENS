@@ -29,6 +29,8 @@
 (in-package :lens.wsn)
 
 (defstruct measurement
+  "Structure representing a discrete measurement (with noise etc) by a
+specific sensor"
   (location (make-coord) :type coord :read-only t)
   (time (simulation-time) :type time-type )
   (value 0 :type real)
@@ -36,47 +38,51 @@
 
 (defclass sensor-message(message)
   ((measurement :type measurement :initform nil :initarg :measurement
-                :accessor measurement)))
+                :accessor measurement))
+  (:documentation "Message sent by a [[sensor]] to its' application
+  gate when it has completed a measurement"))
+
 
 (defclass sensor(wsn-module)
-  ((owner :reader node)
-   (power-consumption
+  ((power-consumption
     :parameter t :initform 0.02 :reader power-consumption
     :initarg :power-consumption :type float
-    :documentation "Power consumption for this sensor")
+    :documentation "Power consumption for this sensor in mJ")
    (physical-process-id
     :parameter t :type integer :reader physical-process-id
     :initarg :physical-process-id
-    :documentation "Index of the physical process being measured")
+    :documentation "Index of the physical process being measured by this sensor")
    (physical-process
     :type physical-process :reader physical-process
-    :documentation "Actual physical process instance")
+    :documentation "Actual physical process instance being measured by
+    this sensor.")
    (measurand
     :parameter t :initform 'temperature :reader measurand
-    :documentation "Type of sensor e.g. humidity, temperature, light etc")
+    :documentation "Type of reading from physical process
+    e.g. humidity, temperature, light etc")
    (bias
     :parameter t :initform (normal 0 0.1 0)
     :initarg :bias :reader bias :format number-or-expression
-    :documentation "Device offset reading")
+    :documentation "Sensor Device offset reading")
    (noise
     :parameter t ::volatile t :initform (normal 0 0.1 1)
     :reader noise :initarg :noise :type float
-    :documentation "stddev of Gaussian Noise for device")
+    :documentation "stddev of Gaussian Noise for sensor")
    (sensitivity
     :parameter t :initform 0 :reader sensitivity :type float
-    :documentation "holds the minimum value which can be sensed by
+    :documentation "The minimum value which can be sensed by
     each sensing device.")
    (resolution
     :parameter t :initform 0.001 :reader resolution :type float
-    :documentation "holds the sensing resolution. the returned value
-     will always be a multiple of number, given here")
+    :documentation "The sensing resolution. the returned value
+     will always be a multiple of this value.")
    (saturation
     :parameter t :initform 1000 :reader saturation :type float
-    :documentation "holds the saturation value for each sensing device")
+    :documentation "The saturation value for each sensing device")
    (last-measurement :type measurement :accessor last-measurement)
    (sample-interval
     :parameter t :initform 0 :type real :reader sample-interval
-    :documentation "Interval between regular samples or 0 if not
+    :documentation "Time interval between regular samples or 0 if not
     continually sampling")
    (measurement-delay
     :parameter t :initform 100e-6 :type real :reader measurement-delay
@@ -90,9 +96,9 @@
    (application :inout))
   (:metaclass module-class)
   (:default-initargs :num-rngs 2)
-  (:documentation "Module representing a single sensor. Sensors may
-  either operate in continual sampling mode or in responsive mode (if
-  sample-interval is 0).
+  (:documentation "Module representing a single sensor on a
+  [[node]]. Sensors may either operate in continual sampling mode or
+  in responsive mode (if sample-interval is 0).
 
 In responsive mode there will be measurement-delay delay between
 request message and sending back a reading message. If in sampling mode
@@ -122,6 +128,7 @@ thern the message will correspond to the last sampled time."))
      nil)
     (1
      ;; emit must be stage 1 so all listeners subscribed
+     ;; castelia doesn't record this correctly
      #-castelia-compatability
      (emit sensor 'power-change (power-consumption sensor))
      t)))
@@ -142,7 +149,7 @@ thern the message will correspond to the last sampled time."))
     (cancel (measurement-timer sensor))))
 
 (defun sensor-measurement(sensor)
-  "Sensor value at this time"
+  "Return a sensor value reading at this time"
   (let* ((location (location (node sensor)))
          (time (simulation-time))
          (value (measure (physical-process sensor) (measurand sensor)
@@ -185,7 +192,7 @@ thern the message will correspond to the last sampled time."))
         (setf (measurement message) (sensor-measurement sensor))
         (set-timer sensor message (measurement-delay sensor)))
        (t
-        ;; we are sampling so put return last-measurement in message
+        ;; we are sampling so return last-measurement in message
         (setf (measurement message) (last-measurement sensor))
         (send sensor message 'application))))
     (t

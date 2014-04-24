@@ -32,14 +32,30 @@
   ((k :parameter t :type real :initform 0.25 :initarg :k
                      :documentation "multiplicative parameter (k)")
    (a :parameter t :type real :initform 1.0 :initarg :a
-                      :documentation "attenuation exponent (a)")
+                      :documentation "exponential attenuation exponent (a) for values vs distance*/k/")
    (sources :parameter t :type list :properties (:format read)
             :reader sources
-            :documentation "List showing how sources evolve over time"
+            :documentation "List of lists showing how sources evolve
+            over time. Each source is represented as a coordinate and
+            a list of conses of times and values in order."
             :initform
             `((,(make-coord 10.0 10.0) (0.0 . 30.5) (5.0 . 45) (12.0 . 7.3)))))
   (:default-initargs :description "fire")
-  (:metaclass module-class))
+  (:metaclass module-class)
+  (:documentation "A Physical process made up of a number of discrete
+physical sources whose output evolves over time. The effect of
+multiple sources in a certain point is additive. At a certain location
+and time the physical process value is given by
+
+\\begin{equation}
+V(p,t) = \\sum_{i=\\text{all sources}} \\frac{V_i(t)}{(K d_i(p_i,t))^a}
+\\end{equation}
+
+where $V(p,t)$ denotes the value of the physical process at point $p$
+and time $t$, $V_i(t)$ denotes the value of the $i^{th}$ source at time
+$t$, $K$ and $a$ are specified by module parameters [[k]] and [[a]]
+that determine how the value from a source diffused.
+"))
 
 (defmethod measure((process scenario-physical-process)
                    (measurand (eql 'temperature))

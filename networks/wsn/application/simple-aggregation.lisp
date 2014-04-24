@@ -46,7 +46,10 @@
    (last-sensed-value :type real :initform 0.0)
    (aggregated-value :type real :initform 0.0))
   (:metaclass module-class)
-  (:documentation "Application that will generate packets at specified rate"))
+  (:documentation "Application providing an example of sensor reading
+ aggregation with [[multipath-rings]] routing. The aggregated value is
+ maximum of its sensor reading and received sensor reading from nodes
+ further away (at higher level) in [[multipath-rings]] routing."))
 
 (defmethod startup((instance simple-aggregation))
   (call-next-method)

@@ -32,10 +32,12 @@
   ((rssi :type double-float :initarg :rssi :accessor rssi
          :documentation "the RSSI of the received packet")
    (lqi :type double-float :initarg :lqi :accessor lqi ;
-        :documentation "the LQI of the received packet")))
+        :documentation "the LQI of the received packet"))
+  (:documentation "Control information from radi to mac layers (RSSI or LQI)"))
 
 (defclass mac-packet(wsn-packet)
-  ())
+  ()
+  (:documentation "Base class for all mac-layer packet types."))
 
 (defmethod print-object((p mac-packet) stream)
    (print-unreadable-object(p stream :type t)
@@ -56,9 +58,6 @@
     :documentation "in bytes")
    (address :parameter t :type integer :reader mac-address
             :documentation "MAC address - will default to nodeid.")
-   ;; physical layer parameters
-   (phy-delay-for-valid-cs :parameter t :initform 0.128e-3
-                           :type time-type :reader phy-delay-for-valid-cs)
    (radio :reader radio))
   (:properties
    :statistic (mac-packet-breakdown :default (indexed-count)))
@@ -66,7 +65,13 @@
   (:gates
    (routing :inout)
    (radio :inout))
-  (:metaclass module-class))
+  (:metaclass module-class)
+  (:documentation "Base class for all mac layer module
+  implementations. Connects to [[radio]] submodule and [[routing]]
+  submodule in the [[communications]] module. Has a [[mac-address]]
+  physical layer adress for this device (defaults to the [[nodeid]]
+  and a [[max-mac-frame-size]] specifyin largest packet size
+  accepted."))
 
 (defmethod initialize list ((instance mac) &optional stage)
   (case stage
@@ -78,7 +83,15 @@
   t)
 
 (defgeneric tx-time(entity no-octets)
-  (:documentation "Return the transmission time for no-octets on entity")
+  (:documentation "* Arguments
+
+- entity :: a [[radio]] or [[mac]] module
+- no-octets :: an /integer/ or [[mac-packet]]
+
+* Description
+
+Return the transmission time for /no-octets/ octets or a packet from
+/entity/ taking account of transmission rate.")
   (:method ((mac mac) (no-octets integer))
     (tx-time (radio mac) no-octets))
   (:method ((mac mac) (pkt mac-packet))
@@ -112,7 +125,15 @@
         (call-next-method))))
 
 (defgeneric to-radio(mac entity)
-  (:documentation "Send packet to radio layer")
+  (:documentation "* Arguments
+
+- mac :: a [[mac]] module instance
+- entity :: a [[radio-control-command]] or [[mac-packet]]
+   or a cons of a control command and arguments
+
+* Description
+
+Send a packet or control command to a [[radio]] module via the radio gate.")
   (:method((module mac) (command communications-control-command))
     (assert (typep command 'radio-control-command))
     (send module command 'radio))
@@ -161,4 +182,12 @@
      nil)))
 
 (defgeneric attempt-tx(module &optional description)
-  (:documentation "Attempt to transmit next packet. Description added to tracelog if present."))
+  (:documentation "* Arguments
+
+- module :: a [[wsn-module]] (usually a [[mac]] instance)
+- description :: a /string/
+
+* Description
+
+Attempt to transmit next packet in /packet-buffer/ from
+  /module/. Description added to tracelog if present."))

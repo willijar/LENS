@@ -30,38 +30,36 @@
 
 (register-signal
  'packet-receive
- "Emitted when application receives a packet.")
+ "Emitted when an application receives a packet.")
 
 (register-signal
  'packet-send
- "Emitted when application sends a packet.")
+ "Emitted when an application entity sends a packet.")
 
 (defclass app-net-control-info()
   ((RSSI :type float :initarg :RSSI :reader RSSI :initform nil
-         :documentation "the RSSI of the received packet")
+         :documentation "Received signal strength indicator (RSSI) of the received packet")
    (LQI :type float :initarg :LQI :reader LQI :initform nil
-        :documentation "the LQI of the received packet")
+        :documentation "Link Quality Indicator (LQI) of the received packet")
    (source :initarg :source :reader source
-           :documentation "the routing layer source of the received packet")
+           :documentation "Routing layer source address of the received packet")
    (destination
     :initarg :destination :reader destination
-    :documentation "the routing layer dest of the packet to be sent"))
-  (:documentation "We need to pass information between app and communication
- layer which is external to the packet i.e. not carried by a real
- packet (e.g., which is the destination, or what was the RSSI for the
- packet received) but this information is related to the specific
- packet."))
+    :documentation "Routing layer destination address of the packet to be sent"))
+  (:documentation "Information passed between application and
+ communication layer which is external to the packet i.e. not carried
+ by a real packet (the source and destination addresses and quality
+ measures of received signal for the packet)"))
 
 (defclass application-packet(packet)
   ((name
     :initarg :applicationid :reader applicationid
-    :documentation "virtual app uses application ID to filter packet delivery.")
-   (lens::encapsulated-packet
-    :type t :initarg :payload :reader payload
-    :documentation "Higher level encapsulated protocol packet.")
-   (sequence-number :initarg :seqnum :initarg :sequence-number
-                    :reader sequence-number :reader sequence-number
-                    :documentation "a field to distinguish between packets")
+    :documentation "Used to filter packet delivery to specific applications.")
+   (lens::encapsulated-packet :reader payload) ;; add in payload reader
+   (sequence-number
+    :initarg :seqnum :initarg :sequence-number
+    :reader sequence-number :reader sequence-number
+    :documentation "A field to distinguish between packets")
    (byte-length :type fixnum :initarg :byte-length :reader byte-length
                 :initform 20))
   (:documentation "A generic application packet. If defining your own
@@ -83,38 +81,44 @@
 
 (defclass application(wsn-module)
   ((owner :reader node)
-   (applicationid :parameter t :type symbol :initform nil
-                  :initarg :id :reader applicationid)
+   (applicationid
+    :parameter t :type symbol :initform nil
+    :initarg :id :reader applicationid
+    :documentation "Used to filter packet delivery to specific applications.")
    (priority :parameter t :type integer :initarg :priority :initform 1
-             :reader priority)
+             :reader priority
+             :documentation "What priority to give the application packets")
    (header-overhead
     :parameter t  :initform 8
     :type integer :initarg :header-overhead :reader header-overhead
-    :documentation "in bytes")
+    :documentation "Size of application packet header in bytes")
    (payload-overhead
     :parameter t :initform 12
     :type integer :initarg :payload-overhead :reader payload-overhead
-    :documentation "in bytes")
-   (last-sequence-number :initform -1 :type integer))
+    :documentation "Size of application packet payload in bytes")
+   (last-sequence-number
+    :initform -1 :type integer
+    :documentation "Sequence number of last packet sent"))
   (:gates
    (network :inout)
    (sensor :inout 0))
   (:properties
    :statistic (latency
                :source (latency packet-receive)
-               :title "application latency"
+               :title "Application Latency"
                :default ((histogram :min 0  :unit "s" :format "~3@/dfv:eng/")))
-   :statistic (packet-receive :title "application packets received"
+   :statistic (packet-receive :title "Application Packets Received"
                               :default (count))
    :statistic (packet-receive-per-node
-               :title "packets received per node"
+               :title "Packets received per source node"
                :source (source (control-info packet-receive))
                :default (indexed-count))
-   :statistic (packet-send :title "application packets sent"
+   :statistic (packet-send :title "Application Packets Sent"
                            :default (count)))
   (:metaclass module-class)
-  (:documentation "Application core module connects to sensors for measurements
-  and to communication module for sending/receiving data."))
+  (:documentation "The Application core module class connects to node
+  sensors for measurements and to the node communication module for
+  sending and receiving data."))
 
 (defmethod initialize-instance :after ((application application)
                                        &key &allow-other-keys)
@@ -123,17 +127,48 @@
           (class-name (class-of application)))))
 
 (defgeneric next-sequence-number(instance)
+  (:documentation "* Arguments
+
+- instance :: a [[module]]
+
+* Description
+
+Returns the next packet sequence number to be used by a source module.")
   (:method (instance)
     (incf (slot-value instance 'last-sequence-number))))
 
 (defun sensor-request(application &optional (sensor-index 0))
-  "To be used by applications to request a sensor reading"
+  "* Arguments
+
+- application :: a [[application]]
+
+* Optional Arguments
+
+- sensor-index :: an =integer= (default 0)
+
+* Description
+
+Sends a request for a reading from /application/ to the sensor
+indicated by /sensor-index/. There may be a delay in the reading. The
+/application/ must implement [[handle-sensor-reading]] to receive the
+returned measured value."
   (send application
         (make-instance 'sensor-message :name 'sensor-request)
         (gate application 'sensor :index sensor-index :direction :output)))
 
 (defgeneric handle-sensor-reading(application measurement)
-  (:documentation "Must be implemented by applications to handle
+  (:documentation "* Arguments
+
+- application :: a [[application]]
+
+- measurement :: a [[measurement]] or a =real=
+
+* Description
+
+Called to pass a measured value from a [[sensor]] to an [[application]] module.
+It must be specialised for all applications which
+
+Must be implemented by applications to handle
   sensor readings")
   (:method(application (measurement measurement))
     (handle-sensor-reading application (measurement-value measurement)))
@@ -141,7 +176,22 @@
     (declare (ignore application measurement))))
 
 (defgeneric to-network(application entity &optional destination)
-  (:documentation "Send message, packet or data to network")
+  (:documentation "* Arguments
+
+- application :: an [[application]] or [[mac]]
+- entity      :: a [[application-packet]] or [[communications-control-command]]
+                 from an application or  [[routing-packet]] from a mac
+
+* Optional Arguments
+
+- destination :: a network routing destination address
+
+* Description
+
+Send message, packet or data to a [[routing]] module. This may be an
+[[application-packet]] or [[communications-control-command]] from an
+[[application]] module.
+")
   (:method((application application) (command communications-control-command)
            &optional destination)
     (assert (not destination))
@@ -178,6 +228,14 @@
    :byte-length (packet-size application data)))
 
 (defgeneric packet-size(application data)
+  (:documentation "* Arguments
+
+- application :: an [[application]] module
+- data :: application data
+
+* Description
+
+Returns the size in bytes to be used as the [[byte-length]] of application packets sent by /application/ when sending /data/. Default implementation returns the sum of the =header-overhead= and =payload-overhead= parameters of the /application/.")
   (:method((application application) data)
     (declare (ignore data))
     (+ (header-overhead application) (payload-overhead application))))
@@ -190,8 +248,15 @@
 (defmethod handle-message((application application) (message sensor-message))
   (handle-sensor-reading application (measurement message)))
 
-(defgeneric sink-network-address(entity)
-  (:documentation "Address of sink node for reporting applications")
+(defgeneric sink-network-address(module)
+  (:documentation "* Attributes
+
+- module :: an [[application]] or other [[wsn-module]]
+
+* Description
+
+Return the address of sink node for reporting applications. Default
+is =sink= however some applications take this as a parameter.")
   (:method((entity application)) 'sink)
   (:method((node node))
     (sink-network-address (submodule node 'application)))
@@ -199,11 +264,24 @@
     (sink-network-address (node instance))))
 
 (defgeneric parent-network-address(entity)
-    (:documentation "Address of parent node for aggregation applications")
+    (:documentation "* Attributes
+
+- entity :: an [[application]] or other [[wsn-module]]
+
+* Description
+
+Return the address of parent node for aggregation applications. Default
+is =parent= however some applications take this as a parameter.")
     (:method((entity application)) 'parent))
 
 (defgeneric sink-p(entity)
-  (:documentation "Return true if an application (or router) is a sink")
+  (:documentation "* Attributes
+
+- entity :: an [[application]] or other [[wsn-module]]
+
+* Description
+
+Return true if an application (or router) is on a sink node")
   (:method((application application))
     (eql (sink-network-address application)
          (network-address (node application))))

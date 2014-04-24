@@ -121,46 +121,83 @@
    (buffer-size :parameter t :initform 32)
 
    ;; tmac protocol parameters
-   (max-tx-retries :parameter t :initform 2 :type integer)
+   (max-tx-retries
+    :parameter t :initform 2 :type integer
+    :documentation
+    "This number of transmission attempts of a single unicast packet
+that TMAC will perform. A transmission is considered successful only
+if acknowledgment packet is received from the destination
+node. Sending an RTS packet is also considered as a transmission
+attempt. Note that this parameter does not apply to broadcast
+packets.")
    (allow-sink-sync
     :parameter t :initform t :type boolean
-    :documentation "allows sink node to start synchronisation immediately")
+    :documentation "If true allows sink node to start synchronisation
+    immediately to avoid contention interval when creating a
+    synchronisation schedule for the network, thus allowing for faster
+    synchronisation, and consequently, better throughput (especially
+    if packets need to be sent early in the simulation)")
    (use-frts
     :parameter t :initform nil :type boolean
-    :documentation "enable/disable FRTS (Future Request To Send), true
-    value not supported")
+    :documentation "enable/disable FRTS (Future Request To
+    Send). Although in the original TMAC protocol it is not supported
+    here.")
    (use-rts-cts
     :parameter t :initform t :type boolean
-    :documentation "enable/disable RTS/CTS handshake")
+    :documentation "Enable/disable RTS/CTS handshake. If disabled (not
+    in orginal TMAC) limits any transmission to a simple DATA - ACK
+    exchange between nodes without the overhead of a reservation. More
+    efficient for small packets.")
    (disable-TA-extension
     :parameter t :initform nil :type boolean
-    :documentation "disabling TA extension effectively creates an SMAC
-    protocol")
+    :documentation "Disabling TA extension effectively creates an SMAC
+    protocol if we also define an appropriate listen interval (10% of
+    the whole frame).")
    (conservative-TA
      :parameter t :initform t :type boolean
-     :documentation "conservative activation timeout - will always
+     :documentation "Conservative activation timeout - will always
      stay awake for at least 15 ms after any activity on the radio")
    (resync-time
     :parameter t :type time-type :initform 6d0
-    :documentation "time for re-sending SYNC msg, in seconds")
+    :documentation "The interval between broadcasting synchronization
+    packets (in seconds). The value of this parameter is directly
+    related to the clock drift of nodes in the simulation network. 40
+    seconds is an adequate value to use with current clock drift
+    model.")
    (contention-period
-    :parameter t :type time-type :initform 10e-3)
+    :parameter t :type time-type :initform 10e-3
+    :documentation "The duration of contention interval (i.e. interval
+    where transmissions of randomized), in milliseconds, for any
+    transmission attempt. The major effect of this parameter is to
+    avoid transmission interference from neighbouring nodes.")
    (listen-timeout
      :parameter t :type time-type :initform 15e-3
-     :documentation "15 ms, is the timeout TA (Activation event)")
+     :documentation "The duration of listen timeout(can also be called
+     activation timeout). This parameter defines the amount of time
+     which has to pass without any activity on the wireless channel in
+     order for a node to go to sleep in the current frame.")
    (wait-timeout
     :parameter t :type time-type :initform 5e-3
-    :documentation "timeout for expecting a reply to DATA or RTS packet")
+    :documentation "The duration of timeout for expecting a reply from
+    another node. This reply may be a CTS packet or an ACK packet. If
+    no reply is received after this time interval, then transmission
+    attempt is considered failed and transmission attempt counter is
+    decremented.")
    (frame-time
     :parameter t :type time-type :initform 610e-3
-    :documentation "frame time (standard = 610ms)")
+    :documentation "The length of each frame period for all nodes (in
+    milliseconds). Nodes try to synchronise the start and end of each
+    frame with a global schedule (with the possibility of more than
+    one schedules). Note that this refers to the duration of the whole
+    frame; the active and inactive portions of each frame are
+    determined dynamically and individually for each node.")
    (collision-resolution
     :parameter t :type symbol :initform 'immediate-retry
     :documentation
-    "collision resolution mechanism, choose from
-     'immediate-retry (low collision avoidance)
-     'overhearing (default)
-		 'retry-next-frame (aggressive collision avoidance)")
+    "Collision resolution mechanism, choose from
+     - immediate-retry :: Low collision avoidance - retry immediately after losing channel)
+     - overhearing  :: (default). Retry only when hear a CTS or RTS/
+		 - retry-next-frame :: Aggressive collision avoidance - retry only in next frame.")
 
    ;; implementation values
    (state :type tmac-state :reader state :initform nil)
@@ -196,7 +233,21 @@
    (transmission-timeout :initform (make-instance 'timer-message))
    (check-ta  :initform (make-instance 'timer-message))
    (carrier-sense :initform (make-instance 'timer-message)))
-  (:documentation "TMAC")
+  (:documentation "TMAC employs many techniques to keep the energy
+  consumption low (using aggressive duty cycling and synchronization)
+  while trying to keep performance (e.g. packet delivery) high by
+  adapting its duty cycle according to the traffic needs. S-MAC is a
+  predecessor of TMAC as it initiated many of the techniques but uses
+  a more rigid duty cycle. This implementation is from CASTELIA - see::
+
+ Yuri Tselishchev, Athanassios Boulis, Lavy Libman, “Experiences and
+ Lessons from Implementing a Wireless Sensor Network MAC Protocol in
+ the Castalia Simulator,” submitted to IEEE Wireless Communications &
+ Networking Conference 2010 (WCNC 2010), Sydney, Australia.
+
+The parameters for SMAC are defined in the SMAC.ini configuration
+file.
+")
   (:metaclass module-class))
 
 (defmethod startup((instance tmac))

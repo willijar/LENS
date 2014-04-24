@@ -30,13 +30,18 @@
 (defgeneric write-class-extras(class)
   (:method(class) (declare (ignore class)))
   (:method((c lens::parameter-class))
-    (writing-section ("Parameters")
-      (dolist (slot (class-direct-slots c))
-        (when (typep slot 'lens::parameter-direct-slot-definition)
+    (let ((parameter-slots
+           (mapcan
+            #'(lambda(s)
+                (when (typep s 'lens::parameter-slot)
+                  (list s)))
+            (class-direct-slots c))))
+      (writing-section ("Parameters")
+        (unless parameter-slots (write-out "None."))
+        (dolist (slot parameter-slots)
           (let ((properties (lens::slot-definition-properties slot)))
-          (write-out
-           "- ~(~A~) :: ~@[a =~(~S~)=.~] ~@[Default: =~A=.~] ~@[=Volatile=~*~]~A"
-           (lens::slot-definition-parameter-name slot)
+            (write-out
+           "- ~(~A~) :: ~@[a =~(~S~)=.~] ~@[Default: =~A=.~] ~@[=Volatile=~*~]~A"           (lens::slot-definition-parameter-name slot)
            (if (getf properties :format)
                (lens::slot-definition-format slot)
                (lens::slot-definition-type slot))
@@ -48,6 +53,7 @@
                              (doctype (eql :slot)))
   (writing-section-for-symbol (:slot (slot-definition-name slot))
     (writing-bulleted-list (write-slot-properties slot))
+    (when (typep slot 'standard-slot-definition)
     #+sbcl(if (documentation slot t)
         (write-docstring-section "Description" (documentation slot t)))
     #-sbcl
@@ -55,7 +61,7 @@
              (slot-boundp slot 'documentation)
              (documentation slot t))
         (write-docstring-section "Description" (documentation slot t)))
-    (call-next-method)))
+    (call-next-method))))
 
 (defmethod document ((sym symbol) (doctype (eql :class)))
   (let* ((c (find-class sym)))
@@ -107,3 +113,46 @@
           (writing-section ("Indirect slots")
             (dolist (slot (list-all-indirect-slots (list c)))
               (document slot :slot))))))))
+
+(defun write-preamble ()
+  "* Arguments
+None.
+* Return Value
+Ignored.
+* Description
+Writes some org instructions, intended to be placed at the start of the
+document. These specify the document's author, title, and set some
+export options."
+  (write-out "~&#+TITLE: ~A" *document-title*)
+  (write-out "~&#+AUTHOR: ~A" *document-author*)
+  (write-out "~&#+EMAIL: ~A" *document-email*)
+  (write-out "~&#+LINK: hs ~A/%s" (if (string-starts-with?
+                                       *hyperspec-root* "http:")
+                                      *hyperspec-root*
+                                      (format nil "file:~A" *hyperspec-root*)))
+  (if *document-style-sheet*
+      (write-out
+       "~&#+STYLE: <link rel=\"stylesheet\" type=\"text/css\" href=~S />"
+       *document-style-sheet*))
+  (write-out "~&#+STARTUP: showall")
+  ;; H:NNN = below this many levels deep, headings become bulleted lists
+  ;; toc:NNN = go this many levels deep in table of contents
+  (write-out "~&#+OPTIONS: toc:4 H:10 num:3 @:t tags:nil~%~%"))
+
+
+(defun lens::document-package(pkg)
+  (clod::document-package
+   pkg
+   (namestring
+   (merge-pathnames
+    (string-downcase (substitute #\- #\. (string pkg)))
+    #p"/home/willijar/dev/lisp/src/lens/doc/*.org"))
+    :author "Dr. John A.R. Williams"
+    :email "J.A.R.Williams@aston.ac.uk"
+    :brief-methods t
+    :internal-symbols? nil
+    :class-diagram t
+    :style-sheet "clod.css"
+    :lines-between-sections nil))
+
+;;(clod:document-package :lens.wsn "/home/willijar/dev/lisp/src/lens/doc/lens-wsn.org" :author "Dr. John A.R. Williams" :email "J.A.R.Williams@aston.ac.uk" :brief-methods t :internal-symbols? nil :style-sheet "clod.css" :lines-between-sections nil)

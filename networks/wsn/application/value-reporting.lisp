@@ -57,7 +57,7 @@
     :statistic (got-value :title "got value" :default (last-value)))
   (:metaclass module-class)
   (:documentation "Document class which will continually sample sensors
-and send data to 'SINK over network"))
+and send data to [[sink-network-address]] over network"))
 
 (defmethod startup((application value-reporting))
   (call-next-method)

@@ -29,36 +29,47 @@
 (in-package :lens.wsn)
 
 (deftype radio-control-command-name()
+  "The allowed radio control commands"
   '(member set-state set-mode set-tx-output set-sleep-level set-carrier-freq
           set-cca-threshold set-cs-interrupt-on set-cs-interrupt-off
           set-encoding))
 
-(deftype radio-state () '(member rx tx sleep))
+(deftype radio-state ()
+  "The allowed radio states"
+  '(member rx tx sleep))
 
 ;; signals for statistic collection
-(register-signal 'tx
-                 "TXed pkts")
+(register-signal 'tx "TXed pkts")
 (register-signal 'rx "RX pkt breakdown")
 
-(defstruct custom-modulation ;; element for storing custom snrtober.
+(defstruct custom-modulation
+  "Structure for storing custom SNtoBER."
   (snr 0.0 :type float)
   (ber 0.0 :type float))
 
-(deftype modulation-type() '(or symbol (array custom-modulation 1)))
-
 (deftype collision-model-type()
+  "Collision model types:
+- no-interference-no-collisions ::
+    Collisions and interference ignored
+- simple-collision-model ::
+    If interfering signals are larger than the noise floor
+		then this is considered catastrophic interference.
+- additive-interference-model ::
+   the default. Add up interference from other signals to determine SNR
+- complex-interference-model ::
+   not implemented.
+"
   '(member
     no-interference-no-collisions
     simple-collision-model
     additive-interference-model
     complex-interference-model))
 
-(deftype encoding-type() '(member nrz code-4b5b manchester secdec))
-
 (defstruct rx-mode
+  "Structure represents a single rx-mode read from radio definition."
   (name nil :type symbol)
   (data-rate 0.0 :type real)
-  (modulation 'ideal :type modulation-type)
+  (modulation 'ideal)
   (bits-per-symbol 1 :type fixnum)
   (bandwidth 0.0 :type float)
   (noise-bandwidth 0.0 :type float)
@@ -67,33 +78,40 @@
   (power-consumed 0.0 :type float))
 
 (defstruct received-signal
+  "Structure storing informstion on a single received signal"
   src ;; used to distingish between signals e.g. node or radio id
   (power-dbm 0.0 :type float)
-  (modulation 'ideal :type modulation-type)
-  (encoding 'nrz :type encoding-type)
+  (modulation 'ideal)
+  (encoding 'nrz)
   (current-interference 0.0 :type float) ;; in dbm
   (max-interference 0.0 :type float) ;; in dbm
   (bit-errors 0 :type (or fixnum t)))
 
 (defstruct total-power-received
+  "Structure recoding recent changes in power level."
   (power-dbm 0.0 :type float)
   (start-time 0d0 :type time-type))
 
 (defstruct transition-element
+  "Structure storing state transition information for radios from radio definition"
   (delay 0d0 :type time-type)
   (power 0.0 :type float)) ;; in mW
 
 (defstruct sleep-level
+   "Structure represents a single sleep-mode read from radio definition."
   (name nil :type symbol)
   (power 0.0 :type float)
   (up (make-transition-element) :type (or transition-element nil))
   (down (make-transition-element) :type (or transition-element nil)))
 
 (defstruct tx-level
+  "Structure mapping power consumed to output power from radio definition."
   (output-power 0.0 :type float) ;; in dbm
   (power-consumed 0.0 :type float)) ;; in W
 
-(deftype cca-result() '(member clear busy cs-not-valid cs-not-valid-yet))
+(deftype cca-result()
+  "Possible results from carrier-sense"
+  '(member clear busy cs-not-valid cs-not-valid-yet))
 
 (defclass radio(comms-module)
   ((address :parameter t :type integer :reader mac-address
@@ -125,7 +143,7 @@
     :accessor carrier-frequency
     :properties (:units "Hz")
     :documentation "the carrier frequency (in Hz) to begin with.")
-   (encoding :initform 'NRZ :type encoding-type :reader encoding)
+   (encoding :initform 'NRZ :reader encoding)
    (collision-model
     :type symbol :parameter t :initform 'additive-interference-model
     :reader collision-model
@@ -208,7 +226,16 @@
                :default (indexed-count))
    :statistic (tx
                :title "TXed pkts" :default (count)))
-  (:metaclass module-class))
+  (:metaclass module-class)
+  (:documentation "Radio implementation for WSN networks. The radio
+  characteristics are read from a configuration file specified in the
+  [[parameters-file]] parameter. This implements radio interference
+  models by using [[wireless-signal-start]] and
+  [[wireless-signal-end]] messages from wireless channel to determine
+  if received signal can be passsed up to mac layer. MAC layer packets
+  received for transmission are buffered. [[radio-command-message]]
+  messages received from MAC can be used to switch between radio
+  states etc."))
 
 (defmethod (setf rx-mode)((new-mode rx-mode) (radio radio))
   "If we change rx-mode we may change data rate and need to inform upper levels"
@@ -383,12 +410,10 @@
            (ecase (collision-model radio)
              (no-interference-no-collisions
               (rx-mode-noise-floor rx-mode))
-             (additive-interference-model ;; the default
+             (additive-interference-model
               (total-power-received-power-dbm
                (first (total-power-received radio))))
              (simple-collision-model
-              ;; if other received signals are larger than the noise floor
-					    ;; then this is considered catastrophic interference.
               (if (> (total-power-received-power-dbm
                       (first (total-power-received radio)))
                      (rx-mode-noise-floor rx-mode))
@@ -638,7 +663,6 @@
 (defmethod handle-control-command((radio radio)
                                   (command (eql 'set-encoding))
                                   (new-coding symbol))
-   (check-type new-coding encoding-type)
    (setf (slot-value radio 'encoding) new-coding))
 
 (defun delay-state-transition(radio delay)
@@ -738,7 +762,14 @@
       tx-time)))
 
 (defgeneric update-total-power-received(radio value)
-  (:documentation "Update the history of total power received."))
+  (:documentation "* Arguments
+
+- radio :: a [[radio]] implementation
+- value :: a real or [[received-signal]]
+
+* Description
+
+Update the history of total power received on the /radio/."))
 
 (defmethod update-total-power-received(radio (new-power number))
   (push
@@ -777,8 +808,17 @@
      (total-power-received radio))))
 
 (defgeneric update-interference(radio received-signal arg)
-  (:documentation " Update interference of one element in the
-  receivedSignals list."))
+  (:documentation "* Arguments
+
+- radio :: a [[radio]]
+- received-signal :: a [[received-signal]]
+- arg :: a [[wireless-signal-start]] or [[received-signal]]
+
+* Description
+
+Update interference of one /received-signal/ of a radio on the basis
+of either receiving a new [[wireless-signal-start]] or when another
+[[received-signal]] has finished."))
 
 (defmethod update-interference
     (radio (received-signal received-signal) (msg wireless-signal-start))
@@ -909,7 +949,16 @@
        :finally (return bit-errors))))
 
 (defgeneric max-errors-allowed(radio encoding)
-  (:documentation "Return the maximum number of bit errors acceptable for given encoding")
+  (:documentation "* Arguments
+
+- radio :: a [[radio]]
+- encoding :: an encoding signafier
+
+* Description
+
+Return the maximum number of bit errors acceptable for given
+encoding. Default is 0 - if an errors packets not sent up to MAC
+layer.")
   (:method(radio encoding)
     (declare (ignore radio encoding))
     0))
@@ -918,7 +967,13 @@
   (reduce #'max (mapcar #'tx-level-power-consumed (tx-levels radio))))
 
 (defgeneric data-rate(entity)
-  (:documentation "The physical layer data rate in bps - needed by mac layer
+  (:documentation "* Arguments
+
+- entity :: a [[radio]] or [[mac-base]] instance
+
+* Description
+
+Return the physical layer data rate in bps - needed by mac layer
   to determine transmission times etc.")
   (:method ((radio radio))
     (rx-mode-data-rate (rx-mode radio))))
@@ -928,6 +983,13 @@
     (rx-mode-bits-per-symbol (rx-mode radio))))
 
 (defgeneric symbol-length(entity)
+  (:documentation "* Arguments
+
+- entity :: a [[radio]] or [[mac-base]]
+
+* Description
+
+Return the duration in bit lengths of physical layer symbols.")
   (:method(entity)
     (/ (bits-per-symbol entity) (data-rate entity))))
 
@@ -936,7 +998,15 @@
      (data-rate radio)))
 
 (defgeneric transition-delay(entity state1 state2)
-  (:documentation "Return the delay in going from state 1 to state 2")
+  (:documentation "* Arguments
+
+- entity :: a state machine
+- state1 :: a state representation
+- state2 :: a state representation
+
+* Description
+
+Return the delay for the transition from /state1/ to /state2/ for /entity/.")
   (:method((radio radio) (from-state symbol) (to-state symbol))
     (transition-element-delay
      (getf (getf (transitions radio) to-state) from-state))))

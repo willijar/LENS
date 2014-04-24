@@ -60,12 +60,24 @@
 
 (defconstant broadcast-network-address -1)
 (defconstant broadcast-mac-address -1)
-(defvar *simulations*
-  #p"/home/willijar/dev/lisp/src/lens/networks/wsn/simulations/")
+
+(defvar *wsn* nil "Pathname to directory of WSN simulations.")
+
+(eval-when (:compile-toplevel)
+  (setq *wsn* (merge-pathnames "../simulations/*.ini" *compile-file-truename*)))
 
 (defclass wsn-module(with-timers module)
-  ((disabled-p :initform t :initarg :disabled-p :reader disabled-p))
-  (:metaclass module-class))
+  ((disabled-p :initform t :initarg :disabled-p :reader disabled-p
+               :documentation "True if module is disabled (does not receive messages)"))
+  (:metaclass module-class)
+  (:documentation "[[wsn-module]]s represent all modules inside a
+[[node]] on thenetwork. They inherit timers from [[with-timers]]
+however the timers use [[get-simulation-time]] so that they take
+account of clock drift on the node (see the [[resources]]
+module). They subscribe to the [[node-shutdown]] and [[node-startup]]
+event signals to [[startup]] and [[shutdown]] the module All
+submodules of a node will receive this signal. For shutdown modules
+[[disabled-p]] is true."))
 
 (defmethod initialize list ((module wsn-module) &optional (stage 0))
   (case stage
@@ -75,7 +87,13 @@
   t)
 
 (defgeneric startup(module)
-  (:documentation "Called to start or restart a module")
+  (:documentation "* Arguments
+
+- module :: a [[wsn-module]]
+
+* Description
+
+Called to start a module when it receives the [[node-startup]] signal.")
   (:method :before ((module wsn-module))
     (assert (disabled-p module)
             ()
@@ -84,6 +102,13 @@
   (:method(instance) (declare (ignore instance))))
 
 (defgeneric shutdown(module)
+  (:documentation "* Arguments
+
+- module :: a [[wsn-module]]
+
+* Description
+
+Called to shutdown a module when it receives the [[node-shutdown]] signal.")
   (:method :before ((module wsn-module))
     (assert (not (disabled-p module))
             ()
@@ -92,7 +117,13 @@
   (:method(instance) (declare (ignore instance))))
 
 (defgeneric node(module)
-  (:documentation "Return the node module for a particular submodule")
+  (:documentation "* Arguments
+
+- module :: a [[wsn-module]]
+
+* Description
+
+Return the parent [[node]] module for /module//.")
   (:method((module wsn-module)) (owner module)))
 
 (defmethod receive-signal((instance wsn-module)
@@ -108,12 +139,28 @@
   (call-next-method
    instance timer (get-simulation-time instance interval) name))
 
-(defgeneric get-simulation-time(instance local-time)
-  (:documentation "Convert a local time value into a simulation time")
+(defgeneric get-simulation-time(module local-time)
+  (:documentation "* Arguments
+
+- module :: a [[wsn-module]]
+- local-time :: a [[time-type]]
+
+* Description
+
+Convert a time value /local-time/ value into a simulation time taking
+account of the clock drift for the local clock as determined by the
+[[resources]] module.")
   (:method(instance local-time)
     (get-simulation-time (submodule (node instance) 'resources) local-time)))
 
 (defgeneric get-clock(instance)
-  (:documentation "Return local absolute time")
+  (:documentation "* Arguments
+
+- module :: a [[wsn-module]]
+
+* Description
+
+Return local value for absolute time taking account of the clock drift
+for the local clock as determined by the [[resources]] module.")
   (:method(instance)
     (get-clock (submodule (node instance) 'resources))))

@@ -1,7 +1,8 @@
 #+TITLE: Lisp Educational Network Simulator (LENS)
 #+AUTHOR: Dr. John A.R. Williams
 #+EMAIL: J.A.R.Williams@aston.ac.uk
-#+OPTIONS: toc:4 H:10 @:t tags:nil
+#+OPTIONS: toc:4 H:10 num:3 @:t tags:nil
+#+OPTIONS: tex:dvipng
 #+STYLE: <link rel="stylesheet" type="text/css" href="clod.css" />
 #+LINK: hs http://www.lispworks.com/reference/HyperSpec//%s
 

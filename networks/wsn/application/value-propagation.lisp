@@ -47,8 +47,9 @@
   (:properties
    :statistic (got-value :title "got value" :default (last-value)))
   (:metaclass module-class)
-  (:documentation "Document class which will continually sample sensors
-and send data to 'SINK over network"))
+  (:documentation "Application class which will continually sample sensors
+and  will transmit maximum of its sensor reading or received
+sensor reading once over the network."))
 
 (defmethod startup((application value-propagation))
   (call-next-method)

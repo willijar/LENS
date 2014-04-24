@@ -32,5 +32,4 @@
   ()
   (:metaclass module-class)
   (:default-initargs :static-p t)
-  (:documentation "Just an alias for mobility for consistency in
-  parameter naming"))
+  (:documentation "Alias for [[mobility] ] module for no movement for consistency in naming"))

@@ -43,17 +43,22 @@
    (<=> (mac radio) (radio mac))
    (<= (radio receive) receive))
   (:metaclass compound-module-class)
-  (:documentation "Communications module"))
+  (:documentation "The Communications module for a WSN [[node]]
+  receives signals from the [[wireless-channel]] on the receive gate,
+  passes them through the [[radio]], [[mac]] and [[routing]] module
+  representing the sublayers and sends application packets to the
+  [[application]] (and visa versa)."))
 
 (defclass communications-control-message(message)
   ((name :accessor command :initarg :command
-         :documentation "Command is held as message name")
+         :documentation "Control message command name")
     (argument :accessor argument :initarg :argument
              :documentation "Additional arguments with command"))
   (:documentation "Base class for all communications control
-  messages (information going up to higher layers). We create classes
-  for these so the layers can specialize handle-message on them and
-  pick out those they need"))
+  messages (control information going from lower up to higher
+  communication layers). We create subclasses for eac layer so they
+  can specialize handle-message on them and pick out those they
+  need."))
 
 (defclass network-control-message(communications-control-message)
   ())
@@ -70,7 +75,9 @@
    (argument :accessor argument :initarg :argument
              :documentation "Additional arguments with command"))
   (:documentation "Base class for all communications control
-  commands (commands going down to lower layers."))
+  commands (commands going down from higher to lower communication
+  layers).  We create subclasses for eac layer so they can specialize
+  handle-message on them and pick out those they need."))
 
 (defclass network-control-command(communications-control-command)
   ())
@@ -90,6 +97,15 @@
                      (command c) (module c) (argument c)))))
 
 (defgeneric handle-control-command(module command argument)
-  (:documentation "Breakdown of MAC commands - return true if successful")
+  (:documentation "* Arguments
+
+- module :: a [[wsn-module]] representation a communications protocol
+- command :: a =symbol= representing the control command.
+- argument :: a =list= of other arguments associated with this command
+
+* Description
+
+Communications protocol modules should specialise this to receive and
+handle control commands from higher layers.")
   (:method(module command argument)
     (warn 'invalid-command :module module :command command :argument argument)))

@@ -42,50 +42,64 @@
   '(member sleep-interval constant multiplying exponential))
 
 (defclass tuneable-mac(mac)
-  ;; The main tuneable parameters
   ((duty-cycle
     :parameter t :type float :initform 1.0 :reader duty-cycle
-    :documentation  "listening / (sleeping+listening)")
+    :documentation "The fraction of time that the node stays on
+    listening to the channe;: listening / (sleeping+listening)")
    (listen-interval
     :parameter t :type time-type :initform 10e-3 :reader listen-interval
-    :documentation "how long do we leave the radio in listen mode, in ms")
+    :documentation "This is the time the node stays on listening each cycle.")
    (beacon-interval-fraction
     :parameter t :type float :initform 1.0 :accessor beacon-interval-fraction
-    :documentation "fraction of the sleeping interval that we send beacons")
+    :documentation "This parameter expresses the fraction of the
+    maximum beacon interval (= sleeping interval) that our beacon
+    interval actually is. The smaller this is the less energy we
+    spend, but the less chance we have to wake up a neighbour.")
    (probability-tx
     :parameter t :type float :initform 1.0 :reader probability-tx
-    :documentation "the probability of a single try of Transmission to happen")
+    :documentation "The probability of a single try of Transmission to
+    happen. This value combined with the number of retransmissions can
+    create any expected number of transmissions per node, even non
+    integer values.")
    (num-tx
     :parameter t :type integer :initform 1 :accessor num-tx
-    :documentation "when we have something to Tx, how many times we try")
+    :documentation "Number of times we try to retransmit something.")
    (random-tx-offset
     :parameter t :type time-type :initform 0d0 :accessor random-tx-offset
-    :documentation "Tx after time chosen randomly from interval [0..randomTxOffset]")
+    :documentation "We start transmitting after time chosen randomly
+    from interval [0..randomTxOffset]")
    (retx-interval
     :parameter t :type time-type :initform 0d0 :accessor retx-interval
-    :documentation "Interval between retransmissions in ms, (numTx-1) retransmissions")
+    :documentation "Interval between retransmissions.")
    (backoff-type
     :parameter t :type symbol
     :initform 'constant :accessor backoff-type
-    :documentation "sleep-interval, constant, multiplying (e.g. 1*a, 2*a, 3*a, 4*a ...), exponential (e.g. 2, 4, 8, 16, 32...)")
+    :documentation "Determines how backoff-interval is determine. Can
+    be sleep-interval, constant, multiplying (e.g. 1*a, 2*a, 3*a, 4*a
+    ...),or exponential (e.g. 2, 4, 8, 16, 32...)")
    (backoff-base-value
-    :parameter t :type time-type :initform 16d-3 :accessor backoff-base-value)
+    :parameter t :type time-type :initform 16d-3 :accessor backoff-base-value
+    :documentation "Base backoff time interval. See also [[parameter
+    backoff-type]]" )
    (csma-persistence
     :parameter t :type float :initform 0 :reader csma-persistence
     :properties (:format (number :min 0 :max 1 :coerce-to float))
-    :documentation "value in [0..1], is CSMA non-persistent, p-persistent, or 1-persistent?")
+    :documentation "Value in range [0..1], 0 is CSMA non-persistent,
+    p-persistent, or 1-persistent?")
    (tx-all-packets-in-free-channel
-    :parameter t :type boolean :initform t :reader tx-all-packets-in-free-channel
-    :documentation " if you find the channel free, tx all packets in buffer?")
+    :parameter t :type boolean :initform t
+    :reader tx-all-packets-in-free-channel
+    :documentation "If true, if you find the channel free, transmit all
+    packets in buffer")
    (sleep-during-backoff
     :parameter t :type boolean :initform nil :reader sleep-during-backoff
-    :documentation " for no dutyCycle case: sleep when backing off")
+    :documentation "For no dutyCycle case: sleep when backing off")
 
    ;;other parameters
    (header-overhead :initform 9)
    (beacon-frame-size
     :parameter t :type integer :initform 125 :reader beacon-frame-size
-    :documentation "have a big beacon, to avoid much processing
+    :documentation "Have a big beacon, to avoid much processing
     overhead, but fit at least 2 in the listening interval")
    (buffer-size :initform 32)
    (max-mac-frame-size :initform 0)
@@ -113,11 +127,28 @@
     :type message :reader send-beacons-or-data-timer
     :initform (make-instance 'timer-message :name 'send-beacons-or-data-timer)))
   (:properties
-   :statistic (mac-packet-breakdown
-               :default (indexed-count)))
-  (:documentation "Default parameter values will result in
-  non-persistent CSMA-CA behaviour")
-  (:metaclass module-class))
+   :statistic (mac-packet-breakdown :default (indexed-count)))
+  (:metaclass module-class)
+  (:documentation "A highly tuneable MAC protocol implementation with
+  broadcast communication in mind (it does not support unicast,
+  acknowledgements or RTC/CTS control packets). It can be tuned in
+  regards to its persistence and backing off policies. It can also be
+  used to duty cycle the radio and to transmit an appropriate train of
+  beacons before each data transmission to wake up potential
+  receivers (since the nodes are not aligned in their sleeping
+  schedules). It also provides several other parameterized functions
+  such as retransmissions, probabilistic transmission, and randomized
+  TX offsets.
+
+Default parameter values will result in non-persistent CSMA-CA
+  behaviour with /no/ radio duty cycling.
+
+Most parameters can be controlled by the application using
+[[mac-control-message]] messages with the commands =set-duty-cycle=,
+=set-listen-interval=, =set-beacon-interval-fraction=, =set-prob-tx=,
+=set-random-tx-offset=, =set-retx-interval=, =set-backoff-type=,
+set-backoff-base-value. See the associated module parameters for
+semantics and arguments."))
 
 (defmethod initialize-instance :after ((instance tuneable-mac)
                                        &key &allow-other-keys)

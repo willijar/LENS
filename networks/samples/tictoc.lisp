@@ -29,9 +29,11 @@
 
 (in-package :lens.samples)
 
-(defconstant +tictoc+
-  (if (boundp '+tictoc+) +tictoc+ (merge-pathnames #p"tictoc.ini" *compile-file-truename*))
-  "Pathname to the titctoc examples configuration file.")
+(defvar +tictoc+ nil  "Pathname to the titctoc examples configuration file.")
+
+(eval-when (:compile-toplevel)
+  (setq +tictoc+ (merge-pathnames #p"tictoc.ini" *compile-file-truename*)))
+
 
 (defclass Txc1(module)
   ()

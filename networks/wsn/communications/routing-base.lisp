@@ -1,4 +1,4 @@
-;; Networ/Routing layer interface and base class
+;; Network/Routing layer interface and base class
 ;; Copyright (C) 2014 Dr. John A.R. Williams
 
 ;; Author: Dr. John A.R. Williams <J.A.R.Williams@jarw.org.uk>
@@ -35,18 +35,20 @@
         :documentation "the LQI of the received packet")
    (next-hop :type integer :initarg :next-hop :accessor next-hop)
    (last-hop :type integer :initarg :last-hop :accessor last-hop))
-  (:documentation "We need to pass information between routing and MAC
-  which is external to the packet i.e. not carried by a real
+  (:documentation "Information between routing and MAC
+  which is external to but related to the packet i.e. not carried by a real
   packet (e.g., what is the next hop, or what was the RSSI for the
-  packet received) but this information is related to the specific
-  packet."))
+  packet received)."))
 
 (defclass routing-packet(wsn-packet)
   ()
   (:documentation "A generic routing packet header. An app packet will
   be encapsulated in it. If definining your own routing protocol and
   need a more specialized packet you have to create one the extends
-  this generic packet."))
+  this generic packet. [[to-mac]], [[enqueue]] and [[decapsulate]]
+  specialisations provided. [[handle-message]] implementations which
+  check destination address and forward to application and check frame
+  size etc are provided. ."))
 
 (defmethod print-object((p routing-packet) stream)
   (print-unreadable-object(p stream :type t)
@@ -77,11 +79,13 @@
   ((max-net-frame-size
     :initform 0 :type integer :parameter t :reader max-net-frame-size
     :properties (:units "B")
-    :documentation "in bytes (0 for no limit)"))
+    :documentation "The maximum packet size the routing can handle in
+    bytes (0 for no limit)"))
   (:gates
    (application :inout)
    (mac :inout))
-  (:metaclass module-class))
+  (:metaclass module-class)
+  (:documentation "Base class for all routing modules. Base implementation Provides checking of maximum frame size allowed"))
 
 (defmethod network-address((instance routing))
   (network-address (node instance)))
@@ -128,7 +132,15 @@
     (send instance (decapsulate packet) 'application)))
 
 (defgeneric to-mac(routing entity &optional next-hop-mac-address)
-  (:documentation "Send packet to mac layer")
+  (:documentation "* Arguments
+
+- routing :: a [[routing]] implementation
+- entity :: a [[message]] or [[communications-control-command]]
+- next-hop-mac-address :: MAC address for MAC layer to forward to
+
+* Description
+
+Send /entity/ from [[routing]] to [[mac]] layer module.")
   (:method((module routing) (command communications-control-command)
            &optional destination)
     (assert (and (not destination)
@@ -161,7 +173,14 @@
     application-packet))
 
 (defgeneric resolve-network-address(routing network-address)
-  (:documentation "Return  resolved mac address from given network address")
+  (:documentation "* Arguments
+
+- routing :: a [[routing]] module
+- network-address :: a network-address designator
+
+* Description
+
+Return resolved mac address from given network address")
   (:method(routing network-address)
     (declare (ignore routing))
     ;; by default mac address and network address have same values in WSN

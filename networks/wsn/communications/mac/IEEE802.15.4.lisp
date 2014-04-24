@@ -122,29 +122,95 @@
    (buffer-size :parameter t :initform 32)
 
    ;; mac specific parameters
-   (enable-slotted-csma :parameter t :type boolean :initform t)
-   (enable-cap :parameter t :type boolean :initform t)
-   (is-ffd :parameter t :type boolean :initform nil)
-   (is-pan-coordinator :parameter t :type boolean :initform nil)
+   (enable-slotted-csma
+    :parameter t :type boolean :initform t
+    :documentation "Enables the slotted version of the CSMA algorithm,
+    explained in the standard.")
+   (enable-cap
+    :parameter t :type boolean :initform t
+    :docuimentation "Enable a node to transmit DATA packets in the CAP
+    period of a frame. Control packets are transmitted only in CAP
+    regardless of this parameter's value.")
+   (is-ffd
+    :parameter t :type boolean :initform nil
+    :documentation "Is the node a full function device? These are the
+    only devices which can act as coordinators.")
+   (is-pan-coordinator
+    :parameter t :type boolean :initform nil
+    :documentation "Is the node the PAN coordinator?")
    (battery-life-extension :parameter t :type boolean :initform nil)
 
-   (frame-order :parameter t :type fixnum :initform 4)
-   (beacon-order :parameter t :type fixnum :initform 6)
-   (unit-backoff-period :parameter t :type fixnum :initform 20) ;;in symbols
-   (base-slot-duration :parameter t :type fixnum :initform 60)
+   (frame-order
+    :parameter t :type fixnum :initform 4
+    :documentation "Specifies how long is the active portion of a
+    frame, when radios are listening or transmitting. Specifically it
+    is equal to base-superframe-duration^{2 frame-order}.")
+   (beacon-order
+    :parameter t :type fixnum :initform 6
+    :documentation "Specifies how long is the full frame (active and
+    inactive). This is the period between two beacons. Specifically it
+    is equal to base-superframe-duration^{2 beacon-order}.")
+   (unit-backoff-period
+    :parameter t :type fixnum :initform 20
+    :documentation "Specifies how long is the unit of time used in
+    backing off in symbols. More specifically the standard uses a
+    exponential backoff technique and the backoff time is:
+    random(1…2backoff-exponent-1) · (unit-backoff-period ·
+    symbol-time). Backoff_exponent is a variable automatically updated
+    by the protocol.")
+   (base-slot-duration
+    :parameter t :type fixnum :initform 60
+    :documentation "Parameter used to calculate [[base-superframe-duration]]")
+   (num-superframe-slots
+    :parameter t :type fixnum :initform 16
+    :documentation "Parameter used to calculate [[base-superframe-duration]]")
    (base-superframe-duration :type fixnum)
 
-   (num-superframe-slots :parameter t :type fixnum :initform 16)
-   (min-be :parameter t :type fixnum :initform 5)
-   (max-be :parameter t :type fixnum :initform 7)
-   (max-csma-backoffs :parameter t :type fixnum :initform 4)
-   (max-frame-retries :parameter t :type fixnum :initform 2)
-   (max-lost-beacons :parameter t :type fixnum :initform 4)
-   (min-cap-length :parameter t :type fixnum :initform 440)
-   (request-gts :parameter t :type fixnum :initform 0)
+   (min-be
+    :parameter t :type fixnum :initform 5
+    :documentation "In calculating the backoff time, this is the
+    minimum value that the backoff exponent can take.")
+   (max-be
+    :parameter t :type fixnum :initform 7
+    :documentation "In calculating the backoff time, this is the
+    maximum value that the backoff exponent can take.")
+   (max-csma-backoffs
+    :parameter t :type fixnum :initform 4
+    :documentation "Maximum number of backoffs until the transmission
+    of the packet is aborted and go for another retry (if there are
+    any left).")
+   (max-frame-retries
+    :parameter t :type fixnum :initform 2
+    :documentation "Maximum number of retries until the packet is
+    considered lost and the upper layer notified.")
+   (max-lost-beacons
+    :parameter t :type fixnum :initform 4
+    :documentation "Maximum number of beacons lost until the node
+    considers itself disassociated from the PAN coordinator.")
+   (min-cap-length
+    :parameter t :type fixnum :initform 440
+    :documentation "The minimum length of CAP period when GTS is used,
+    defined in symbols.")
+   (request-gts
+    :parameter t :type fixnum :initform 0
+    :documentation "Allows a node to request a specified number of GTS
+    slots from the coordinator. If the request is successful, DATA
+    packets will be transmitted in the GTS slots assigned by the
+    coordinator These slots are assigned dynamically according to
+    availability. If no slots are available, the request will
+    fail. Note that this is an easy way for a node to statically
+    request a certain number of slots. A more dynamic solution would
+    be for the application module to instruct the MAC module how many
+    slots should it request. The current (parameter-based) solution is
+    a shortcut when we have constant application traffic and we can
+    figure out a priory an optimal way to share the slots among the
+    nodes.")
 
    ;; reception guard time
-   (guard-time :parameter t :type time-type :initform 1e-3)
+   (guard-time
+    :parameter t :type time-type :initform 1e-3
+    :documentation "Reception guard time to sue in physical
+    layer. Essential when dealing with time synchronisation.")
 
    ;; general variables
    (next-packet-try  :type integer)
@@ -214,7 +280,21 @@
                :title "Fraction of time without PAN connection"
                :default ((accumulated-time :fractional t :initial-state t
                                            :format "~,8f"))))
-  (:documentation "IEEE802.15.4 MAC implementation")
+  (:documentation "IEEE802.15.4 MAC - IEE standard for wireless low-power short range communications.
+
+Functionality implemented:
+- CSMA-CA functionality (slotted and unslotted)
+- Beacon-enabled PANs with association (auto associate)
+- Direct data transfer mode
+- Guaranteed time slots (GTS).
+
+Features that are NOT implemented:
+- Non-beacon PANs
+- Indirect data transfer mode
+- Multihop PAN topologies
+
+See The IEEE 802.15.4 standard (ver. 2006) [http://standards.ieee.org/getieee802/download/802.15.4-2006.pdf]
+")
   (:metaclass module-class))
 
 (defun ack-wait-duration(instance)

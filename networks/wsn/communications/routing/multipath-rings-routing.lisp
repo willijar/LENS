@@ -40,7 +40,9 @@
 
 (defclass multipath-rings-routing(routing)
   ((header-overhead :initform 14)
-   (setup-overhead :parameter t :type integer :initform 13 :reader setup-overhead)
+   (setup-overhead
+    :parameter t :type integer :initform 13 :reader setup-overhead
+    :documentation "The size of a specific control message to setup the rings")
    (buffer-size :initform 32)
    (max-net-frame-size :initform 0)
    (setup-frame-size
@@ -48,12 +50,32 @@
     :reader setup-frame-size)
    (setup-timeout
     :type time-type :parameter t :initform 50d-3 :initarg :setup-timeout
-    :reader setup-timeout)
+    :reader setup-timeout
+    :documentation "Specifies a timeout when the setting up of the
+    network tree (or level information) is taking place. If a
+    particular node does not receive timely information it might
+    declare it self \"not connected\" and reports this to the
+    application with a message.")
    (current-sink :initform nil :type mprings-sink :reader current-sink)
    (connected-p :type boolean :initform nil :accessor connected-p)
    (tmp-sink :initform nil :type mprings-sink
              :documentation "Used during setup"))
-  (:metaclass module-class))
+  (:metaclass module-class)
+  (:documentation "Multipath Rings Routing nodes do not have a
+  specific parent. A node just gets a level number (or ring number)
+  during setup. The first setup packet sent from the sink has level
+  0. Any node that receives it adds 1 to the level and retransmits
+  it. The process continues with every node adding 1 to the level of
+  the received packet. Eventually all connected nodes will have a
+  level number (there is also a possibility for unconnected
+  nodes). When a node wants to send a packet to the sink it does not
+  send it to a particular node but rather broadcasts it, attaching its
+  level number. Any node with a smaller level number will rebroadcast
+  it. The process continues until the sink is reached. You can see
+  with this algorithm many paths to the sink can be taken. The
+  algorithm can be more robust compared to single route algorithms but
+  if the traffic is passes a certain low threshold, congestion can
+  kill performance."))
 
 (defmethod parent-network-address((instance routing))
   (parent-network-address (submodule (node instance) 'application)))

@@ -32,16 +32,20 @@
 (in-package :lens.wsn)
 
 (defclass node(compound-module)
-  ((owner :reader network)
-   (index :reader nodeid)
-   (network-address :parameter t :reader network-address)
+  ((owner :reader network
+          :documentation "Nodes are owned by the [[wsn]] network")
+   (index :reader nodeid :documentation "Nodeid is an integer - the
+   index of the node in the network array of nodes.")
+   (network-address
+    :parameter t :reader network-address
+    :documentation "The network address for this node. Defaults to [[nodeid]]")
    (startup-offset
     :parameter t :type time-type :initform 0.0d0 :reader startup-offset
     :documentation "Node offset startup delay in seconds")
    (startup-randomization
     :parameter t :type time-type :initform 0.05d0
     :reader startup-randomization
-    :documentation "node startup randomisation, in seconds"))
+    :documentation "Node startup delay randomisation, in seconds"))
   (:gates
    (receive :input))
   (:submodules
@@ -53,7 +57,14 @@
   (:connections
    (<=> (application network) (communications application))
    (<= (communications receive) receive))
-  (:metaclass compound-module-class))
+  (:metaclass compound-module-class)
+  (:documentation "Base class representing sensing motes on a wireless
+  sensor motes. Brings together an array of [[sensor]]s which received
+  measurements from the [[physical-process]]s being sensed, a sensing
+  [[application]] on the mote, the [[communications]] module receibing
+  messages from the global [[wireless-channell]] and implementing the
+  communications protocols, [[mobility]] handling mote movement, and a
+  [[resources]] module handling energy usages."))
 
 (defmethod print-object((node node) os)
   (print-unreadable-object(node os :type t :identity nil)
@@ -65,6 +76,7 @@
 
 (defmethod build-connections((node node))
   (call-next-method)
+  ;; connect all sensors bidirectionally to the application 'sensor gate.
   (let ((application (submodule node 'application)))
     (map nil
          #'(lambda(sensor)

@@ -101,9 +101,17 @@
 
 (flet((db-to-ratio(db) (expt 10.0 (* db 0.1))))
 (defgeneric snr2ber(encoding snr-db &optional bits-per-noise-bandwidth)
-  (:documentation "Given a particular encoding, signal to noise ratio
-  in db and the ratio of data rate to noise bandwidth calculate the
-  bit error rate")
+  (:documentation "* Arguments
+
+- encoding :: a +symbol+ or array of [[custom-coding]]
+- snr-db :: a +real+
+- bits-per-noise-bandwidth :: a +real+
+
+* Description
+
+Given a particular /encoding/, signal to noise ratio in db /snr-db/
+and the ratio of data rate to noise bandwidth
+/bits-per-noise-bandwidth/ return the bit error rate")
   (:method((encoding (eql 'fsk)) snr-db &optional bpnb)
     (* 0.5 (exp (* -0.5 (/ (db-to-ratio snr-db) bpnb)))))
   (:method((encoding (eql 'psk)) snr-db &optional bpnb)
@@ -113,7 +121,6 @@
   (:method((encoding (eql 'ideal)) snr-db &optional bpnb)
     (declare (ignore bpnb))
     (if (< snr-db +ideal-modulation-threshold+) 1.0d0 0.0d0))))
-
 
 (defun probability-of-exactly-N-errors(ber num-errors num-bits)
   (declare (double-float ber) (fixnum num-errors) (fixnum num-bits))
@@ -136,12 +143,11 @@
 (defun erfcinv(x) (erfinv (- 1d0 x)))
 
 (defun erf(x)
-  "Error function calculation
-  This is a translation of a FORTRAN program by W. J. Cody,
-  Argonne National Laboratory, NETLIB/SPECFUN, March 19, 1990.
-  The main computation evaluates near-minimax approximations
-  from 'Rational Chebyshev approximations for the error function'
-  by W. J. Cody, Math. Comp., 1969, PP. 631-638."
+  "Error function calculation. This is a translation of a FORTRAN
+  program by W. J. Cody,Argonne National Laboratory, NETLIB/SPECFUN,
+  March 19, 1990.  The main computation evaluates near-minimax
+  approximations from 'Rational Chebyshev approximations for the error
+  function' by W. J. Cody, Math. Comp., 1969, PP. 631-638."
   (let* ((xbreak 0.46875d0)
 	 (y (abs x))
 	 (result
@@ -202,6 +208,7 @@
 
 (defun erfinv(y)
   "ERFINV Inverse error function.
+
   X = ERFINV(Y) is the inverse error function for each element of X.
   The inverse error functions satisfies y = erf(x), for -1 <= y < 1
   and -inf <= x <= inf."

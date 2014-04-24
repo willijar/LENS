@@ -33,7 +33,8 @@
    (assigned-values :type read :initform nil :parameter t
                     :documentation "Assigned values in a range specification"))
   (:metaclass module-class)
-  (:documentation "Physical process where value is assigned per node"))
+  (:documentation "Simple physical process where a value is assigned
+  per node"))
 
 (defmethod measure((instance direct-node-physical-process)
                    measurand location time)
