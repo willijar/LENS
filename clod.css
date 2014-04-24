@@ -9,7 +9,7 @@
   .timestamp-kwd { color: #5f9ea0; }
   p.verse { margin-left: 3% }
   pre {
-	border: 1pt solid #AEBDCC;
+  border: 1pt solid #AEBDCC;
 	background-color: #F3F5F7;
 	padding: 5pt;
 	font-family: courier, monospace;
@@ -18,7 +18,7 @@
   }
   table { border-collapse: collapse; }
   td, th { vertical-align: top; }
-   dl { border: 3px double #ccc; padding: 0.5em; } 
+   dl { border: none; padding: 0.5em; } 
    dt { float: left; clear: left; width: auto; text-align: left; font-style: italic; font-weight: normal; padding-right: 1em; } 
   dt:after { content: " ---"; }
   dd {  margin: 0 0 0 auto; padding: 0 0 0.5em 0.5em; }
@@ -41,3 +41,4 @@
   h6 { padding: 0 0 0 0;  margin: 0 0 0 0;}
   .outline-6:  { padding: 0 0 0 0; margin: 0 0 0 0;}
   code { font-size: 80%; }
+  h7,h8 {  font-weight: bold; }
