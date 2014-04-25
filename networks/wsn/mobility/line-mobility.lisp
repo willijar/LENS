@@ -31,7 +31,7 @@
 (defclass line-mobility(mobility)
   ((start-location :type coord :reader start-location
                    :documentation "Starting location coordinate")
-   (destination
+   (destination-location
     :parameter t :type coord :initform (make-coord 1.0 1.0)
     :initarg :destination-location
     :documentation "End location coordinate.")
@@ -52,10 +52,10 @@
 
 (defmethod initialize-instance :after ((instance line-mobility)
                                        &key &allow-other-keys)
-  (with-slots(start-location distance delta location destination) instance
+  (with-slots(start-location distance delta location destination-location) instance
        (setf start-location location
-             distance       (distance location destination)
-             delta          (coord- destination location))))
+             distance       (distance location destination-location)
+             delta          (coord- destination-location location))))
 
 (defmethod initialize list ((instance line-mobility) &optional (stage 0))
   (case stage
