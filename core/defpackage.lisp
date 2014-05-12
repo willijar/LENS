@@ -58,7 +58,7 @@ the whole network is created.")
   (:use :closer-common-lisp :closer-common-lisp-user :data-format-validation)
   (:import-from :alg
                  #:enqueue #:dequeue #:make-binary-heap #:empty-p #:size
-                 #:peek)
+                 #:peek #:make-queue)
   (:shadow duration)
   (:export
    ;; common
@@ -66,7 +66,7 @@ the whole network is created.")
    #:coord+ #:coord- #:coord* #:coord-op #:distance
    #:while #:until #:filter #:for #:copy-slots #:set-slots #:reinitialise-slots
    #:range-getf #:range-list-p
-   #:queue #:make-queue #:enqueue #:dequeue #:peek #:average-queue-time #:size
+   #:queue #:make-queue #:enqueue #:dequeue #:peek #:back #:average-queue-time #:size
    #:timestamped-queue #:packet-buffer
    #:buffer-size #:buffer-size-bytes #:empty-p
    #:history-buffer #:duplicate-p
