@@ -64,16 +64,16 @@
   ((header-overhead :initform (header-overhead 'mac802.15.6-packet)
                     :allocation :class :reader header-overhead)
    ;;MAC Header fields
-   (hid :type integer :accessor hid :initarg :hid
+   (hid :type integer :accessor hid :initarg :hid :initform unconnected
         :documentation "2 last bytes of full MAC address")
-   (nid :type integer :accessor nid :initarg :hid
+   (nid :type integer :accessor nid :initarg :hid :initform unconnected
         :documentation "1 bytes short MAC address")
    ;;MAC header control fields
    ;;int protocolVersion;							//2 bits
    ;; int securityLevel enum(SecurityLevel_type);		//2 bits
    ;;int TKindex;									//1 bit
    ;;int retry;										//1 bit
-   (ack-policy :type acknowledgement-policy :initform :ack-policy
+   (ack-policy :type acknowledgement-policy :initarg :ack-policy
                :accessor ack-policy)
    (frame-type
     :type frame-type :initarg :frame-type :accessor frame-type)
@@ -214,7 +214,6 @@
    (max-mac-frame-size :parameter t :initform 1000)
    (header-overhead :parameter t :initform 7)
    (buffer-size :parameter t :initform 32)
-
    (is-hub
     :parameter t :type boolean :initform nil :reader is-hub
     :documentation "Is the node a hub (coordinator device)?")
@@ -290,7 +289,6 @@
    (polled-access-end :type integer :accessor polled-access-end)
    (posted-access-end :type integer :accessor posted-access-end)
 
-   (priority :type fixnum :accessor priority)
    (current-packet-transmissions
     :type integer :accessor current-packet-transmissions :initform 0)
    (current-packet-cs-fails
@@ -300,7 +298,7 @@
    (cw-double :type boolean :accessor cw-double :initform nil)
    (backoff-counter :type integer :initform 0 :accessor backoff-counter)
 
-   (state :type mac802.15.6-state :reader state)
+   (state :type mac802.15.6-state :reader state :initform 'setup)
    (past-sync-interval-nominal
     :type boolean :accessor past-sync-interval-nominal :initform nil)
    (sync-interval-additional-start
@@ -392,7 +390,7 @@
 (defun is-radio-sleeping(mac)
   (eql (state (radio mac)) 'sleep))
 
-(defmethod priority((mac mac))
+(defmethod priority((mac mac802.15.6))
   (priority (submodule (owner (owner mac)) 'application)))
 
 (defmethod startup((instance mac802.15.6))
@@ -418,7 +416,7 @@
       (tracelog "Selected random unconnected NID ~A" (unconnected-nid instance))
        (reinitialise-slots
         '(past-sync-interval-nominal si-nominal) instance)
-       (setf (state instance) 'setup) ))
+       (set-state instance 'setup) ))
   (reinitialise-slots
    '(send-i-ack-poll current-slot next-future-poll-slot cw-double
      backoff-counter packet-to-be-sent current-packet-transmissions
@@ -470,13 +468,13 @@
   (attempt-tx instance))
 
 (defmethod handle-timer((instance mac802.15.6) (timer (eql 'start-sleeping)))
-  (setf (state instance) 'sleep)
+  (set-state instance 'sleep)
   (to-radio  instance '(set-state . sleep))
   (setf (is-poll-period instance) nil))
 
 (defmethod handle-timer((instance mac802.15.6)
                         (timer (eql 'start-scheduled-tx-access)))
-  (setf (state instance) 'free-tx-access)
+  (set-state instance 'free-tx-access)
   (with-slots(scheduled-tx-access-end scheduled-tx-access-start) instance
     (let ((dt (* (+ scheduled-tx-access-end scheduled-tx-access-start)
                  (allocation-slot-length instance))))
@@ -487,7 +485,7 @@
 
 (defmethod handle-timer((instance mac802.15.6)
                         (timer (eql 'start-scheduled-rx-access)))
-  (setf (state instance) 'free-rx-access)
+  (set-state instance 'free-rx-access)
   (to-radio  instance '(set-state . rx))
   (with-slots(scheduled-rx-access-end scheduled-rx-access-start) instance
     (let ((dt (* (+ scheduled-rx-access-end scheduled-rx-access-start)
@@ -497,7 +495,7 @@
 
 (defmethod handle-timer((instance mac802.15.6)
                         (timer (eql 'start-posted-access)))
-  (setf (state instance) 'free-rx-access)
+  (set-state instance 'free-rx-access)
   (to-radio  instance '(set-state . rx))
   ;; reset the timer for sleeping as needed
   (with-slots((pae posted-access-end)) instance
@@ -509,7 +507,7 @@
 
 (defmethod handle-timer((instance mac802.15.6)
                         (timer (eql 'wakeup-for-beacon)))
-  (setf (state instance) 'beacon-wait)
+  (set-state instance 'beacon-wait)
   (to-radio  instance '(set-state . rx))
   (setf (is-poll-period instance) nil))
 
@@ -519,14 +517,14 @@
         (sync-interval-additional-start instance) (get-clock instance)))
 
 (defmethod handle-timer((instance mac802.15.6) (timer (eql 'start-setup)))
-  (setf (state instance) 'setup))
+  (set-state instance 'setup))
 
 (defmethod handle-timer((instance mac802.15.6) (timer (eql 'send-beacon)))
   (let ((beacon-period-length (beacon-period-length instance))
         (allocation-slot-length (allocation-slot-length instance)))
     (tracelog "BEACON SEND, next beacon in ~:/dfv:eng/s"
               (* beacon-period-length allocation-slot-length))
-    (setf (state instance) 'rap)
+    (set-state instance 'rap)
     (set-timer instance 'send-beacon
                (* beacon-period-length allocation-slot-length))
     (set-timer instance 'hub-scheduled-access
@@ -565,7 +563,7 @@
                         allocation-slot-length))))))
 
 (defmethod handle-timer((instance mac802.15.6) (timer (eql 'send-future-polls)))
-  (setf (state instance) 'free-tx-access)
+  (set-state instance 'free-tx-access)
   (setf (end-time instance)
         (+ (get-clock instance) (allocation-slot-length instance)))
   (let ((available-slots (1- (- (beacon-period-length instance)
@@ -611,7 +609,7 @@
 
 (defmethod handle-timer((instance mac802.15.6) (timer (eql 'send-poll)))
   (assert (not (empty-p (hub-poll-timers instance))))
-  (setf (state instance) 'free-rx-access)
+  (set-state instance 'free-rx-access)
   (let ((ti (dequeue (hub-poll-timers instance))))
     (to-radio
      instance
@@ -639,7 +637,7 @@
 
 (defmethod handle-timer((instance mac802.15.6)
                         (timer (eql 'hub-scheduled-access)))
-  (setf (state instance) 'free-rx-access))
+  (set-state instance 'free-rx-access))
 
 (defmethod handle-message((instance mac802.15.6) (packet routing-packet))
   ;; from routing layer
@@ -739,7 +737,7 @@
                                       allocation-slot-length) instance
             (when (or (empty-p hub-poll-timers)
                       (/= (nid packet)
-                          (nid (back (hub-poll-timers instance)))))
+                          (nid (alg:back (hub-poll-timers instance)))))
               (let ((poll-time
                      (+  frame-start-time
                          (* (1- next-future-poll-slot) allocation-slot-length)
@@ -794,11 +792,11 @@
     (setf (beacon-period-length instance)  (beacon-period-length packet)
           (rap1-length instance) (rap1-length packet))
     (when (> (rap1-length instance) 0)
-      (setf (state instance) 'rap
-            (end-time instance) (+ (get-clock instance)
-                                   (* (rap1-length instance)
-                                      (allocation-slot-length instance))
-                                   (- beacon-tx-time))))
+      (set-state instance 'rap)
+      (setf (end-time instance)
+            (+ (get-clock instance)
+               (* (rap1-length instance) (allocation-slot-length instance))
+               (- beacon-tx-time))))
     (emit instance 'mac-stats "beacons received")
     (tracelog "Beacon rx: reseting sync clock to ~As~%~Tslot=~A, beacon-period=~A slots~%~TRAP1=~D slots, RAP ends at time ~A"
               (si-nominal instance)
@@ -1156,8 +1154,8 @@
 (defun handle-poll(instance pkt)
   (cond
     ((zerop (more-data pkt))
-     (setf (state instance) 'free-tx-access
-           (is-poll-period instance) t)
+     (set-state instance 'free-tx-access)
+     (setf (is-poll-period instance) t)
      (let ((end-polled-access-slot (sequence-number pkt)))
        ;; The end of the polled access time is given as the end of an
        ;; allocation slot. We have to know the start of the whole

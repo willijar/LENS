@@ -458,8 +458,7 @@ See The IEEE 802.15.4 standard (ver. 2006) [http://standards.ieee.org/getieee802
           (set-state instance 'csma-ca)
           (continue-csma-ca instance))))
       (not-valid-yet
-       (set-timer instance 'perform-cca
-                  (slot-value instance 'phy-delay-for-valid-cs))))))
+       (set-timer instance 'perform-cca (delay-for-valid-cs instance))))))
 
 (defmethod handle-timer((instance mac802.15.4) (timer (eql 'start-sleeping)))
   (set-state instance 'sleep)

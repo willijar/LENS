@@ -73,6 +73,10 @@
   and a [[max-mac-frame-size]] specifyin largest packet size
   accepted."))
 
+(defgeneric delay-for-valid-cs(module)
+  (:documentation "Return the physical layer delay for a valid carrier sense")
+  (:method((mac mac)) (delay-for-valid-cs (radio mac))))
+
 (defmethod initialize list ((instance mac) &optional stage)
   (case stage
     (0

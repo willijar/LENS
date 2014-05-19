@@ -345,7 +345,8 @@ file.
 	;;  something on the radio while waiting to start carrier sense,
 	;;  then MAC was set to MAC_STATE_ACTIVE_SILENT. In this case we can
 	;;  not transmit and there is no point to perform carrier sense
-  (let ((state (state instance)))
+  (let ((state (state instance))
+        (cs-delay (delay-for-valid-cs instance)))
     (when (member state '(sleep active-silent))
       (return-from handle-timer))
     (unless (member state '(carrier-sense-for-tx-rts
@@ -358,15 +359,13 @@ file.
       (clear (carrier-is-clear instance))
       (busy (carrier-is-busy instance))
       (cs-not-valid-yet
-       (set-timer instance 'carrier-sense
-                  (slot-value instance 'phy-delay-for-valid-cs))
-       (tracelog "Set carrier sense timer ~:/dfv:eng/s" (slot-value instance 'phy-delay-for-valid-cs)))
+       (set-timer instance 'carrier-sense cs-delay)
+       (tracelog "Set carrier sense timer ~:/dfv:eng/s" cs-delay))
       (cs-not-valid
        (unless (eql state 'sleep)
          (to-radio instance '(set-state . rx))
-         (set-timer instance 'carrier-sense
-                    (slot-value instance 'phy-delay-for-valid-cs))
-         (tracelog "Set carrier sense timer ~:/dfv:eng/s" (slot-value instance 'phy-delay-for-valid-cs)))))))
+         (set-timer instance 'carrier-sense cs-delay)
+         (tracelog "Set carrier sense timer ~:/dfv:eng/s" cs-delay))))))
 
 (defmethod handle-timer((instance tmac) (timer (eql 'transmission-timeout)))
   (reset-default-state instance "timeout"))

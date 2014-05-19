@@ -165,6 +165,10 @@
     :type time-type :initform 1d0 :parameter t :reader avg-busy-frame
     :properties (:units "s")
     :documentation "integration time for measuring avg busy time")
+   (delay-for-valid-cs
+    :initform 0.128d-3 :type time-type :parameter t
+    :reader delay-for-valid-cs
+    :documentation "Delay to wait for a valid carrier sense")
    (avg-busy :type time-type :initform 0d0 :accessor avg-busy)
    (buffer-size :initform 16) ;; overwrite inherited default
    (wireless-channel :type gate :reader wireless-channel
@@ -199,6 +203,7 @@
    (rssi-integration-time
     :initform 1d0 :type time-type :reader rssi-integration-time
     :documentation "span of time the total received power is integrated to calculate RSSI")
+
    (cs-interrupt-message
     :type radio-control-message :reader cs-interrupt-message
     :initform (make-instance 'radio-control-message

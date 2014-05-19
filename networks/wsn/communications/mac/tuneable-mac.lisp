@@ -212,7 +212,7 @@ semantics and arguments."))
          ;; (=CSMApersistence) then we do not transmit but instead we
          ;; carrier sense yet again.
          (set-timer instance (start-cs-timer instance)
-                    (phy-delay-for-valid-cs instance)))
+                    (delay-for-valid-cs instance)))
        (t
         ;; We transmit: Reset the backoff counter, then proceed to
         ;; calculate the number of beacons required to be sent
@@ -241,7 +241,7 @@ semantics and arguments."))
         ;; performance can thus be better than p-persistent even with
         ;; high traffic and and high number of contending nodes.
         (set-timer instance (start-cs-timer instance)
-                   (phy-delay-for-valid-cs instance)))
+                   (delay-for-valid-cs instance)))
        (t
         (with-slots(backoff-times sleep-interval backoff-base-value)
             instance
@@ -266,7 +266,7 @@ semantics and arguments."))
           (to-radio instance '(set-state . sleep)))))))
     ((cs-not-valid cs-not-valid-yet)
      (set-timer instance (start-cs-timer instance)
-                (phy-delay-for-valid-cs instance))
+                (delay-for-valid-cs instance))
      (tracelog "CS not valid yet, trying again."))))
 
 (defmethod handle-message((instance tuneable-mac) (packet routing-packet))
