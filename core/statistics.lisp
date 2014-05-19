@@ -151,7 +151,7 @@ propery definitons of simulation components."
                  (nconc (list :name name :owner owner) args))
           (error "Unknown result recorder ~A" name)))))
 
-(defclass statistic-listener()
+(defclass statistic-listener(owned-object parameter-object)
   ((title :type string :reader title)
    (signal-values :type list :initform nil :accessor signal-values
                   :documentation "Cache of last signal values received")
@@ -159,6 +159,7 @@ propery definitons of simulation components."
            :documentation "Filter function for this statistic")
    (recorders :initarg :recorder :initform nil :reader recorders
               :documentation "The result recorders for this statistic"))
+  (:metaclass parameter-class)
   (:documentation "Listener class for statistic recording. Statistics
   are declared using =:statistic= property in simulation component
   definitions and created after the simulation network has been

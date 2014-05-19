@@ -381,4 +381,7 @@ must be called when the component's ownership changes.")
                    (slot-value parent 'has-local-listeners)))))))
 
 (defmethod finish ((instance entity-with-signals))
-  (map nil #'finish (listeners instance t)))
+  ;; finish any listener that is not an entity with signals
+  (map nil
+       #'(lambda(l)  (unless (typep l 'entity-with-signals) (finish l)))
+       (listeners instance t)))

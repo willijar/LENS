@@ -58,7 +58,7 @@ the whole network is created.")
   (:use :closer-common-lisp :closer-common-lisp-user :data-format-validation)
   (:import-from :alg
                  #:enqueue #:dequeue #:make-binary-heap #:empty-p #:size
-                 #:peek #:make-queue)
+                 #:peek #:make-queue #:back)
   (:shadow duration)
   (:export
    ;; common
