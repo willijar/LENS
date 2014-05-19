@@ -69,7 +69,7 @@
    ;; MAC layer
    #:mac-radio-control-info #:mac-packet #:mac #:mac-packet-breakdown
    #:to-radio #:to-network #:broadcast-mac-address
-   #:max-mac-frame-size #:mac-address #:phy-delay-for-valid-cs
+   #:max-mac-frame-size #:mac-address #:delay-for-valid-cs
    #:attempt-tx
    ;; RADIO layer
    #:sleep #:rx #:tx #:tx-time #:radio-control-command-name

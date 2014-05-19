@@ -66,12 +66,15 @@
 (eval-when (:compile-toplevel)
   (setq *wsn* (merge-pathnames "../simulations/*.ini" *compile-file-truename*)))
 
+(eval-when (:load-toplevel)
+  (setq *wsn* (merge-pathnames "../simulations/*.ini" *load-truename*)))
+
 (defclass wsn-module(with-timers module)
   ((disabled-p :initform t :initarg :disabled-p :reader disabled-p
                :documentation "True if module is disabled (does not receive messages)"))
   (:metaclass module-class)
   (:documentation "[[wsn-module]]s represent all modules inside a
-[[node]] on thenetwork. They inherit timers from [[with-timers]]
+[[node]] on the network. They inherit timers from [[with-timers]]
 however the timers use [[get-simulation-time]] so that they take
 account of clock drift on the node (see the [[resources]]
 module). They subscribe to the [[node-shutdown]] and [[node-startup]]

@@ -131,6 +131,7 @@ and returning the new signal variation.")
    (path-loss-model log-distance))
   (:properties
    :statistic (fade-depth
+               :title "Fade Depth"
                :default ((histogram :min -50.0 :max 15.0 :num-cells 14
                                     :units "dB" :format "~0@/dfv:eng/"))))
   (:metaclass compound-module-class)
