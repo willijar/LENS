@@ -601,18 +601,18 @@
        (emit radio 'power-change transition-power)
        (delay-state-transition radio transition-delay))))
 
-    ;; For the rest of the control commands we do not need to take any
-    ;; special measures, or create new messages. We just parse the
-    ;; command and assign the new value to the appropriate variable. We
-    ;; do not need to change the drawn power, or otherwise change the
-    ;; current behaviour of the radio. If the radio is transmiting we
-    ;; will continue to TX with the old power until the buffer is
-    ;; flushed and we try to TX again. If we are sleeping and change the
-    ;; sleepLevel, the power will change the next time to go to
-    ;; sleep. Only exception is RX mode where we change the power drawn,
-    ;; even though we keep receiving currently received signals as with
-    ;; the old mode. We could go and make all bitErrors = ALL_ERRORS,
-    ;; but not worth the trouble I think.
+;; For the rest of the control commands we do not need to take any
+;; special measures, or create new messages. We just parse the command
+;; and assign the new value to the appropriate variable. We do not
+;; need to change the drawn power, or otherwise change the current
+;; behaviour of the radio. If the radio is transmiting we will
+;; continue to TX with the old power until the buffer is flushed and
+;; we try to TX again. If we are sleeping and change the sleepLevel,
+;; the power will change the next time to go to sleep. Only exception
+;; is RX mode where we change the power drawn, even though we keep
+;; receiving currently received signals as with the old mode. We could
+;; go and make all bitErrors = ALL_ERRORS, but not worth the trouble I
+;; think.
 (defmethod handle-control-command((radio radio) (command (eql 'set-mode))
                                   (label symbol))
   (let ((new-mode (find label (rx-modes radio) :key #'rx-mode-name)))

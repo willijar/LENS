@@ -110,6 +110,10 @@
 (defun draw-from-pdf(pdf)
   (let*((n (lens::%genintrand (length pdf) 0))
         (v (aref pdf n)))
+    #+nil(tracelog "pdf n(~A/~A)=~A/~A"
+              (slot-value (aref (rng-map lens::*context*) 0) 'lens::seed)
+              (slot-value (aref (rng-map lens::*context*) 0) 'lens::count)
+              n (length pdf))
     (etypecase v
       (number v)
       (vector (draw-from-pdf v)))))

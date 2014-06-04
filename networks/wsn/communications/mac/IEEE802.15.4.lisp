@@ -373,7 +373,7 @@ See The IEEE 802.15.4 standard (ver. 2006) [http://standards.ieee.org/getieee802
                (+ (get-clock instance)
                   (transition-delay (radio instance) 'rx 'tx))))))
     (t ;; not PAN coordinator so wait for beacon
-     (to-radio instance '(set-state . tx))
+     (to-radio instance '(set-state . rx))
      (set-state instance 'wait-for-beacon)
      (set-timer instance 'beacon-timeout
                 (* 3 (slot-value instance 'guard-time))))))
@@ -529,7 +529,7 @@ See The IEEE 802.15.4 standard (ver. 2006) [http://standards.ieee.org/getieee802
           (setf gts-start (* (1- (gts-spec-start gts)) s))
           (setf gts-end (+ gts-start (* (gts-spec-length gts) s)))
           (setf gts-length (- gts-end gts-start))
-          (tracelog "GTS slot from ~7g to ~7g"
+          (tracelog "GTS slot from ~7:/dfv:eng/s to ~7:/dfv:eng/s"
                     (+ get-clock gts-start)
                     (+ get-clock gts-end))))))
     (cancel-timer instance 'beacon-timeout)
@@ -584,6 +584,7 @@ See The IEEE 802.15.4 standard (ver. 2006) [http://standards.ieee.org/getieee802
   (let ((ack-packet
          (make-instance
           'mac802.15.4-ack-packet
+          :name 'PAN-associate-response
           :pan-id (mac-address instance)
           :destination (source pkt))))
     (to-radio instance ack-packet)
@@ -600,6 +601,7 @@ See The IEEE 802.15.4 standard (ver. 2006) [http://standards.ieee.org/getieee802
     (let ((ack-packet
            (make-instance
             'mac802.15.4-ack-packet
+            :name 'gts-response
             :pan-id (mac-address instance)
             :destination (source pkt)
             :gts-length 0))
